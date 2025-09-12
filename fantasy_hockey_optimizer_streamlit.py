@@ -451,7 +451,7 @@ else:
         for result in daily_results:
             active_list = []
             # Tarkista että result['Active'] ei ole None
-            if result['Active'] is not None:
+            if result.get('Active') is not None:
                 for pos, players in result['Active'].items():
                     for player in players:
                         active_list.append(f"{player} ({pos})")
@@ -459,7 +459,7 @@ else:
             daily_data.append({
                 'Päivä': result['Date'],
                 'Aktiiviset pelaajat': ", ".join(active_list),
-                'Penkki': ", ".join(result['Bench']) if result['Bench'] else "Ei pelaajia penkille"
+                'Penkki': ", ".join(result.get('Bench', [])) if result.get('Bench') else "Ei pelaajia penkille"
             })
         
         daily_df = pd.DataFrame(daily_data)
@@ -547,21 +547,9 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                     # Hae päivän pelit
                     day_games = schedule_filtered[schedule_filtered['Date'] == date]
                     
-                    # Hae pelaajat, joiden joukkueelle on peli tänään
-                    available_players = []
-                    for _, game in day_games.iterrows():
-                        for team in [game['Visitor'], game['Home']]:
-                            for _, player in st.session_state['roster'].iterrows():
-                                if player['team'] == team and player['name'] not in [p['name'] for p in available_players]:
-                                    available_players.append({
-                                        'name': player['name'],
-                                        'team': team,
-                                        'positions': [p.strip() for p in player['positions'].split('/')]
-                                    })
-                    
                     # Optimoi päivän rosteri ja laske aktiiviset pelaajat
                     daily_active = 0
-                    if available_players:
+                    if not day_games.empty:
                         # Luo päiväkohtainen joukkueiden pelipäivät
                         day_team_days = {}
                         for _, game in day_games.iterrows():
@@ -578,7 +566,7 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                             day_team_days
                         )
                         for result in daily_results:
-                            if result['Active']:
+                            if result.get('Active') is not None:
                                 daily_active += sum(len(players) for players in result['Active'].values())
                     
                     original_total += daily_active
@@ -604,21 +592,9 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                     new_player_team_playing = sim_team in day_games[['Visitor', 'Home']].values
                     
                     if new_player_team_playing:
-                        # Hae pelaajat ilman uutta pelaajaa
-                        available_players_without = []
-                        for _, game in day_games.iterrows():
-                            for team in [game['Visitor'], game['Home']]:
-                                for _, player in st.session_state['roster'].iterrows():
-                                    if player['team'] == team and player['name'] not in [p['name'] for p in available_players_without]:
-                                        available_players_without.append({
-                                            'name': player['name'],
-                                            'team': team,
-                                            'positions': [p.strip() for p in player['positions'].split('/')]
-                                        })
-                        
                         # Optimoi ilman uutta pelaajaa
                         daily_active_without = 0
-                        if available_players_without:
+                        if not day_games.empty:
                             # Luo päiväkohtainen joukkueiden pelipäivät
                             day_team_days = {}
                             for _, game in day_games.iterrows():
@@ -635,27 +611,15 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                                 day_team_days
                             )
                             for result in daily_results_without:
-                                if result['Active']:
+                                if result.get('Active') is not None:
                                     daily_active_without += sum(len(players) for players in result['Active'].values())
-                        
-                        # Hae pelaajat uudella pelaajalla
-                        available_players_with = []
-                        for _, game in day_games.iterrows():
-                            for team in [game['Visitor'], game['Home']]:
-                                for _, player in new_roster.iterrows():
-                                    if player['team'] == team and player['name'] not in [p['name'] for p in available_players_with]:
-                                        available_players_with.append({
-                                            'name': player['name'],
-                                            'team': team,
-                                            'positions': [p.strip() for p in player['positions'].split('/')]
-                                        })
                         
                         # Optimoi uudella pelaajalla
                         daily_active_with = 0
                         player_is_active = False
                         player_position = None
                         
-                        if available_players_with:
+                        if not day_games.empty:
                             # Luo päiväkohtainen joukkueiden pelipäivät
                             day_team_days = {}
                             for _, game in day_games.iterrows():
@@ -672,7 +636,7 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                                 day_team_days
                             )
                             for result in daily_results_with:
-                                if result['Active']:
+                                if result.get('Active') is not None:
                                     day_active_count = sum(len(players) for players in result['Active'].values())
                                     daily_active_with = day_active_count
                                     
@@ -819,8 +783,9 @@ with st.expander("📖 Käyttöohjeet"):
     - **Älykäs vaihtojärjestelmä**: Monipaikkaiset pelaajat voidaan siirtää toiseen paikkaan, jos se mahdollistaa toisen pelaajan nostamisen penkiltä
     - **Lisää yrityksiä**: 200 yritystä löytää paras mahdollinen ratkaisu
     - **Täydellinen pelaajaseuranta**: Kaikki pelaajat (sekä aktiiviset että penkillä olevat) näytetään selkeästi
+    - **Virheenkäsittely**: Parannettu virheenkäsittely estää ohjelman kaatumisen
     """)
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.8 | Täysin uusittu monipaikkaisten pelaajien optimointi")
+st.markdown("Fantasy Hockey Optimizer Pro v3.9 | Täysin korjattu monipaikkaisten pelaajien optimointi")
