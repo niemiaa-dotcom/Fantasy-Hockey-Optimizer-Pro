@@ -192,9 +192,18 @@ else:
             # Luo pelaajien tiedot
             players_info = {}
             for _, player in roster_df.iterrows():
+                # Käsittele mahdolliset NaN-arvot ja varmista että positions on lista
+                positions_str = player['positions']
+                if pd.isna(positions_str):
+                    positions_list = []
+                elif isinstance(positions_str, str):
+                    positions_list = [p.strip() for p in positions_str.split('/')]
+                else:
+                    positions_list = positions_str  # Oletetaan että se on jo lista
+                    
                 players_info[player['name']] = {
                     'team': player['team'],
-                    'positions': [p.strip() for p in player['positions'].split('/')]
+                    'positions': positions_list
                 }
             
             # Ryhmitä pelit päivittäin
@@ -215,7 +224,7 @@ else:
                                 available_players.append({
                                     'name': player_name,
                                     'team': team,
-                                    'positions': info['positions']
+                                    'positions': info['positions']  # Tämä on nyt lista
                                 })
                 
                 # Useita yrityksiä löytää paras sijoittelu
@@ -237,9 +246,14 @@ else:
                     for player in shuffled_players:
                         placed = False
                         
+                        # Varmista että positions on lista
+                        positions_list = player['positions']
+                        if isinstance(positions_list, str):
+                            positions_list = positions_list.split('/')
+                        
                         # Yritä sijoittaa ensisijaisiin paikkoihin
                         for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                            if pos in player['positions'] and len(active[pos]) < limits[pos]:
+                            if pos in positions_list and len(active[pos]) < limits[pos]:
                                 active[pos].append(player['name'])
                                 placed = True
                                 break
@@ -247,7 +261,7 @@ else:
                         # Jos ei sijoitettu, yritä UTIL-paikkaa
                         if not placed and len(active['UTIL']) < limits['UTIL']:
                             # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
-                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
+                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
                                 active['UTIL'].append(player['name'])
                                 placed = True
                         
@@ -260,17 +274,20 @@ else:
                     all_players = []
                     for pos, players in active.items():
                         for player_name in players:
+                            # Hae pelaajan tiedot players_info:stä
+                            player_positions = players_info[player_name]['positions']
                             all_players.append({
                                 'name': player_name,
-                                'positions': players_info[player_name]['positions'],
+                                'positions': player_positions,
                                 'current_pos': pos,
                                 'active': True
                             })
                     
                     for player_name in bench:
+                        player_positions = players_info[player_name]['positions']
                         all_players.append({
                             'name': player_name,
-                            'positions': players_info[player_name]['positions'],
+                            'positions': player_positions,
                             'current_pos': None,
                             'active': False
                         })
@@ -282,12 +299,22 @@ else:
                         
                         # Käy läpi kaikki epäaktiiviset pelaajat
                         for bench_player in [p for p in all_players if not p['active']]:
+                            # Varmista että positions on lista
+                            bench_positions = bench_player['positions']
+                            if isinstance(bench_positions, str):
+                                bench_positions = bench_positions.split('/')
+                            
                             # Käy läpi kaikki aktiiviset pelaajat
                             for active_player in [p for p in all_players if p['active']]:
+                                # Varmista että positions on lista
+                                active_positions = active_player['positions']
+                                if isinstance(active_positions, str):
+                                    active_positions = active_positions.split('/')
+                                
                                 # Tarkista voiko penkkipelaaja korvata aktiivisen pelaajan
-                                if active_player['current_pos'] in bench_player['positions']:
+                                if active_player['current_pos'] in bench_positions:
                                     # Tarkista voiko aktiivinen pelaaja siirtyä toiseen paikkaan
-                                    for new_pos in active_player['positions']:
+                                    for new_pos in active_positions:
                                         # Varmista että new_pos on validi pelipaikka
                                         if new_pos != active_player['current_pos'] and new_pos in limits and len(active[new_pos]) < limits[new_pos]:
                                             # Vaihto on mahdollinen!
@@ -312,13 +339,17 @@ else:
                                 break
                     
                     # Vaihe 3: Yritä vielä kerran sijoittaa penkille jääneet pelaajat
-                    # Tämä on tärkeä korjaus - yritämme vielä kerran sijoittaa kaikki penkille jääneet
                     for player in bench.copy():  # Käytä copya, koska muokkaamme listaa
                         placed = False
                         
+                        # Varmista että positions on lista
+                        positions_list = player['positions']
+                        if isinstance(positions_list, str):
+                            positions_list = positions_list.split('/')
+                        
                         # Yritä sijoittaa ensisijaisiin paikkoihin
                         for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                            if pos in player['positions'] and len(active[pos]) < limits[pos]:
+                            if pos in positions_list and len(active[pos]) < limits[pos]:
                                 active[pos].append(player['name'])
                                 bench.remove(player['name'])
                                 placed = True
@@ -327,7 +358,7 @@ else:
                         # Jos ei sijoitettu, yritä UTIL-paikkaa
                         if not placed and len(active['UTIL']) < limits['UTIL']:
                             # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
-                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
+                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
                                 active['UTIL'].append(player['name'])
                                 bench.remove(player['name'])
                                 placed = True
