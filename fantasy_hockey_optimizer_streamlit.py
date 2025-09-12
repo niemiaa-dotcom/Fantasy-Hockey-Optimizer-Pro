@@ -32,11 +32,19 @@ schedule_file = st.sidebar.file_uploader(
     help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
 )
 
-if schedule_file:
-    schedule = pd.read_csv(schedule_file)
-    schedule['Date'] = pd.to_datetime(schedule['Date'])
-    st.session_state['schedule'] = schedule
-    st.sidebar.success("Peliaikataulu ladattu!")
+# KORJAUS: Tarkista ensin onko tiedosto ladattu
+if schedule_file is not None:
+    try:
+        schedule = pd.read_csv(schedule_file)
+        # Tarkista että DataFrame ei ole tyhjä ja sisältää tarvittavat sarakkeet
+        if not schedule.empty and 'Date' in schedule.columns:
+            schedule['Date'] = pd.to_datetime(schedule['Date'])
+            st.session_state['schedule'] = schedule
+            st.sidebar.success("Peliaikataulu ladattu!")
+        else:
+            st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää 'Date'-sarake")
+    except Exception as e:
+        st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 else:
     st.session_state['schedule'] = pd.DataFrame()
 
@@ -47,10 +55,18 @@ roster_file = st.sidebar.file_uploader(
     help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions"
 )
 
-if roster_file:
-    roster = pd.read_csv(roster_file)
-    st.session_state['roster'] = roster
-    st.sidebar.success("Rosteri ladattu!")
+# KORJAUS: Tarkista ensin onko tiedosto ladattu
+if roster_file is not None:
+    try:
+        roster = pd.read_csv(roster_file)
+        # Tarkista että DataFrame ei ole tyhjä ja sisältää tarvittavat sarakkeet
+        if not roster.empty and all(col in roster.columns for col in ['name', 'team', 'positions']):
+            st.session_state['roster'] = roster
+            st.sidebar.success("Rosteri ladattu!")
+        else:
+            st.sidebar.error("Rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions")
+    except Exception as e:
+        st.sidebar.error(f"Virhe rosterin lukemisessa: {str(e)}")
 else:
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
 
@@ -143,7 +159,10 @@ else:
 # --- PÄÄSIVU: OPTIMOINTI ---
 st.header("🚀 Rosterin optimointi")
 
-if not st.session_state['schedule'].empty and not st.session_state['roster'].empty:
+# KORJAUS: Tarkista että molemmat tiedostot on ladattu
+if st.session_state['schedule'].empty or st.session_state['roster'].empty:
+    st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi optimoinnin")
+else:
     # Suodata peliaikataulu valitulle aikavälille
     schedule_filtered = st.session_state['schedule'][
         (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
@@ -296,12 +315,25 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                             'bench': bench.copy()
                         }
                 
+                # KORJAUS: Varmista, että best_assignment ei ole None
+                if best_assignment is None:
+                    # Jos mikään sijoittelu ei ollut parempi kuin 0, luo tyhjä sijoittelu
+                    best_assignment = {
+                        'active': {
+                            'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
+                        },
+                        'bench': [p['name'] for p in available_players]
+                    }
+                
                 # KORJAUS: Varmista, että kaikki pelaajat on huomioitu
                 # Rakenna uusi lista kaikista pelaajista
                 all_player_names = [p['name'] for p in available_players]
                 active_player_names = set()
-                for pos, players in best_assignment['active'].items():
-                    active_player_names.update(players)
+                
+                # KORJAUS: Tarkista että best_assignment['active'] ei ole None
+                if best_assignment['active'] is not None:
+                    for pos, players in best_assignment['active'].items():
+                        active_player_names.update(players)
                 
                 # Päivitä penkki: kaikki pelaajat, jotka eivät ole aktiivisia
                 final_bench = [name for name in all_player_names if name not in active_player_names]
@@ -313,9 +345,10 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                 })
                 
                 # Päivitä pelaajien pelimäärät
-                for pos, players in best_assignment['active'].items():
-                    for player_name in players:
-                        player_games[player_name] += 1
+                if best_assignment['active'] is not None:
+                    for pos, players in best_assignment['active'].items():
+                        for player_name in players:
+                            player_games[player_name] += 1
             
             return daily_results, player_games
         
@@ -335,9 +368,11 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
         daily_data = []
         for result in daily_results:
             active_list = []
-            for pos, players in result['Active'].items():
-                for player in players:
-                    active_list.append(f"{player} ({pos})")
+            # KORJAUS: Tarkista että result['Active'] ei ole None
+            if result['Active'] is not None:
+                for pos, players in result['Active'].items():
+                    for player in players:
+                        active_list.append(f"{player} ({pos})")
             
             daily_data.append({
                 'Päivä': result['Date'],
@@ -481,8 +516,10 @@ with st.expander("📖 Käyttöohjeet"):
     - **Älykäs sijoittelu**: Algoritmi yrittää löytää parhaan mahdollisen sijoittelun
     - **Paikkojen vaihto**: Pelaajia voidaan siirtää paikasta toiseen vapauttaen tilaa muille
     - **Täydellinen pelaajaseuranta**: Kaikki pelaajat (sekä aktiiviset että penkillä olevat) näytetään selkeästi
+    - **Virheenkäsittely**: Tarkistukset varmistavat, että tiedostot ovat oikeassa muodossa
+    - **Varovainen käsittely**: Varmistetaan ettei yritetä käsitellä None-arvoja
     """)
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.1 | Täydellinen pelaajaseuranta")
+st.markdown("Fantasy Hockey Optimizer Pro v3.3 | Varmistettu None-arvojen käsittely")
