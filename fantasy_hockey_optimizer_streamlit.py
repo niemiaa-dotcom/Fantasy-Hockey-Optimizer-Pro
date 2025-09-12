@@ -188,197 +188,197 @@ else:
                 team_game_days[team].add(date)
         
         # Korjattu optimointifunktio
-def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=100):
-    # Luo pelaajien tiedot
-    players_info = {}
-    for _, player in roster_df.iterrows():
-        players_info[player['name']] = {
-            'team': player['team'],
-            'positions': [p.strip() for p in player['positions'].split('/')]
-        }
-    
-    # Ryhmitä pelit päivittäin
-    daily_results = []
-    player_games = {name: 0 for name in players_info.keys()}
-    
-    # Käy läpi jokainen päivä
-    for date in sorted(schedule_df['Date'].unique()):
-        # Hae päivän pelit
-        day_games = schedule_df[schedule_df['Date'] == date]
-        
-        # Hae pelaajat, joiden joukkueelle on peli tänään
-        available_players = []
-        for _, game in day_games.iterrows():
-            for team in [game['Visitor'], game['Home']]:
-                for player_name, info in players_info.items():
-                    if info['team'] == team and player_name not in [p['name'] for p in available_players]:
-                        available_players.append({
+        def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=100):
+            # Luo pelaajien tiedot
+            players_info = {}
+            for _, player in roster_df.iterrows():
+                players_info[player['name']] = {
+                    'team': player['team'],
+                    'positions': [p.strip() for p in player['positions'].split('/')]
+                }
+            
+            # Ryhmitä pelit päivittäin
+            daily_results = []
+            player_games = {name: 0 for name in players_info.keys()}
+            
+            # Käy läpi jokainen päivä
+            for date in sorted(schedule_df['Date'].unique()):
+                # Hae päivän pelit
+                day_games = schedule_df[schedule_df['Date'] == date]
+                
+                # Hae pelaajat, joiden joukkueelle on peli tänään
+                available_players = []
+                for _, game in day_games.iterrows():
+                    for team in [game['Visitor'], game['Home']]:
+                        for player_name, info in players_info.items():
+                            if info['team'] == team and player_name not in [p['name'] for p in available_players]:
+                                available_players.append({
+                                    'name': player_name,
+                                    'team': team,
+                                    'positions': info['positions']
+                                })
+                
+                # Useita yrityksiä löytää paras sijoittelu
+                best_assignment = None
+                max_active = 0
+                
+                for attempt in range(num_attempts):
+                    # Sekoita pelaajat satunnaisjärjestykseen
+                    shuffled_players = available_players.copy()
+                    np.random.shuffle(shuffled_players)
+                    
+                    # Alusta pelipaikat
+                    active = {
+                        'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
+                    }
+                    bench = []
+                    
+                    # Vaihe 1: Sijoita pelaajat ensisijaisiin paikkoihin
+                    for player in shuffled_players:
+                        placed = False
+                        
+                        # Yritä sijoittaa ensisijaisiin paikkoihin
+                        for pos in ['C', 'LW', 'RW', 'D', 'G']:
+                            if pos in player['positions'] and len(active[pos]) < limits[pos]:
+                                active[pos].append(player['name'])
+                                placed = True
+                                break
+                        
+                        # Jos ei sijoitettu, yritä UTIL-paikkaa
+                        if not placed and len(active['UTIL']) < limits['UTIL']:
+                            # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
+                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
+                                active['UTIL'].append(player['name'])
+                                placed = True
+                        
+                        # Jos ei vieläkään sijoitettu, lisää penkille
+                        if not placed:
+                            bench.append(player['name'])
+                    
+                    # Vaihe 2: Yritä parantaa sijoittelua vaihtamalla pelaajien paikkoja
+                    # Luo lista kaikista pelaajista (aktiiviset + penkki)
+                    all_players = []
+                    for pos, players in active.items():
+                        for player_name in players:
+                            all_players.append({
+                                'name': player_name,
+                                'positions': players_info[player_name]['positions'],
+                                'current_pos': pos,
+                                'active': True
+                            })
+                    
+                    for player_name in bench:
+                        all_players.append({
                             'name': player_name,
-                            'team': team,
-                            'positions': info['positions']
+                            'positions': players_info[player_name]['positions'],
+                            'current_pos': None,
+                            'active': False
                         })
-        
-        # Useita yrityksiä löytää paras sijoittelu
-        best_assignment = None
-        max_active = 0
-        
-        for attempt in range(num_attempts):
-            # Sekoita pelaajat satunnaisjärjestykseen
-            shuffled_players = available_players.copy()
-            np.random.shuffle(shuffled_players)
-            
-            # Alusta pelipaikat
-            active = {
-                'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
-            }
-            bench = []
-            
-            # Vaihe 1: Sijoita pelaajat ensisijaisiin paikkoihin
-            for player in shuffled_players:
-                placed = False
-                
-                # Yritä sijoittaa ensisijaisiin paikkoihin
-                for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                    if pos in player['positions'] and len(active[pos]) < limits[pos]:
-                        active[pos].append(player['name'])
-                        placed = True
-                        break
-                
-                # Jos ei sijoitettu, yritä UTIL-paikkaa
-                if not placed and len(active['UTIL']) < limits['UTIL']:
-                    # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
-                    if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
-                        active['UTIL'].append(player['name'])
-                        placed = True
-                
-                # Jos ei vieläkään sijoitettu, lisää penkille
-                if not placed:
-                    bench.append(player['name'])
-            
-            # Vaihe 2: Yritä parantaa sijoittelua vaihtamalla pelaajien paikkoja
-            # Luo lista kaikista pelaajista (aktiiviset + penkki)
-            all_players = []
-            for pos, players in active.items():
-                for player_name in players:
-                    all_players.append({
-                        'name': player_name,
-                        'positions': players_info[player_name]['positions'],
-                        'current_pos': pos,
-                        'active': True
-                    })
-            
-            for player_name in bench:
-                all_players.append({
-                    'name': player_name,
-                    'positions': players_info[player_name]['positions'],
-                    'current_pos': None,
-                    'active': False
-                })
-            
-            # Yritä parantaa sijoittelua
-            improved = True
-            while improved:
-                improved = False
-                
-                # Käy läpi kaikki epäaktiiviset pelaajat
-                for bench_player in [p for p in all_players if not p['active']]:
-                    # Käy läpi kaikki aktiiviset pelaajat
-                    for active_player in [p for p in all_players if p['active']]:
-                        # Tarkista voiko penkkipelaaja korvata aktiivisen pelaajan
-                        if active_player['current_pos'] in bench_player['positions']:
-                            # Tarkista voiko aktiivinen pelaaja siirtyä toiseen paikkaan
-                            for new_pos in active_player['positions']:
-                                # Varmista että new_pos on validi pelipaikka
-                                if new_pos != active_player['current_pos'] and new_pos in limits and len(active[new_pos]) < limits[new_pos]:
-                                    # Vaihto on mahdollinen!
-                                    # Poista aktiivinen pelaaja nykyisestä paikastaan
-                                    active[active_player['current_pos']].remove(active_player['name'])
-                                    # Lisää hänet uuteen paikkaan
-                                    active[new_pos].append(active_player['name'])
-                                    # Lisää penkkipelaaja vapautuneeseen paikkaan
-                                    active[active_player['current_pos']].append(bench_player['name'])
-                                    # Päivitä pelaajien tilat
-                                    active_player['current_pos'] = new_pos
-                                    bench_player['active'] = True
-                                    bench_player['current_pos'] = active_player['current_pos']
-                                    # Poista pelaaja penkilta
-                                    if bench_player['name'] in bench:
-                                        bench.remove(bench_player['name'])
-                                    improved = True
-                                    break
+                    
+                    # Yritä parantaa sijoittelua
+                    improved = True
+                    while improved:
+                        improved = False
+                        
+                        # Käy läpi kaikki epäaktiiviset pelaajat
+                        for bench_player in [p for p in all_players if not p['active']]:
+                            # Käy läpi kaikki aktiiviset pelaajat
+                            for active_player in [p for p in all_players if p['active']]:
+                                # Tarkista voiko penkkipelaaja korvata aktiivisen pelaajan
+                                if active_player['current_pos'] in bench_player['positions']:
+                                    # Tarkista voiko aktiivinen pelaaja siirtyä toiseen paikkaan
+                                    for new_pos in active_player['positions']:
+                                        # Varmista että new_pos on validi pelipaikka
+                                        if new_pos != active_player['current_pos'] and new_pos in limits and len(active[new_pos]) < limits[new_pos]:
+                                            # Vaihto on mahdollinen!
+                                            # Poista aktiivinen pelaaja nykyisestä paikastaan
+                                            active[active_player['current_pos']].remove(active_player['name'])
+                                            # Lisää hänet uuteen paikkaan
+                                            active[new_pos].append(active_player['name'])
+                                            # Lisää penkkipelaaja vapautuneeseen paikkaan
+                                            active[active_player['current_pos']].append(bench_player['name'])
+                                            # Päivitä pelaajien tilat
+                                            active_player['current_pos'] = new_pos
+                                            bench_player['active'] = True
+                                            bench_player['current_pos'] = active_player['current_pos']
+                                            # Poista pelaaja penkilta
+                                            if bench_player['name'] in bench:
+                                                bench.remove(bench_player['name'])
+                                            improved = True
+                                            break
+                                    if improved:
+                                        break
                             if improved:
                                 break
-                    if improved:
-                        break
-            
-            # Vaihe 3: Yritä vielä kerran sijoittaa penkille jääneet pelaajat
-            # Tämä on tärkeä korjaus - yritämme vielä kerran sijoittaa kaikki penkille jääneet
-            for player in bench.copy():  # Käytä copya, koska muokkaamme listaa
-                placed = False
+                    
+                    # Vaihe 3: Yritä vielä kerran sijoittaa penkille jääneet pelaajat
+                    # Tämä on tärkeä korjaus - yritämme vielä kerran sijoittaa kaikki penkille jääneet
+                    for player in bench.copy():  # Käytä copya, koska muokkaamme listaa
+                        placed = False
+                        
+                        # Yritä sijoittaa ensisijaisiin paikkoihin
+                        for pos in ['C', 'LW', 'RW', 'D', 'G']:
+                            if pos in player['positions'] and len(active[pos]) < limits[pos]:
+                                active[pos].append(player['name'])
+                                bench.remove(player['name'])
+                                placed = True
+                                break
+                        
+                        # Jos ei sijoitettu, yritä UTIL-paikkaa
+                        if not placed and len(active['UTIL']) < limits['UTIL']:
+                            # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
+                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
+                                active['UTIL'].append(player['name'])
+                                bench.remove(player['name'])
+                                placed = True
+                    
+                    # Laske aktiivisten pelaajien määrä
+                    total_active = sum(len(players) for players in active.values())
+                    
+                    # Tallenna paras sijoittelu
+                    if total_active > max_active:
+                        max_active = total_active
+                        best_assignment = {
+                            'active': active.copy(),
+                            'bench': bench.copy()
+                        }
                 
-                # Yritä sijoittaa ensisijaisiin paikkoihin
-                for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                    if pos in player['positions'] and len(active[pos]) < limits[pos]:
-                        active[pos].append(player['name'])
-                        bench.remove(player['name'])
-                        placed = True
-                        break
+                # Varmista, että best_assignment ei ole None
+                if best_assignment is None:
+                    # Jos mikään sijoittelu ei ollut parempi kuin 0, luo tyhjä sijoittelu
+                    best_assignment = {
+                        'active': {
+                            'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
+                        },
+                        'bench': [p['name'] for p in available_players]
+                    }
                 
-                # Jos ei sijoitettu, yritä UTIL-paikkaa
-                if not placed and len(active['UTIL']) < limits['UTIL']:
-                    # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
-                    if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
-                        active['UTIL'].append(player['name'])
-                        bench.remove(player['name'])
-                        placed = True
+                # Varmista, että kaikki pelaajat on huomioitu
+                # Rakenna uusi lista kaikista pelaajista
+                all_player_names = [p['name'] for p in available_players]
+                active_player_names = set()
+                
+                # Tarkista että best_assignment['active'] ei ole None
+                if best_assignment['active'] is not None:
+                    for pos, players in best_assignment['active'].items():
+                        active_player_names.update(players)
+                
+                # Päivitä penkki: kaikki pelaajat, jotka eivät ole aktiivisia
+                final_bench = [name for name in all_player_names if name not in active_player_names]
+                
+                daily_results.append({
+                    'Date': date.date(),
+                    'Active': best_assignment['active'],
+                    'Bench': final_bench
+                })
+                
+                # Päivitä pelaajien pelimäärät
+                if best_assignment['active'] is not None:
+                    for pos, players in best_assignment['active'].items():
+                        for player_name in players:
+                            player_games[player_name] += 1
             
-            # Laske aktiivisten pelaajien määrä
-            total_active = sum(len(players) for players in active.values())
-            
-            # Tallenna paras sijoittelu
-            if total_active > max_active:
-                max_active = total_active
-                best_assignment = {
-                    'active': active.copy(),
-                    'bench': bench.copy()
-                }
-        
-        # Varmista, että best_assignment ei ole None
-        if best_assignment is None:
-            # Jos mikään sijoittelu ei ollut parempi kuin 0, luo tyhjä sijoittelu
-            best_assignment = {
-                'active': {
-                    'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
-                },
-                'bench': [p['name'] for p in available_players]
-            }
-        
-        # Varmista, että kaikki pelaajat on huomioitu
-        # Rakenna uusi lista kaikista pelaajista
-        all_player_names = [p['name'] for p in available_players]
-        active_player_names = set()
-        
-        # Tarkista että best_assignment['active'] ei ole None
-        if best_assignment['active'] is not None:
-            for pos, players in best_assignment['active'].items():
-                active_player_names.update(players)
-        
-        # Päivitä penkki: kaikki pelaajat, jotka eivät ole aktiivisia
-        final_bench = [name for name in all_player_names if name not in active_player_names]
-        
-        daily_results.append({
-            'Date': date.date(),
-            'Active': best_assignment['active'],
-            'Bench': final_bench
-        })
-        
-        # Päivitä pelaajien pelimäärät
-        if best_assignment['active'] is not None:
-            for pos, players in best_assignment['active'].items():
-                for player_name in players:
-                    player_games[player_name] += 1
-    
-    return daily_results, player_games
+            return daily_results, player_games
         
         # Suorita optimointi
         with st.spinner("Optimoidaan rosteria älykkäällä algoritmilla..."):
