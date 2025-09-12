@@ -243,14 +243,10 @@ else:
                     bench = []
                     
                     # Vaihe 1: Sijoita pelaajat ensisijaisiin paikkoihin
-                    for player_dict in shuffled_players:
+                    for player_info in shuffled_players:
                         placed = False
-                        player_name = player_dict['name']
-                        positions_list = player_dict.get('positions', [])
-                        
-                        # Varmista että positions on lista
-                        if isinstance(positions_list, str):
-                            positions_list = positions_list.split('/')
+                        player_name = player_info['name']
+                        positions_list = player_info['positions']  # Tämä on jo lista
                         
                         # Yritä sijoittaa ensisijaisiin paikkoihin
                         for pos in ['C', 'LW', 'RW', 'D', 'G']:
@@ -300,17 +296,11 @@ else:
                         
                         # Käy läpi kaikki epäaktiiviset pelaajat
                         for bench_player in [p for p in all_players if not p['active']]:
-                            # Varmista että positions on lista
                             bench_positions = bench_player['positions']
-                            if isinstance(bench_positions, str):
-                                bench_positions = bench_positions.split('/')
                             
                             # Käy läpi kaikki aktiiviset pelaajat
                             for active_player in [p for p in all_players if p['active']]:
-                                # Varmista että positions on lista
                                 active_positions = active_player['positions']
-                                if isinstance(active_positions, str):
-                                    active_positions = active_positions.split('/')
                                 
                                 # Tarkista voiko penkkipelaaja korvata aktiivisen pelaajan
                                 if active_player['current_pos'] in bench_positions:
@@ -346,10 +336,6 @@ else:
                         # Hae pelaajan pelipaikat players_info:stä
                         positions_list = players_info[player_name]['positions']
                         
-                        # Varmista että positions on lista
-                        if isinstance(positions_list, str):
-                            positions_list = positions_list.split('/')
-                        
                         # Yritä sijoittaa ensisijaisiin paikkoihin
                         for pos in ['C', 'LW', 'RW', 'D', 'G']:
                             if pos in positions_list and len(active[pos]) < limits[pos]:
@@ -365,6 +351,31 @@ else:
                                 active['UTIL'].append(player_name)
                                 bench.remove(player_name)
                                 placed = True
+                    
+                    # Vaihe 4: Yritä vielä kerran sijoittaa monipaikkaiset pelaajat eri paikkoihin
+                    # Tämä on uusi vaihe, joka yrittää optimoida monipaikkaisten pelaajien sijoittelua
+                    for pos_name, pos_players in active.items():
+                        if pos_name != 'UTIL':  # Ohitetaan UTIL-paikka
+                            for player_name in pos_players:
+                                player_positions = players_info[player_name]['positions']
+                                
+                                # Jos pelaajalla on useita paikkoja, yritä siirtää hänet toiseen paikkaan
+                                # jos se mahdollistaa toisen pelaajan sijoittamisen
+                                if len(player_positions) > 1:
+                                    for other_pos in player_positions:
+                                        if other_pos != pos_name and other_pos in limits and len(active[other_pos]) < limits[other_pos]:
+                                            # Tarkista onko penkillä pelaaja, joka voisi täyttää tämän paikan
+                                            for bench_player_name in bench:
+                                                bench_player_positions = players_info[bench_player_name]['positions']
+                                                if pos_name in bench_player_positions:
+                                                    # Siirrä pelaaja toiseen paikkaan
+                                                    active[pos_name].remove(player_name)
+                                                    active[other_pos].append(player_name)
+                                                    # Siirrä penkkipelaaja aktiiviseen rosteriin
+                                                    active[pos_name].append(bench_player_name)
+                                                    bench.remove(bench_player_name)
+                                                    break
+                                            break
                     
                     # Laske aktiivisten pelaajien määrä
                     total_active = sum(len(players) for players in active.values())
@@ -800,8 +811,9 @@ with st.expander("📖 Käyttöohjeet"):
     - **Virheenkäsittely**: Tarkistukset varmistavat, että tiedostot ovat oikeassa muodossa
     - **Validit pelipaikat**: Varmistetaan että pelaajat sijoitetaan vain määriteltyihin pelipaikkoihin
     - **Tarkka simulaatio**: Simulaatio näyttää vain aktiivisen rosterin vaikutuksen, ei kaikkia pelejä
+    - **Monipaikkaisten pelaajien optimointi**: Algoritmi osaa nyt hyödyntää pelaajien useita pelipaikkoja paremmin
     """)
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.6 | Korjattu DataFrame-käsittely")
+st.markdown("Fantasy Hockey Optimizer Pro v3.7 | Paranneltu monipaikkaisten pelaajien optimointi")
