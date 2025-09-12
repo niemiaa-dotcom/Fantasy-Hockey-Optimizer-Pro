@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import plotly.express as px
 from datetime import datetime, timedelta
 
 # Aseta sivun konfiguraatio
@@ -114,7 +113,7 @@ with col1:
     
 with col2:
     d_limit = st.number_input("Puolustajat (D)", 4, 1, 8)
-    g_limit = st.number_number_input("Maalivahdit (G)", 2, 1, 4)
+    g_limit = st.number_input("Maalivahdit (G)", 2, 1, 4)
     util_limit = st.number_input("UTIL-paikat", 1, 0, 3)
 
 pos_limits = {
@@ -137,13 +136,7 @@ else:
     # Joukkueiden jakauma
     st.subheader("Joukkueiden jakauma")
     team_counts = st.session_state['roster']['team'].value_counts()
-    fig_team = px.bar(
-        x=team_counts.index, 
-        y=team_counts.values,
-        labels={'x': 'Joukkue', 'y': 'Pelaajia'},
-        title="Pelaajien määrä per joukkue"
-    )
-    st.plotly_chart(fig_team, use_container_width=True)
+    st.bar_chart(team_counts)
 
 # --- PÄÄSIVU: OPTIMOINTI ---
 st.header("🚀 Rosterin optimointi")
@@ -275,7 +268,7 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
             mime='text/csv'
         )
         
-        # Visualisoinnit
+        # Visualisoinnit (ilman plotlya)
         st.subheader("📈 Analyysit")
         
         col1, col2 = st.columns(2)
@@ -283,16 +276,8 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
         with col1:
             # Top 10 pelaajaa
             top_players = games_df.head(10)
-            fig_top = px.bar(
-                top_players,
-                x='Pelit',
-                y='Pelaaja',
-                orientation='h',
-                title="Top 10 eniten pelanneet pelaajat",
-                color='Pelit',
-                color_continuous_scale='Blues'
-            )
-            st.plotly_chart(fig_top, use_container_width=True)
+            st.write("Top 10 eniten pelanneet pelaajat")
+            st.dataframe(top_players)
         
         with col2:
             # Pelipaikkojen jakauma
@@ -311,13 +296,8 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                 'Pelit': list(position_data.values())
             })
             
-            fig_pos = px.pie(
-                pos_df,
-                values='Pelit',
-                names='Pelipaikka',
-                title="Pelipaikkojen kokonaispelimäärät"
-            )
-            st.plotly_chart(fig_pos, use_container_width=True)
+            st.write("Pelipaikkojen kokonaispelimäärät")
+            st.dataframe(pos_df)
 
 # --- SIMULOINTI ---
 st.header("🔮 Simuloi rosterimuutoksia")
