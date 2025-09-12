@@ -32,21 +32,25 @@ schedule_file = st.sidebar.file_uploader(
     help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
 )
 
-# KORJAUS: Tarkista ensin onko tiedosto ladattu
+# Alusta session muuttujat
+if 'schedule' not in st.session_state:
+    st.session_state['schedule'] = pd.DataFrame()
+if 'roster' not in st.session_state:
+    st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
+
+# Tarkista ensin onko tiedosto ladattu
 if schedule_file is not None:
     try:
         schedule = pd.read_csv(schedule_file)
         # Tarkista että DataFrame ei ole tyhjä ja sisältää tarvittavat sarakkeet
-        if not schedule.empty and 'Date' in schedule.columns:
+        if not schedule.empty and all(col in schedule.columns for col in ['Date', 'Visitor', 'Home']):
             schedule['Date'] = pd.to_datetime(schedule['Date'])
             st.session_state['schedule'] = schedule
             st.sidebar.success("Peliaikataulu ladattu!")
         else:
-            st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää 'Date'-sarake")
+            st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home")
     except Exception as e:
         st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
-else:
-    st.session_state['schedule'] = pd.DataFrame()
 
 # Rosterin lataus
 roster_file = st.sidebar.file_uploader(
@@ -55,7 +59,7 @@ roster_file = st.sidebar.file_uploader(
     help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions"
 )
 
-# KORJAUS: Tarkista ensin onko tiedosto ladattu
+# Tarkista ensin onko tiedosto ladattu
 if roster_file is not None:
     try:
         roster = pd.read_csv(roster_file)
@@ -67,8 +71,6 @@ if roster_file is not None:
             st.sidebar.error("Rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions")
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lukemisessa: {str(e)}")
-else:
-    st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
@@ -120,10 +122,13 @@ today = datetime.now().date()
 start_date = st.sidebar.date_input("Alkupäivä", today - timedelta(days=30))
 end_date = st.sidebar.date_input("Loppupäivä", today)
 
+# Tarkista että päivämäärät ovat järkevät
+if start_date > end_date:
+    st.sidebar.error("Aloituspäivä ei voi olla loppupäivän jälkeen")
+
 # Pelipaikkojen rajoitukset
 st.sidebar.subheader("Pelipaikkojen rajoitukset")
 col1, col2 = st.sidebar.columns(2)
-
 with col1:
     c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=3)
     lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=3)
@@ -145,7 +150,6 @@ pos_limits = {
 
 # --- PÄÄSIVU: ROSTERIN NÄYTTÖ ---
 st.header("📊 Nykyinen rosteri")
-
 if st.session_state['roster'].empty:
     st.warning("Lataa rosteri nähdäksesi pelaajat")
 else:
@@ -159,9 +163,11 @@ else:
 # --- PÄÄSIVU: OPTIMOINTI ---
 st.header("🚀 Rosterin optimointi")
 
-# KORJAUS: Tarkista että molemmat tiedostot on ladattu
+# Tarkista että molemmat tiedostot on ladattu ja päivämäärät kunnossa
 if st.session_state['schedule'].empty or st.session_state['roster'].empty:
     st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi optimoinnin")
+elif start_date > end_date:
+    st.warning("Korjaa päivämääräväli niin että aloituspäivä on ennen loppupäivää")
 else:
     # Suodata peliaikataulu valitulle aikavälille
     schedule_filtered = st.session_state['schedule'][
@@ -181,7 +187,7 @@ else:
                     team_game_days[team] = set()
                 team_game_days[team].add(date)
         
-        # KORJATTU optimointifunktio
+        # Korjattu optimointifunktio
         def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=50):
             # Luo pelaajien tiedot
             players_info = {}
@@ -212,7 +218,7 @@ else:
                                     'positions': info['positions']
                                 })
                 
-                # PARANNETTU ALGORITMI: Useita yrityksiä löytää paras sijoittelu
+                # Useita yrityksiä löytää paras sijoittelu
                 best_assignment = None
                 max_active = 0
                 
@@ -233,13 +239,13 @@ else:
                         
                         # Yritä sijoittaa ensisijaisiin paikkoihin
                         for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                            if pos in player['positions'] and pos in limits and len(active[pos]) < limits[pos]:
+                            if pos in player['positions'] and len(active[pos]) < limits[pos]:
                                 active[pos].append(player['name'])
                                 placed = True
                                 break
                         
                         # Jos ei sijoitettu, yritä UTIL-paikkaa
-                        if not placed and 'UTIL' in limits and len(active['UTIL']) < limits['UTIL']:
+                        if not placed and len(active['UTIL']) < limits['UTIL']:
                             # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
                             if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
                                 active['UTIL'].append(player['name'])
@@ -282,8 +288,8 @@ else:
                                 if active_player['current_pos'] in bench_player['positions']:
                                     # Tarkista voiko aktiivinen pelaaja siirtyä toiseen paikkaan
                                     for new_pos in active_player['positions']:
-                                        # KORJAUS: Varmista että new_pos on validi pelipaikka
-                                        if new_pos != active_player['current_pos'] and new_pos in active and len(active[new_pos]) < limits[new_pos]:
+                                        # Varmista että new_pos on validi pelipaikka
+                                        if new_pos != active_player['current_pos'] and new_pos in limits and len(active[new_pos]) < limits[new_pos]:
                                             # Vaihto on mahdollinen!
                                             # Poista aktiivinen pelaaja nykyisestä paikastaan
                                             active[active_player['current_pos']].remove(active_player['name'])
@@ -316,7 +322,7 @@ else:
                             'bench': bench.copy()
                         }
                 
-                # KORJAUS: Varmista, että best_assignment ei ole None
+                # Varmista, että best_assignment ei ole None
                 if best_assignment is None:
                     # Jos mikään sijoittelu ei ollut parempi kuin 0, luo tyhjä sijoittelu
                     best_assignment = {
@@ -326,12 +332,12 @@ else:
                         'bench': [p['name'] for p in available_players]
                     }
                 
-                # KORJAUS: Varmista, että kaikki pelaajat on huomioitu
+                # Varmista, että kaikki pelaajat on huomioitu
                 # Rakenna uusi lista kaikista pelaajista
                 all_player_names = [p['name'] for p in available_players]
                 active_player_names = set()
                 
-                # KORJAUS: Tarkista että best_assignment['active'] ei ole None
+                # Tarkista että best_assignment['active'] ei ole None
                 if best_assignment['active'] is not None:
                     for pos, players in best_assignment['active'].items():
                         active_player_names.update(players)
@@ -369,7 +375,7 @@ else:
         daily_data = []
         for result in daily_results:
             active_list = []
-            # KORJAUS: Tarkista että result['Active'] ei ole None
+            # Tarkista että result['Active'] ei ole None
             if result['Active'] is not None:
                 for pos, players in result['Active'].items():
                     for player in players:
@@ -437,17 +443,17 @@ else:
 # --- SIMULOINTI ---
 st.header("🔮 Simuloi uuden pelaajan vaikutus")
 
-if not st.session_state['roster'].empty and not schedule_filtered.empty:
+if not st.session_state['roster'].empty and not schedule_filtered.empty and start_date <= end_date:
     st.subheader("Lisää uusi pelaaja")
     
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        sim_name = st.text_input("Pelaajan nimi")
+        sim_name = st.text_input("Pelaajan nimi", key="sim_name")
     with col2:
-        sim_team = st.text_input("Joukkue")
+        sim_team = st.text_input("Joukkue", key="sim_team")
     with col3:
-        sim_positions = st.text_input("Pelipaikat (esim. C/LW)")
+        sim_positions = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions")
     
     if st.button("Simuloi pelaajan lisääminen"):
         if sim_name and sim_team and sim_positions:
@@ -481,12 +487,20 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                     # Optimoi päivän rosteri ja laske aktiiviset pelaajat
                     daily_active = 0
                     if available_players:
-                        # KORJAUS: Muuta day_games DataFrameksi oikein
+                        # Luo päiväkohtainen joukkueiden pelipäivät
+                        day_team_days = {}
+                        for _, game in day_games.iterrows():
+                            date = game['Date']
+                            for team in [game['Visitor'], game['Home']]:
+                                if team not in day_team_days:
+                                    day_team_days[team] = set()
+                                day_team_days[team].add(date)
+                        
                         daily_results = optimize_roster_advanced(
                             schedule_filtered[schedule_filtered['Date'] == date], 
                             st.session_state['roster'], 
                             pos_limits,
-                            {team: {date} for team in [game['Visitor'], game['Home']] for _, game in day_games.iterrows()}
+                            day_team_days
                         )
                         for result in daily_results:
                             if result['Active']:
@@ -504,7 +518,7 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                 new_total = 0
                 player_impact_days = 0  # Päivät, joina uusi pelaaja on aktiivinen
                 
-                # UUSI: Päiväkohtainen analyysi
+                # Päiväkohtainen analyysi
                 daily_impact_data = []
                 
                 for date in sorted(schedule_filtered['Date'].unique()):
@@ -530,12 +544,20 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                         # Optimoi ilman uutta pelaajaa
                         daily_active_without = 0
                         if available_players_without:
-                            # KORJAUS: Muuta day_games DataFrameksi oikein
+                            # Luo päiväkohtainen joukkueiden pelipäivät
+                            day_team_days = {}
+                            for _, game in day_games.iterrows():
+                                date = game['Date']
+                                for team in [game['Visitor'], game['Home']]:
+                                    if team not in day_team_days:
+                                        day_team_days[team] = set()
+                                    day_team_days[team].add(date)
+                            
                             daily_results_without = optimize_roster_advanced(
                                 schedule_filtered[schedule_filtered['Date'] == date], 
                                 st.session_state['roster'], 
                                 pos_limits,
-                                {team: {date} for team in [game['Visitor'], game['Home']] for _, game in day_games.iterrows()}
+                                day_team_days
                             )
                             for result in daily_results_without:
                                 if result['Active']:
@@ -559,12 +581,20 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                         player_position = None
                         
                         if available_players_with:
-                            # KORJAUS: Muuta day_games DataFrameksi oikein
+                            # Luo päiväkohtainen joukkueiden pelipäivät
+                            day_team_days = {}
+                            for _, game in day_games.iterrows():
+                                date = game['Date']
+                                for team in [game['Visitor'], game['Home']]:
+                                    if team not in day_team_days:
+                                        day_team_days[team] = set()
+                                    day_team_days[team].add(date)
+                            
                             daily_results_with = optimize_roster_advanced(
                                 schedule_filtered[schedule_filtered['Date'] == date], 
                                 new_roster, 
                                 pos_limits,
-                                {team: {date} for team in [game['Visitor'], game['Home']] for _, game in day_games.iterrows()}
+                                day_team_days
                             )
                             for result in daily_results_with:
                                 if result['Active']:
@@ -629,7 +659,7 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                     st.warning(f"{sim_name} ei olisi koskaan aktiivinen rosterissa valitulla aikavälillä")
                     st.info("Tämä pelaaja ei lisäisi arvoa nykyiselle rosterillesi")
                 
-                # NÄYTÄ PÄIVÄKOHTAINEN ANALYYSI
+                # Näytä päiväkohtainen analyysi
                 st.subheader("📊 Päiväkohtainen vaikutus")
                 
                 # Suodata vain ne päivät joina uusi pelaaja on aktiivinen
@@ -638,13 +668,6 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                 
                 if not active_days_df.empty:
                     st.write("Päivät joina uusi pelaaja lisäisi aktiivisen rosterin pelimäärää:")
-                    
-                    # Luo korostettu taulukko
-                    def highlight_positive_difference(val):
-                        color = 'lightgreen' if val > 0 else 'white'
-                        return f'background-color: {color}'
-                    
-                    styled_df = active_days_df.style.applymap(highlight_positive_difference, subset=['Ero'])
                     
                     # Näytä vain tärkeät sarakkeet
                     display_df = active_days_df[[
