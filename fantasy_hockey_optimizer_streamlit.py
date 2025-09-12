@@ -38,6 +38,8 @@ if 'schedule' not in st.session_state:
     st.session_state['schedule'] = pd.DataFrame()
 if 'roster' not in st.session_state:
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
+if 'team_impact_results' not in st.session_state:
+    st.session_state['team_impact_results'] = None
 
 # Tarkista ensin onko tiedosto ladattu
 if schedule_file is not None:
@@ -293,7 +295,7 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_atte
 @st.cache_data
 def simulate_team_impact(schedule_df, roster_df, limits, team_days):
     nhl_teams = sorted(list(set(schedule_df['Home'].unique()) | set(schedule_df['Visitor'].unique())))
-    positions_to_simulate = ['C', 'LW', 'RW', 'D', 'G', 'UTIL']
+    positions_to_simulate = ['C', 'LW', 'RW', 'D', 'G']
     
     impact_data = []
     
@@ -301,42 +303,52 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
         for team in nhl_teams:
             for position in positions_to_simulate:
                 
-                # Korjaus: Varmista, että pelipaikka on muodossa 'C/UTIL' jos kyseessä on UTIL-paikka
-                if position == 'UTIL':
-                    # UTIL-paikka voi olla C, LW, RW tai D
-                    positions_str = 'C/LW/RW/D'
-                else:
-                    positions_str = position
+                positions_str = position
+                sim_player_name = f"SIM_{team}_{position}"
                 
-                # Luo simuloitu pelaaja tietyllä joukkueella ja pelipaikalla
                 sim_player = pd.DataFrame([{
-                    'name': f"SIM_{team}_{position}",
+                    'name': sim_player_name,
                     'team': team,
                     'positions': positions_str
                 }])
                 
-                # Yhdistä simuloitu pelaaja nykyiseen rosteriin
                 sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
                 
-                # Optimoi rosteri uudella pelaajalla
                 _, simulated_games = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
                 
-                # Hae simuloidun pelaajan pelimäärä
-                games_played = simulated_games.get(f"SIM_{team}_{position}", 0)
+                games_played = simulated_games.get(sim_player_name, 0)
                 
                 impact_data.append({
                     'Joukkue': team,
                     'Pelipaikka': position,
                     'Pelit': games_played
                 })
+
+            if 'UTIL' in limits:
+                positions_str = 'C/LW/RW/D'
+                sim_player_name = f"SIM_{team}_UTIL"
+                
+                sim_player = pd.DataFrame([{
+                    'name': sim_player_name,
+                    'team': team,
+                    'positions': positions_str
+                }])
+                sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
+                _, simulated_games = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
+                
+                games_played = simulated_games.get(sim_player_name, 0)
+                
+                impact_data.append({
+                    'Joukkue': team,
+                    'Pelipaikka': 'UTIL',
+                    'Pelit': games_played
+                })
                 
     impact_df = pd.DataFrame(impact_data)
     
-    # Järjestä tulokset
     results_by_position = {}
-    for pos in positions_to_simulate:
+    for pos in positions_to_simulate + ['UTIL']:
         pos_df = impact_df[impact_df['Pelipaikka'] == pos].sort_values(by='Pelit', ascending=False)
-        # Poista 0-arvot
         pos_df = pos_df[pos_df['Pelit'] > 0]
         if not pos_df.empty:
             results_by_position[pos] = pos_df.head(10).reset_index(drop=True)
@@ -465,7 +477,6 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
     
     if st.button("Simuloi pelaajan lisääminen"):
         if sim_name and sim_team and sim_positions:
-            # Luo pelaaja samalla logiikalla kuin muissa simulaatioissa
             new_player_info = {
                 'name': sim_name,
                 'team': sim_team,
@@ -559,16 +570,18 @@ else:
                     team_game_days[team] = set()
                 team_game_days[team].add(date)
 
-        # Suorita analyysi
-        team_impact_results = simulate_team_impact(
-            schedule_filtered,
-            st.session_state['roster'],
-            pos_limits,
-            team_game_days
-        )
+        # UUSI: Lisätty painike, joka käynnistää analyysin
+        if st.button("Suorita joukkueanalyysi"):
+            st.session_state['team_impact_results'] = simulate_team_impact(
+                schedule_filtered,
+                st.session_state['roster'],
+                pos_limits,
+                team_game_days
+            )
         
-        # Näytä tulokset taulukoissa
-        for pos, df in team_impact_results.items():
-            st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
-            df.columns = ['Joukkue', 'Pelipaikka', 'Pelit']
-            st.dataframe(df, use_container_width=True)
+        # Näytä tulokset taulukoissa vain jos ne on laskettu ja tallennettu
+        if st.session_state['team_impact_results'] is not None:
+            for pos, df in st.session_state['team_impact_results'].items():
+                st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
+                df.columns = ['Joukkue', 'Pelipaikka', 'Pelit']
+                st.dataframe(df, use_container_width=True)
