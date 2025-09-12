@@ -187,8 +187,8 @@ else:
                     team_game_days[team] = set()
                 team_game_days[team].add(date)
         
-        # Korjattu optimointifunktio
-        def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=100):
+        # Täysin uusittu optimointifunktio monipaikkaisille pelaajille
+        def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=200):
             # Luo pelaajien tiedot
             players_info = {}
             for _, player in roster_df.iterrows():
@@ -248,14 +248,14 @@ else:
                         player_name = player_info['name']
                         positions_list = player_info['positions']  # Tämä on jo lista
                         
-                        # Yritä sijoittaa ensisijaisiin paikkoihin
-                        for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                            if pos in positions_list and len(active[pos]) < limits[pos]:
+                        # Yritä sijoittaa johonkin pelaajan pelipaikoista
+                        for pos in positions_list:
+                            if pos in limits and len(active[pos]) < limits[pos]:
                                 active[pos].append(player_name)
                                 placed = True
                                 break
                         
-                        # Jos ei sijoitettu, yritä UTIL-paikkaa
+                        # Jos ei sijoitettu mihinkään erityispaikkaan, yritä UTIL-paikkaa
                         if not placed and len(active['UTIL']) < limits['UTIL']:
                             # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
                             if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
@@ -336,15 +336,15 @@ else:
                         # Hae pelaajan pelipaikat players_info:stä
                         positions_list = players_info[player_name]['positions']
                         
-                        # Yritä sijoittaa ensisijaisiin paikkoihin
-                        for pos in ['C', 'LW', 'RW', 'D', 'G']:
-                            if pos in positions_list and len(active[pos]) < limits[pos]:
+                        # Yritä sijoittaa johonkin pelaajan pelipaikoista
+                        for pos in positions_list:
+                            if pos in limits and len(active[pos]) < limits[pos]:
                                 active[pos].append(player_name)
                                 bench.remove(player_name)
                                 placed = True
                                 break
                         
-                        # Jos ei sijoitettu, yritä UTIL-paikkaa
+                        # Jos ei sijoitettu mihinkään erityispaikkaan, yritä UTIL-paikkaa
                         if not placed and len(active['UTIL']) < limits['UTIL']:
                             # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
                             if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
@@ -352,30 +352,39 @@ else:
                                 bench.remove(player_name)
                                 placed = True
                     
-                    # Vaihe 4: Yritä vielä kerran sijoittaa monipaikkaiset pelaajat eri paikkoihin
-                    # Tämä on uusi vaihe, joka yrittää optimoida monipaikkaisten pelaajien sijoittelua
-                    for pos_name, pos_players in active.items():
-                        if pos_name != 'UTIL':  # Ohitetaan UTIL-paikka
-                            for player_name in pos_players:
-                                player_positions = players_info[player_name]['positions']
-                                
-                                # Jos pelaajalla on useita paikkoja, yritä siirtää hänet toiseen paikkaan
-                                # jos se mahdollistaa toisen pelaajan sijoittamisen
-                                if len(player_positions) > 1:
-                                    for other_pos in player_positions:
-                                        if other_pos != pos_name and other_pos in limits and len(active[other_pos]) < limits[other_pos]:
-                                            # Tarkista onko penkillä pelaaja, joka voisi täyttää tämän paikan
-                                            for bench_player_name in bench:
-                                                bench_player_positions = players_info[bench_player_name]['positions']
-                                                if pos_name in bench_player_positions:
-                                                    # Siirrä pelaaja toiseen paikkaan
-                                                    active[pos_name].remove(player_name)
-                                                    active[other_pos].append(player_name)
-                                                    # Siirrä penkkipelaaja aktiiviseen rosteriin
-                                                    active[pos_name].append(bench_player_name)
-                                                    bench.remove(bench_player_name)
-                                                    break
-                                            break
+                    # Vaihe 4: Monipaikkaisten pelaajien optimointi - UUSI PARANNUS
+                    # Käy läpi kaikki aktiiviset pelaajat ja yritä siirtää monipaikkaisia pelaajia
+                    # toiseen paikkaan, jos se mahdollistaa toisen pelaajan nostamisen penkiltä
+                    for pos_name in ['C', 'LW', 'RW', 'D', 'G']:
+                        for player_name in active[pos_name].copy():  # Käytä copya, koska muokkaamme listaa
+                            player_positions = players_info[player_name]['positions']
+                            
+                            # Jos pelaajalla on useita paikkoja, yritä siirtää häntä
+                            if len(player_positions) > 1:
+                                for other_pos in player_positions:
+                                    if other_pos != pos_name and other_pos in limits and len(active[other_pos]) < limits[other_pos]:
+                                        # Tarkista onko penkillä pelaaja, joka voisi täyttää tämän paikan
+                                        for bench_player_name in bench.copy():
+                                            bench_player_positions = players_info[bench_player_name]['positions']
+                                            
+                                            # Jos penkkipelaaja voi pelata tässä paikassa
+                                            if pos_name in bench_player_positions:
+                                                # Siirrä monipaikkainen pelaaja toiseen paikkaan
+                                                active[pos_name].remove(player_name)
+                                                active[other_pos].append(player_name)
+                                                
+                                                # Siirrä penkkipelaaja aktiiviseen rosteriin
+                                                active[pos_name].append(bench_player_name)
+                                                bench.remove(bench_player_name)
+                                                
+                                                # Päivitä all_players-lista
+                                                for p in all_players:
+                                                    if p['name'] == player_name:
+                                                        p['current_pos'] = other_pos
+                                                    elif p['name'] == bench_player_name:
+                                                        p['active'] = True
+                                                        p['current_pos'] = pos_name
+                                                break
                     
                     # Laske aktiivisten pelaajien määrä
                     total_active = sum(len(players) for players in active.values())
@@ -804,16 +813,14 @@ with st.expander("📖 Käyttöohjeet"):
        - Näet tarkalleen, kuinka monta kertaa pelaaja olisi aktiivinen
        - Näet päiväkohtaisen vaikutuksen ja parhaat päivät pelaajan käyttöön
     
-    ### Tärkeät parannukset:
-    - **Älykäs sijoittelu**: Algoritmi yrittää löytää parhaan mahdollisen sijoittelun
-    - **Paikkojen vaihto**: Pelaajia voidaan siirtää paikasta toiseen vapauttaen tilaa muille
-    - **Täydellinen pelaajaseuranta**: Kaikki pelaajat (sekä aktiiviset että penkillä olevat) näytetään selkeästi
-    - **Virheenkäsittely**: Tarkistukset varmistavat, että tiedostot ovat oikeassa muodossa
-    - **Validit pelipaikat**: Varmistetaan että pelaajat sijoitetaan vain määriteltyihin pelipaikkoihin
-    - **Tarkka simulaatio**: Simulaatio näyttää vain aktiivisen rosterin vaikutuksen, ei kaikkia pelejä
+    ### Tärkeimmät parannukset:
     - **Monipaikkaisten pelaajien optimointi**: Algoritmi osaa nyt hyödyntää pelaajien useita pelipaikkoja paremmin
+    - **Joustava sijoittelu**: Pelaaja voidaan sijoittaa mihin tahansa hänen pelipaikoistaan, johon on tilaa
+    - **Älykäs vaihtojärjestelmä**: Monipaikkaiset pelaajat voidaan siirtää toiseen paikkaan, jos se mahdollistaa toisen pelaajan nostamisen penkiltä
+    - **Lisää yrityksiä**: 200 yritystä löytää paras mahdollinen ratkaisu
+    - **Täydellinen pelaajaseuranta**: Kaikki pelaajat (sekä aktiiviset että penkillä olevat) näytetään selkeästi
     """)
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.7 | Paranneltu monipaikkaisten pelaajien optimointi")
+st.markdown("Fantasy Hockey Optimizer Pro v3.8 | Täysin uusittu monipaikkaisten pelaajien optimointi")
