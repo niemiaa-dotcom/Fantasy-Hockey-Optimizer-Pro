@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-# Set page configuration
+# Aseta sivun konfiguraatio
 st.set_page_config(
     page_title="Fantasy Hockey Optimizer Pro",
     page_icon="🏒",
@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# Title and Introduction
+# Otsikko ja johdanto
 st.title("🏒 Fantasy Hockey Optimizer Pro")
 st.markdown("""
 **Optimoi fantasy hockey rosterisi NHL-kauden aikataulun perusteella!**
@@ -22,27 +22,27 @@ st.markdown("""
 - Näet tarkasti ketkä pelaajat ovat aktiivisia ja ketkä penkillä
 """)
 
-# --- SIDEBAR: FILE UPLOAD ---
+# --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
-# Schedule upload
+# Peliaikataulun lataus
 schedule_file = st.sidebar.file_uploader(
-    "Lataa NHL-peliaikataulu (CSV)",
+    "Lataa NHL-peliaikataulu (CSV)", 
     type=["csv"],
     help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
 )
 
-# Initialize session state variables
+# Alusta session muuttujat
 if 'schedule' not in st.session_state:
     st.session_state['schedule'] = pd.DataFrame()
 if 'roster' not in st.session_state:
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
 
-# Check if file is uploaded first
+# Tarkista ensin onko tiedosto ladattu
 if schedule_file is not None:
     try:
         schedule = pd.read_csv(schedule_file)
-        # Check if DataFrame is not empty and contains required columns
+        # Tarkista että DataFrame ei ole tyhjä ja sisältää tarvittavat sarakkeet
         if not schedule.empty and all(col in schedule.columns for col in ['Date', 'Visitor', 'Home']):
             schedule['Date'] = pd.to_datetime(schedule['Date'])
             st.session_state['schedule'] = schedule
@@ -52,18 +52,18 @@ if schedule_file is not None:
     except Exception as e:
         st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
-# Roster upload
+# Rosterin lataus
 roster_file = st.sidebar.file_uploader(
-    "Lataa rosteri (CSV)",
+    "Lataa rosteri (CSV)", 
     type=["csv"],
     help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions"
 )
 
-# Check if file is uploaded first
+# Tarkista ensin onko tiedosto ladattu
 if roster_file is not None:
     try:
         roster = pd.read_csv(roster_file)
-        # Check if DataFrame is not empty and contains required columns
+        # Tarkista että DataFrame ei ole tyhjä ja sisältää tarvittavat sarakkeet
         if not roster.empty and all(col in roster.columns for col in ['name', 'team', 'positions']):
             st.session_state['roster'] = roster
             st.sidebar.success("Rosteri ladattu!")
@@ -72,17 +72,17 @@ if roster_file is not None:
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lukemisessa: {str(e)}")
 
-# --- SIDEBAR: ROSTER MANAGEMENT ---
+# --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
 
-# Display current roster
+# Näytä nykyinen rosteri
 if not st.session_state['roster'].empty:
     st.sidebar.subheader("Nykyinen rosteri")
     st.sidebar.dataframe(st.session_state['roster'])
-
-    # Remove player
+    
+    # Poista pelaaja
     remove_player = st.sidebar.selectbox(
-        "Poista pelaaja",
+        "Poista pelaaja", 
         [""] + list(st.session_state['roster']['name'])
     )
     if st.sidebar.button("Poista valittu pelaaja") and remove_player:
@@ -91,15 +91,15 @@ if not st.session_state['roster'].empty:
         ]
         st.sidebar.success(f"Pelaaja {remove_player} poistettu!")
         st.rerun()
-
-    # Add player
+    
+    # Lisää pelaaja
     st.sidebar.subheader("Lisää uusi pelaaja")
     with st.sidebar.form("add_player_form"):
         new_name = st.text_input("Pelaajan nimi")
         new_team = st.text_input("Joukkue")
         new_positions = st.text_input("Pelipaikat (esim. C/LW)")
         submitted = st.form_submit_button("Lisää pelaaja")
-
+        
         if submitted and new_name and new_team and new_positions:
             new_player = pd.DataFrame({
                 'name': [new_name],
@@ -107,33 +107,33 @@ if not st.session_state['roster'].empty:
                 'positions': [new_positions]
             })
             st.session_state['roster'] = pd.concat([
-                st.session_state['roster'],
+                st.session_state['roster'], 
                 new_player
             ], ignore_index=True)
             st.sidebar.success(f"Pelaaja {new_name} lisätty!")
             st.rerun()
 
-# --- SIDEBAR: SETTINGS ---
+# --- SIVUPALKKI: ASETUKSET ---
 st.sidebar.header("⚙️ Asetukset")
 
-# Date selection
+# Päivämäärävalinta
 st.sidebar.subheader("Aikaväli")
 today = datetime.now().date()
 start_date = st.sidebar.date_input("Alkupäivä", today - timedelta(days=30))
 end_date = st.sidebar.date_input("Loppupäivä", today)
 
-# Check if dates are sensible
+# Tarkista että päivämäärät ovat järkevät
 if start_date > end_date:
     st.sidebar.error("Aloituspäivä ei voi olla loppupäivän jälkeen")
 
-# Position limits
+# Pelipaikkojen rajoitukset
 st.sidebar.subheader("Pelipaikkojen rajoitukset")
 col1, col2 = st.sidebar.columns(2)
 with col1:
     c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=3)
     lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=3)
     rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", min_value=1, max_value=6, value=3)
-
+    
 with col2:
     d_limit = st.number_input("Puolustajat (D)", min_value=1, max_value=8, value=4)
     g_limit = st.number_input("Maalivahdit (G)", min_value=1, max_value=4, value=2)
@@ -148,37 +148,37 @@ pos_limits = {
     'UTIL': util_limit
 }
 
-# --- MAIN PAGE: ROSTER DISPLAY ---
+# --- PÄÄSIVU: ROSTERIN NÄYTTÖ ---
 st.header("📊 Nykyinen rosteri")
 if st.session_state['roster'].empty:
     st.warning("Lataa rosteri nähdäksesi pelaajat")
 else:
     st.dataframe(st.session_state['roster'], use_container_width=True)
-
-    # Team distribution
+    
+    # Joukkueiden jakauma
     st.subheader("Joukkueiden jakauma")
     team_counts = st.session_state['roster']['team'].value_counts()
     st.bar_chart(team_counts)
 
-# --- MAIN PAGE: OPTIMIZATION ---
+# --- PÄÄSIVU: OPTIMOINTI ---
 st.header("🚀 Rosterin optimointi")
 
-# Check if both files are loaded and dates are okay
+# Tarkista että molemmat tiedostot on ladattu ja päivämäärät kunnossa
 if st.session_state['schedule'].empty or st.session_state['roster'].empty:
     st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi optimoinnin")
 elif start_date > end_date:
     st.warning("Korjaa päivämääräväli niin että aloituspäivä on ennen loppupäivää")
 else:
-    # Filter schedule for the selected date range
+    # Suodata peliaikataulu valitulle aikavälille
     schedule_filtered = st.session_state['schedule'][
         (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
         (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
     ]
-
+    
     if schedule_filtered.empty:
         st.warning("Ei pelejä valitulla aikavälillä")
     else:
-        # Create team game days
+        # Luo joukkueiden pelipäivät
         team_game_days = {}
         for _, row in schedule_filtered.iterrows():
             date = row['Date']
@@ -186,36 +186,36 @@ else:
                 if team not in team_game_days:
                     team_game_days[team] = set()
                 team_game_days[team].add(date)
-
-        # Fully revised optimization function for multi-position players
+        
+        # Täysin uusittu optimointifunktio monipaikkaisille pelaajille
         def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=200):
-            # Create player information
+            # Luo pelaajien tiedot
             players_info = {}
             for _, player in roster_df.iterrows():
-                # Handle potential NaN values and ensure positions is a list
+                # Käsittele mahdolliset NaN-arvot ja varmista että positions on lista
                 positions_str = player['positions']
                 if pd.isna(positions_str):
                     positions_list = []
                 elif isinstance(positions_str, str):
                     positions_list = [p.strip() for p in positions_str.split('/')]
                 else:
-                    positions_list = positions_str  # Assume it's already a list
-
+                    positions_list = positions_str  # Oletetaan että se on jo lista
+                    
                 players_info[player['name']] = {
                     'team': player['team'],
                     'positions': positions_list
                 }
-
-            # Group games by day
+            
+            # Ryhmitä pelit päivittäin
             daily_results = []
             player_games = {name: 0 for name in players_info.keys()}
-
-            # Iterate through each day
+            
+            # Käy läpi jokainen päivä
             for date in sorted(schedule_df['Date'].unique()):
-                # Get games for the day
+                # Hae päivän pelit
                 day_games = schedule_df[schedule_df['Date'] == date]
-
-                # Get players whose team has a game today
+                
+                # Hae pelaajat, joiden joukkueelle on peli tänään
                 available_players = []
                 for _, game in day_games.iterrows():
                     for team in [game['Visitor'], game['Home']]:
@@ -224,52 +224,54 @@ else:
                                 available_players.append({
                                     'name': player_name,
                                     'team': team,
-                                    'positions': info['positions']  # This is now a list
+                                    'positions': info['positions']  # Tämä on nyt lista
                                 })
-
-                # Multiple attempts to find the best placement
+                
+                # Useita yrityksiä löytää paras sijoittelu
                 best_assignment = None
                 max_active = 0
-
+                
                 for attempt in range(num_attempts):
-                    # Shuffle players randomly
+                    # Sekoita pelaajat satunnaisjärjestykseen
                     shuffled_players = available_players.copy()
                     np.random.shuffle(shuffled_players)
-
-                    # Initialize positions
+                    
+                    # Alusta pelipaikat
                     active = {
                         'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
                     }
                     bench = []
-
-                    # Phase 1: Place players in primary positions
+                    
+                    # Vaihe 1: Sijoita pelaajat ensisijaisiin paikkoihin
                     for player_info in shuffled_players:
                         placed = False
                         player_name = player_info['name']
-                        positions_list = player_info['positions'] # This is already a list
-
-                        # Try to place in one of the player's positions
+                        positions_list = player_info['positions']  # Tämä on jo lista
+                        
+                        # Yritä sijoittaa johonkin pelaajan pelipaikoista
                         for pos in positions_list:
                             if pos in limits and len(active[pos]) < limits[pos]:
                                 active[pos].append(player_name)
                                 placed = True
                                 break
-
-                        # If not placed in a specific position, try UTIL
+                        
+                        # Jos ei sijoitettu mihinkään erityispaikkaan, yritä UTIL-paikkaa
                         if not placed and len(active['UTIL']) < limits['UTIL']:
-                            # Check if player fits UTIL (forward or defenseman)
+                            # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
                             if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
                                 active['UTIL'].append(player_name)
                                 placed = True
-
-                        # If still not placed, add to bench
+                        
+                        # Jos ei vieläkään sijoitettu, lisää penkille
                         if not placed:
                             bench.append(player_name)
-
-                    # Phase 2: Try to improve placement by swapping player positions
+                    
+                    # Vaihe 2: Yritä parantaa sijoittelua vaihtamalla pelaajien paikkoja
+                    # Luo lista kaikista pelaajista (aktiiviset + penkki)
                     all_players = []
                     for pos, players in active.items():
                         for player_name in players:
+                            # Hae pelaajan tiedot players_info:stä
                             player_positions = players_info[player_name]['positions']
                             all_players.append({
                                 'name': player_name,
@@ -277,7 +279,7 @@ else:
                                 'current_pos': pos,
                                 'active': True
                             })
-
+                    
                     for player_name in bench:
                         player_positions = players_info[player_name]['positions']
                         all_players.append({
@@ -286,92 +288,96 @@ else:
                             'current_pos': None,
                             'active': False
                         })
-
-                    # Try to improve placement
+                    
+                    # Yritä parantaa sijoittelua
                     improved = True
                     while improved:
                         improved = False
-
-                        # Iterate through all inactive players
+                        
+                        # Käy läpi kaikki epäaktiiviset pelaajat
                         for bench_player in [p for p in all_players if not p['active']]:
                             bench_positions = bench_player['positions']
-
-                            # Iterate through all active players
+                            
+                            # Käy läpi kaikki aktiiviset pelaajat
                             for active_player in [p for p in all_players if p['active']]:
                                 active_positions = active_player['positions']
-
-                                # Check if bench player can replace active player
+                                
+                                # Tarkista voiko penkkipelaaja korvata aktiivisen pelaajan
                                 if active_player['current_pos'] in bench_positions:
-                                    # Check if active player can move to another position
+                                    # Tarkista voiko aktiivinen pelaaja siirtyä toiseen paikkaan
                                     for new_pos in active_positions:
+                                        # Varmista että new_pos on validi pelipaikka
                                         if new_pos != active_player['current_pos'] and new_pos in limits and len(active[new_pos]) < limits[new_pos]:
-                                            # Swap is possible!
-                                            # Remove active player from current position
+                                            # Vaihto on mahdollinen!
+                                            # Poista aktiivinen pelaaja nykyisestä paikastaan
                                             active[active_player['current_pos']].remove(active_player['name'])
-                                            # Add them to the new position
+                                            # Lisää hänet uuteen paikkaan
                                             active[new_pos].append(active_player['name'])
-                                            # Add bench player to the freed position
+                                            # Lisää penkkipelaaja vapautuneeseen paikkaan
                                             active[active_player['current_pos']].append(bench_player['name'])
-                                            # Update player states
+                                            # Päivitä pelaajien tilat
                                             active_player['current_pos'] = new_pos
                                             bench_player['active'] = True
                                             bench_player['current_pos'] = active_player['current_pos']
-                                            # Remove player from bench
+                                            # Poista pelaaja penkilta
                                             if bench_player['name'] in bench:
                                                 bench.remove(bench_player['name'])
                                             improved = True
                                             break
-                                        if improved:
-                                            break
                                     if improved:
                                         break
-                                if improved:
-                                    break
-
-                    # Phase 3: Try one more time to place players remaining on the bench
-                    for player_name in bench.copy():  # Use a copy as we're modifying the list
+                            if improved:
+                                break
+                    
+                    # Vaihe 3: Yritä vielä kerran sijoittaa penkille jääneet pelaajat
+                    for player_name in bench.copy():  # Käytä copya, koska muokkaamme listaa
                         placed = False
-
+                        
+                        # Hae pelaajan pelipaikat players_info:stä
                         positions_list = players_info[player_name]['positions']
-
-                        # Try to place in one of the player's positions
+                        
+                        # Yritä sijoittaa johonkin pelaajan pelipaikoista
                         for pos in positions_list:
                             if pos in limits and len(active[pos]) < limits[pos]:
                                 active[pos].append(player_name)
                                 bench.remove(player_name)
                                 placed = True
                                 break
-
-                        # If not placed in a specific position, try UTIL
+                        
+                        # Jos ei sijoitettu mihinkään erityispaikkaan, yritä UTIL-paikkaa
                         if not placed and len(active['UTIL']) < limits['UTIL']:
+                            # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
                             if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
                                 active['UTIL'].append(player_name)
                                 bench.remove(player_name)
                                 placed = True
-
-                    # Phase 4: Multi-position player optimization - NEW IMPROVEMENT
+                    
+                    # Vaihe 4: Monipaikkaisten pelaajien optimointi - UUSI PARANNUS
+                    # Käy läpi kaikki aktiiviset pelaajat ja yritä siirtää monipaikkaisia pelaajia
+                    # toiseen paikkaan, jos se mahdollistaa toisen pelaajan nostamisen penkiltä
                     for pos_name in ['C', 'LW', 'RW', 'D', 'G']:
-                        for player_name in active[pos_name].copy():  # Use a copy as we're modifying the list
+                        for player_name in active[pos_name].copy():  # Käytä copya, koska muokkaamme listaa
                             player_positions = players_info[player_name]['positions']
-
+                            
+                            # Jos pelaajalla on useita paikkoja, yritä siirtää häntä
                             if len(player_positions) > 1:
                                 for other_pos in player_positions:
                                     if other_pos != pos_name and other_pos in limits and len(active[other_pos]) < limits[other_pos]:
-                                        # Check if there's a player on the bench who can fill this spot
+                                        # Tarkista onko penkillä pelaaja, joka voisi täyttää tämän paikan
                                         for bench_player_name in bench.copy():
                                             bench_player_positions = players_info[bench_player_name]['positions']
-
-                                            # If bench player can play in this position
+                                            
+                                            # Jos penkkipelaaja voi pelata tässä paikassa
                                             if pos_name in bench_player_positions:
-                                                # Move multi-position player to another spot
+                                                # Siirrä monipaikkainen pelaaja toiseen paikkaan
                                                 active[pos_name].remove(player_name)
                                                 active[other_pos].append(player_name)
-
-                                                # Move bench player to active roster
+                                                
+                                                # Siirrä penkkipelaaja aktiiviseen rosteriin
                                                 active[pos_name].append(bench_player_name)
                                                 bench.remove(bench_player_name)
-
-                                                # Update all_players list
+                                                
+                                                # Päivitä all_players-lista
                                                 for p in all_players:
                                                     if p['name'] == player_name:
                                                         p['current_pos'] = other_pos
@@ -379,100 +385,102 @@ else:
                                                         p['active'] = True
                                                         p['current_pos'] = pos_name
                                                 break
-                                            if player_name in active[pos_name]: # Check if player was moved
-                                                break
-                                        if player_name in active[pos_name]: # Check if player was moved
-                                            break
-
-                    # Calculate the number of active players
+                    
+                    # Laske aktiivisten pelaajien määrä
                     total_active = sum(len(players) for players in active.values())
-
-                    # Save the best assignment
+                    
+                    # Tallenna paras sijoittelu
                     if total_active > max_active:
                         max_active = total_active
                         best_assignment = {
                             'active': active.copy(),
                             'bench': bench.copy()
                         }
-
-                # Ensure best_assignment is not None
+                
+                # Varmista, että best_assignment ei ole None
                 if best_assignment is None:
+                    # Jos mikään sijoittelu ei ollut parempi kuin 0, luo tyhjä sijoittelu
                     best_assignment = {
                         'active': {
                             'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
                         },
                         'bench': [p['name'] for p in available_players]
                     }
-
-                # Ensure all players are accounted for
+                
+                # Varmista, että kaikki pelaajat on huomioitu
+                # Rakenna uusi lista kaikista pelaajista
                 all_player_names = [p['name'] for p in available_players]
                 active_player_names = set()
-
+                
+                # Tarkista että best_assignment['active'] ei ole None
                 if best_assignment['active'] is not None:
                     for pos, players in best_assignment['active'].items():
                         active_player_names.update(players)
-
+                
+                # Päivitä penkki: kaikki pelaajat, jotka eivät ole aktiivisia
                 final_bench = [name for name in all_player_names if name not in active_player_names]
-
+                
                 daily_results.append({
                     'Date': date.date(),
                     'Active': best_assignment['active'],
                     'Bench': final_bench
                 })
-
-                # Update player game counts
+                
+                # Päivitä pelaajien pelimäärät
                 if best_assignment['active'] is not None:
                     for pos, players in best_assignment['active'].items():
                         for player_name in players:
                             player_games[player_name] += 1
-
+            
             return daily_results, player_games
-
-        # Run optimization
+        
+        # Suorita optimointi
         with st.spinner("Optimoidaan rosteria älykkäällä algoritmilla..."):
             daily_results, total_games = optimize_roster_advanced(
-                schedule_filtered,
-                st.session_state['roster'],
+                schedule_filtered, 
+                st.session_state['roster'], 
                 pos_limits,
                 team_game_days
             )
-
-        # Display results
+        
+        # Näytä tulokset
         st.subheader("Päivittäiset aktiiviset rosterit")
-
-        # Create daily results DataFrame
+        
+        # Luo päivittäiset tulokset DataFrameen
         daily_data = []
         for result in daily_results:
             active_list = []
+            # Varmista että result on sanakirja ja että se sisältää 'Active'-avaimen
             if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
                 for pos, players in result['Active'].items():
                     for player in players:
                         active_list.append(f"{player} ({pos})")
-
+            
+            # Varmista että result on sanakirja ja että se sisältää 'Bench'-avaimen
             bench_list = []
             if isinstance(result, dict) and 'Bench' in result and result['Bench'] is not None:
                 bench_list = result['Bench']
-
+            
             daily_data.append({
                 'Päivä': result['Date'] if isinstance(result, dict) and 'Date' in result else None,
                 'Aktiiviset pelaajat': ", ".join(active_list),
                 'Penkki': ", ".join(bench_list) if bench_list else "Ei pelaajia penkille"
             })
-
+        
         daily_df = pd.DataFrame(daily_data)
         st.dataframe(daily_df, use_container_width=True)
-
-        # Game count summary
+        
+        # Pelimäärien yhteenveto
         st.subheader("Pelaajien kokonaispelimäärät")
-
+        
         games_df = pd.DataFrame({
             'Pelaaja': list(total_games.keys()),
             'Pelit': list(total_games.values())
         }).sort_values('Pelit', ascending=False)
-
+        
         st.dataframe(games_df, use_container_width=True)
-
-        # Download button
+        
+        # Latauspainike
         csv = games_df.to_csv(index=False).encode('utf-8')
         st.download_button(
             "Lataa pelimäärät CSV-muodossa",
@@ -480,20 +488,20 @@ else:
             file_name='pelimäärät.csv',
             mime='text/csv'
         )
-
-        # Visualizations
+        
+        # Visualisoinnit
         st.subheader("📈 Analyysit")
-
+        
         col1, col2 = st.columns(2)
-
+        
         with col1:
-            # Top 10 players
+            # Top 10 pelaajaa
             top_players = games_df.head(10)
             st.write("Top 10 eniten pelanneet pelaajat")
             st.dataframe(top_players)
-
+        
         with col2:
-            # Position distribution
+            # Pelipaikkojen jakauma
             position_data = {}
             for _, row in st.session_state['roster'].iterrows():
                 positions = row['positions'].split('/')
@@ -503,148 +511,95 @@ else:
                         if pos_clean not in position_data:
                             position_data[pos_clean] = 0
                         position_data[pos_clean] += total_games.get(row['name'], 0)
-
+            
             pos_df = pd.DataFrame({
                 'Pelipaikka': list(position_data.keys()),
                 'Pelit': list(position_data.values())
             })
-
+            
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
-# --- SIMULATION ---
+# --- SIMULOINTI ---
 st.header("🔮 Simuloi uuden pelaajan vaikutus")
 
 if not st.session_state['roster'].empty and not schedule_filtered.empty and start_date <= end_date:
     st.subheader("Lisää uusi pelaaja")
-
+    
     col1, col2, col3 = st.columns(3)
-
+    
     with col1:
         sim_name = st.text_input("Pelaajan nimi", key="sim_name")
     with col2:
         sim_team = st.text_input("Joukkue", key="sim_team")
     with col3:
         sim_positions = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions")
-
+    
     if st.button("Simuloi pelaajan lisääminen"):
         if sim_name and sim_team and sim_positions:
-            # Create new player info
+            # Luo uuden pelaajan tiedot
             new_player_info = {
                 'name': sim_name,
                 'team': sim_team,
                 'positions': sim_positions
             }
-
-            # Run corrected simulation
+            
+            # LASKE ALKUPERÄINEN TILANNE (ilman uutta pelaajaa)
+            with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää..."):
+                # Simulaatio on päiväkohtainen. Laske alkuperäinen kokonaissumma
+                # Käytä optimize_roster_advanced -funktiota suoraan
+                _, original_total_games_dict = optimize_roster_advanced(
+                    schedule_filtered,
+                    st.session_state['roster'],
+                    pos_limits,
+                    team_game_days
+                )
+                original_total = sum(original_total_games_dict.values())
+            
+            # LASKE UUSI TILANNE (uudella pelaajalla)
             with st.spinner("Lasketaan uuden pelaajan vaikutusta..."):
-                # CALCULATE ORIGINAL STATE (without new player)
-                original_total_games = 0
-                original_daily_active_counts = {} # To store daily active counts for original roster
-
-                for date in sorted(schedule_filtered['Date'].unique()):
-                    day_games = schedule_filtered[schedule_filtered['Date'] == date]
-                    daily_active_count = 0
-                    if not day_games.empty:
-                        # Create daily team game days
-                        day_team_days = {}
-                        for _, game in day_games.iterrows():
-                            for team in [game['Visitor'], game['Home']]:
-                                if team not in day_team_days:
-                                    day_team_days[team] = set()
-                                day_team_days[team].add(game['Date'])
-
-                        daily_results_original, _ = optimize_roster_advanced(
-                            schedule_filtered[schedule_filtered['Date'] == date],
-                            st.session_state['roster'],
-                            pos_limits,
-                            day_team_days
-                        )
-                        if isinstance(daily_results_original, list):
-                            for result in daily_results_original:
-                                if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
-                                    daily_active_count += sum(len(players) for players in result['Active'].values())
-                    original_daily_active_counts[date.date()] = daily_active_count
-                    original_total_games += daily_active_count
-
-                # CALCULATE NEW STATE (with new player)
                 new_roster = pd.concat([
                     st.session_state['roster'],
                     pd.DataFrame([new_player_info])
                 ], ignore_index=True)
+                
+                _, new_total_games_dict = optimize_roster_advanced(
+                    schedule_filtered,
+                    new_roster,
+                    pos_limits,
+                    team_game_days
+                )
+                new_total = sum(new_total_games_dict.values())
+            
+            # Varmista, että uusi pelaaja on rosterissa ja laske hänen pelipäivänsä
+            player_impact_days = 0
+            if sim_name in new_total_games_dict:
+                player_impact_days = new_total_games_dict[sim_name]
 
-                new_total_games = 0
-                player_impact_days = 0  # Days the new player is active
-                new_daily_active_counts = {} # To store daily active counts for new roster
-
-                for date in sorted(schedule_filtered['Date'].unique()):
-                    day_games = schedule_filtered[schedule_filtered['Date'] == date]
-                    daily_active_count_with = 0
-                    new_player_active_today = False
-
-                    if not day_games.empty:
-                        # Check if new player's team is playing today
-                        new_player_team_playing = sim_team in day_games[['Visitor', 'Home']].values
-
-                        if new_player_team_playing:
-                            # Create daily team game days
-                            day_team_days = {}
-                            for _, game in day_games.iterrows():
-                                for team in [game['Visitor'], game['Home']]:
-                                    if team not in day_team_days:
-                                        day_team_days[team] = set()
-                                    day_team_days[team].add(game['Date'])
-
-                            daily_results_with, _ = optimize_roster_advanced(
-                                schedule_filtered[schedule_filtered['Date'] == date],
-                                new_roster,
-                                pos_limits,
-                                day_team_days
-                            )
-
-                            if isinstance(daily_results_with, list):
-                                for result in daily_results_with:
-                                    if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
-                                        daily_active_count_with += sum(len(players) for players in result['Active'].values())
-                                        # Check if the new player is in the active list for this day
-                                        if sim_name in [p for players in result['Active'].values() for p in players]:
-                                            new_player_active_today = True
-
-                    new_daily_active_counts[date.date()] = daily_active_count_with
-                    if new_player_active_today:
-                        player_impact_days += 1
-                    new_total_games += daily_active_count_with
-
-
-                # Calculate the impact
-                games_increase = new_total_games - original_total_games
-                st.subheader("Simulaation tulokset")
-
-                st.markdown(f"**Alkuperäinen kokonaispelimäärä:** {original_total_games}")
-                st.markdown(f"**Kokonaispelimäärä uudella pelaajalla:** {new_total_games}")
-                st.markdown(f"**Pelimäärän lisäys:** {games_increase}")
-                st.markdown(f"**Päiviä, jolloin uusi pelaaja on aktiivinen:** {player_impact_days}")
-
-                if games_increase > 0:
-                    st.success(f"Uuden pelaajan lisääminen **lisäsi** rosterisi kokonaispelimäärää yhteensä **{games_increase}** pelillä.")
-                elif games_increase < 0:
-                    st.warning(f"Uuden pelaajan lisääminen **vähensi** rosterisi kokonaispelimäärää yhteensä **{abs(games_increase)}** pelillä.")
-                else:
-                    st.info("Uuden pelaajan lisääminen ei vaikuttanut kokonaispelimääriin.")
-
-                # Display daily comparison
-                st.subheader("Päivittäinen vertailu")
-                comparison_data = []
-                for date in sorted(schedule_filtered['Date'].unique()):
-                    comparison_data.append({
-                        'Päivä': date.date(),
-                        'Aktiivisia (ilman uutta)': original_daily_active_counts.get(date.date(), 0),
-                        'Aktiivisia (uuden kanssa)': new_daily_active_counts.get(date.date(), 0)
-                    })
-                comparison_df = pd.DataFrame(comparison_data)
-                st.dataframe(comparison_df, use_container_width=True)
-
+            # Näytä simuloinnin tulokset
+            st.subheader(f"Simuloinnin tulos: {sim_name} ({sim_team})")
+            
+            col_a, col_b, col_c = st.columns(3)
+            
+            col_a.metric(
+                "Alkuperäinen kokonaispelimäärä",
+                original_total
+            )
+            col_b.metric(
+                "Uusi kokonaispelimäärä",
+                new_total
+            )
+            
+            change = new_total - original_total
+            col_c.metric(
+                "Muutos",
+                f"{change}"
+            )
+            
+            st.write(f"Uusi pelaaja, **{sim_name}**, lisäsi kokonaispelimäärää {change} pelillä.")
+            st.write(f"Hän pelasi itse {player_impact_days} peliä tällä aikavälillä.")
+            
         else:
-            st.error("Syötä kaikki tiedot uudelle pelaajalle.")
+            st.warning("Syötä kaikki pelaajan tiedot suorittaaksesi simulaation.")
 else:
-    st.warning("Lataa peliaikataulu ja rosteri, ja varmista että päivämääräväli on kelvollinen, ennen kuin voit simuloida uutta pelaajaa.")
+    st.warning("Lataa ensin rosteri ja peliaikataulu, sekä valitse päivämäärät, ennen simulaation suorittamista.")
