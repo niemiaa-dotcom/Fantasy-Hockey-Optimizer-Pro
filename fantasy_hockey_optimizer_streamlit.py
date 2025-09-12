@@ -102,19 +102,19 @@ today = datetime.now().date()
 start_date = st.sidebar.date_input("Alkupäivä", today - timedelta(days=30))
 end_date = st.sidebar.date_input("Loppupäivä", today)
 
-# Pelipaikkojen rajoitukset
+# Pelipaikkojen rajoitukset - KORJATTU
 st.sidebar.subheader("Pelipaikkojen rajoitukset")
 col1, col2 = st.sidebar.columns(2)
 
 with col1:
-    c_limit = st.number_input("Hyökkääjät (C)", 3, 1, 6)
-    lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", 3, 1, 6)
-    rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", 3, 1, 6)
+    c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=3)
+    lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=3)
+    rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", min_value=1, max_value=6, value=3)
     
 with col2:
-    d_limit = st.number_input("Puolustajat (D)", 4, 1, 8)
-    g_limit = st.number_input("Maalivahdit (G)", 2, 1, 4)
-    util_limit = st.number_input("UTIL-paikat", 1, 0, 3)
+    d_limit = st.number_input("Puolustajat (D)", min_value=1, max_value=8, value=4)
+    g_limit = st.number_input("Maalivahdit (G)", min_value=1, max_value=4, value=2)
+    util_limit = st.number_input("UTIL-paikat", min_value=0, max_value=3, value=1)
 
 pos_limits = {
     'C': c_limit,
@@ -343,7 +343,11 @@ if not st.session_state['roster'].empty:
             
             st.success(f"Kokonaispelit ennen: {original_total}")
             st.success(f"Kokonaispelit jälkeen: {new_total}")
-            st.success(f"Muutos: {new_total - original_total} (+{((new_total/original_total - 1)*100):.1f}%)" if original_total > 0 else "Ei vertailukelpoista dataa")
+            if original_total > 0:
+                change_pct = ((new_total/original_total - 1)*100)
+                st.success(f"Muutos: {new_total - original_total} ({change_pct:+.1f}%)")
+            else:
+                st.success("Ei vertailukelpoista dataa")
             
             # Näytä uuden pelaajan pelimäärä
             if sim_name in sim_games:
