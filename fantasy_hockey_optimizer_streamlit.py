@@ -19,6 +19,7 @@ st.markdown("""
 - Kukin pelaaja voi olla vain yhdellä pelipaikalla per päivä
 - Pelimäärät kertyvät vain peleistä, joissa pelaajan joukkue on mukana
 - Älykäs optimointi huomioi pelaajien monipuolisuuden ja vaihtoehtoiset sijoittelut
+- Näet tarkasti ketkä pelaajat ovat aktiivisia ja ketkä penkillä
 """)
 
 # --- SIVUPALKKI: TIEDOSTONLATAUS ---
@@ -161,7 +162,7 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                     team_game_days[team] = set()
                 team_game_days[team].add(date)
         
-        # PARANNETTU optimointifunktio
+        # KORJATTU optimointifunktio
         def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=50):
             # Luo pelaajien tiedot
             players_info = {}
@@ -211,31 +212,25 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                     for player in shuffled_players:
                         placed = False
                         
-                        # Yritä sijoittaa ensisijaisiin paikkoihin, mutta valitse paras vaihtoehto
-                        eligible_positions = []
+                        # Yritä sijoittaa ensisijaisiin paikkoihin
                         for pos in ['C', 'LW', 'RW', 'D', 'G']:
                             if pos in player['positions'] and len(active[pos]) < limits[pos]:
-                                eligible_positions.append(pos)
+                                active[pos].append(player['name'])
+                                placed = True
+                                break
                         
-                        if eligible_positions:
-                            # Valitse paikka, jossa on eniten vapaata tilaa TAI joka on pelaajan ensisijainen
-                            # Tässä voimme käyttää älykästä valintaa
-                            best_pos = None
-                            max_slots = -1
-                            
-                            for pos in eligible_positions:
-                                slots_available = limits[pos] - len(active[pos])
-                                if slots_available > max_slots:
-                                    max_slots = slots_available
-                                    best_pos = pos
-                            
-                            active[best_pos].append(player['name'])
-                            placed = True
+                        # Jos ei sijoitettu, yritä UTIL-paikkaa
+                        if not placed and len(active['UTIL']) < limits['UTIL']:
+                            # Tarkista, että pelaaja sopii UTIL-paikkaan (hyökkääjä tai puolustaja)
+                            if any(pos in ['C', 'LW', 'RW', 'D'] for pos in player['positions']):
+                                active['UTIL'].append(player['name'])
+                                placed = True
+                        
+                        # Jos ei vieläkään sijoitettu, lisää penkille
+                        if not placed:
+                            bench.append(player['name'])
                     
                     # Vaihe 2: Yritä parantaa sijoittelua vaihtamalla pelaajien paikkoja
-                    # Tarkista onko penkillä pelaajia, jotka voisivat korvata aktiivisia pelaajia
-                    # ja vapauttaa paikan toiselle pelaajalle
-                    
                     # Luo lista kaikista pelaajista (aktiiviset + penkki)
                     all_players = []
                     for pos, players in active.items():
@@ -281,7 +276,8 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                                             bench_player['active'] = True
                                             bench_player['current_pos'] = active_player['current_pos']
                                             # Poista pelaaja penkilta
-                                            bench.remove(bench_player['name'])
+                                            if bench_player['name'] in bench:
+                                                bench.remove(bench_player['name'])
                                             improved = True
                                             break
                                     if improved:
@@ -300,18 +296,26 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
                             'bench': bench.copy()
                         }
                 
-                # Käytä parasta sijoittelua
-                if best_assignment:
-                    daily_results.append({
-                        'Date': date.date(),
-                        'Active': best_assignment['active'],
-                        'Bench': best_assignment['bench']
-                    })
-                    
-                    # Päivitä pelaajien pelimäärät
-                    for pos, players in best_assignment['active'].items():
-                        for player_name in players:
-                            player_games[player_name] += 1
+                # KORJAUS: Varmista, että kaikki pelaajat on huomioitu
+                # Rakenna uusi lista kaikista pelaajista
+                all_player_names = [p['name'] for p in available_players]
+                active_player_names = set()
+                for pos, players in best_assignment['active'].items():
+                    active_player_names.update(players)
+                
+                # Päivitä penkki: kaikki pelaajat, jotka eivät ole aktiivisia
+                final_bench = [name for name in all_player_names if name not in active_player_names]
+                
+                daily_results.append({
+                    'Date': date.date(),
+                    'Active': best_assignment['active'],
+                    'Bench': final_bench
+                })
+                
+                # Päivitä pelaajien pelimäärät
+                for pos, players in best_assignment['active'].items():
+                    for player_name in players:
+                        player_games[player_name] += 1
             
             return daily_results, player_games
         
@@ -338,7 +342,7 @@ if not st.session_state['schedule'].empty and not st.session_state['roster'].emp
             daily_data.append({
                 'Päivä': result['Date'],
                 'Aktiiviset pelaajat': ", ".join(active_list),
-                'Penkki': ", ".join(result['Bench'])
+                'Penkki': ", ".join(result['Bench']) if result['Bench'] else "Ei pelaajia penkille"
             })
         
         daily_df = pd.DataFrame(daily_data)
@@ -468,16 +472,17 @@ with st.expander("📖 Käyttöohjeet"):
        - Se huomioi pelaajien monipuolisuuden ja vaihtoehtoiset sijoittelut
        - Pelaajat sijoitetaan vain yhdelle pelipaikalle per päivä
     
-    5. **Simuloi muutoksia**:
-       - Testaa, mitä tapahtuisi jos lisäisit uuden pelaajan
-       - Vertaa eri pelaajien vaikutusta kokonaispelimääriin
+    5. **Tulosten tulkinta**:
+       - **Aktiiviset pelaajat**: Pelaajat, jotka on sijoitettu rosteriin tietylle päivälle
+       - **Penkki**: Pelaajat, joiden joukkueella on peli, mutta heitä ei voitu sijoittaa aktiiviseen rosteriin
+       - **Kokonaispelimäärät**: Kuinka monta kertaa kukin pelaaja olisi aktiivinen valitulla aikavälillä
     
     ### Tärkeät parannukset:
     - **Älykäs sijoittelu**: Algoritmi yrittää löytää parhaan mahdollisen sijoittelun
     - **Paikkojen vaihto**: Pelaajia voidaan siirtää paikasta toiseen vapauttaen tilaa muille
-    - **Monipuolisuuden hyödyntäminen**: C/LW-pelaajat voidaan sijoittaa jompaankumpaan paikkaan tarpeen mukaan
+    - **Täydellinen pelaajaseuranta**: Kaikki pelaajat (sekä aktiiviset että penkillä olevat) näytetään selkeästi
     """)
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.0 | Älykäs optimointi ja paikkojen vaihto")
+st.markdown("Fantasy Hockey Optimizer Pro v3.1 | Täydellinen pelaajaseuranta")
