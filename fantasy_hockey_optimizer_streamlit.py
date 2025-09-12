@@ -450,16 +450,21 @@ else:
         daily_data = []
         for result in daily_results:
             active_list = []
-            # Tarkista että result['Active'] ei ole None
-            if result.get('Active') is not None:
+            # Varmista että result on sanakirja ja että se sisältää 'Active'-avaimen
+            if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
                 for pos, players in result['Active'].items():
                     for player in players:
                         active_list.append(f"{player} ({pos})")
             
+            # Varmista että result on sanakirja ja että se sisältää 'Bench'-avaimen
+            bench_list = []
+            if isinstance(result, dict) and 'Bench' in result and result['Bench'] is not None:
+                bench_list = result['Bench']
+            
             daily_data.append({
-                'Päivä': result['Date'],
+                'Päivä': result['Date'] if isinstance(result, dict) and 'Date' in result else None,
                 'Aktiiviset pelaajat': ", ".join(active_list),
-                'Penkki': ", ".join(result.get('Bench', [])) if result.get('Bench') else "Ei pelaajia penkille"
+                'Penkki': ", ".join(bench_list) if bench_list else "Ei pelaajia penkille"
             })
         
         daily_df = pd.DataFrame(daily_data)
@@ -565,9 +570,12 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                             pos_limits,
                             day_team_days
                         )
-                        for result in daily_results:
-                            if result.get('Active') is not None:
-                                daily_active += sum(len(players) for players in result['Active'].values())
+                        # Varmista että daily_results on lista
+                        if isinstance(daily_results, list):
+                            for result in daily_results:
+                                # Varmista että result on sanakirja ja että se sisältää 'Active'-avaimen
+                                if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
+                                    daily_active += sum(len(players) for players in result['Active'].values())
                     
                     original_total += daily_active
                 
@@ -610,9 +618,12 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                                 pos_limits,
                                 day_team_days
                             )
-                            for result in daily_results_without:
-                                if result.get('Active') is not None:
-                                    daily_active_without += sum(len(players) for players in result['Active'].values())
+                            # Varmista että daily_results_without on lista
+                            if isinstance(daily_results_without, list):
+                                for result in daily_results_without:
+                                    # Varmista että result on sanakirja ja että se sisältää 'Active'-avaimen
+                                    if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
+                                        daily_active_without += sum(len(players) for players in result['Active'].values())
                         
                         # Optimoi uudella pelaajalla
                         daily_active_with = 0
@@ -635,17 +646,20 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
                                 pos_limits,
                                 day_team_days
                             )
-                            for result in daily_results_with:
-                                if result.get('Active') is not None:
-                                    day_active_count = sum(len(players) for players in result['Active'].values())
-                                    daily_active_with = day_active_count
-                                    
-                                    # Tarkista onko uusi pelaaja aktiivinen
-                                    for pos, players in result['Active'].items():
-                                        if sim_name in players:
-                                            player_is_active = True
-                                            player_position = pos
-                                            break
+                            # Varmista että daily_results_with on lista
+                            if isinstance(daily_results_with, list):
+                                for result in daily_results_with:
+                                    # Varmista että result on sanakirja ja että se sisältää 'Active'-avaimen
+                                    if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
+                                        day_active_count = sum(len(players) for players in result['Active'].values())
+                                        daily_active_with = day_active_count
+                                        
+                                        # Tarkista onko uusi pelaaja aktiivinen
+                                        for pos, players in result['Active'].items():
+                                            if sim_name in players:
+                                                player_is_active = True
+                                                player_position = pos
+                                                break
                         
                         # Laske ero
                         daily_difference = daily_active_with - daily_active_without
@@ -788,4 +802,4 @@ with st.expander("📖 Käyttöohjeet"):
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.9 | Täysin korjattu monipaikkaisten pelaajien optimointi")
+st.markdown("Fantasy Hockey Optimizer Pro v3.10 | Täysin korjattu monipaikkaisten pelaajien optimointi")
