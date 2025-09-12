@@ -301,11 +301,18 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
         for team in nhl_teams:
             for position in positions_to_simulate:
                 
+                # Korjaus: Varmista, että pelipaikka on muodossa 'C/UTIL' jos kyseessä on UTIL-paikka
+                if position == 'UTIL':
+                    # UTIL-paikka voi olla C, LW, RW tai D
+                    positions_str = 'C/LW/RW/D'
+                else:
+                    positions_str = position
+                
                 # Luo simuloitu pelaaja tietyllä joukkueella ja pelipaikalla
                 sim_player = pd.DataFrame([{
                     'name': f"SIM_{team}_{position}",
                     'team': team,
-                    'positions': position
+                    'positions': positions_str
                 }])
                 
                 # Yhdistä simuloitu pelaaja nykyiseen rosteriin
@@ -445,7 +452,7 @@ else:
 
 # --- SIMULOINTI ---
 st.header("🔮 Simuloi uuden pelaajan vaikutus")
-if not st.session_state['roster'].empty and not schedule_filtered.empty and start_date <= end_date:
+if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
     st.subheader("Lisää uusi pelaaja")
     col1, col2, col3 = st.columns(3)
     
@@ -458,12 +465,26 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty and star
     
     if st.button("Simuloi pelaajan lisääminen"):
         if sim_name and sim_team and sim_positions:
+            # Luo pelaaja samalla logiikalla kuin muissa simulaatioissa
             new_player_info = {
                 'name': sim_name,
                 'team': sim_team,
                 'positions': sim_positions
             }
             
+            schedule_filtered = st.session_state['schedule'][
+                (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+                (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+            ]
+            
+            team_game_days = {}
+            for _, row in schedule_filtered.iterrows():
+                date = row['Date']
+                for team in [row['Visitor'], row['Home']]:
+                    if team not in team_game_days:
+                        team_game_days[team] = set()
+                    team_game_days[team].add(date)
+
             with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää..."):
                 _, original_total_games_dict = optimize_roster_advanced(
                     schedule_filtered,
@@ -530,6 +551,14 @@ else:
     ]
 
     if not schedule_filtered.empty:
+        team_game_days = {}
+        for _, row in schedule_filtered.iterrows():
+            date = row['Date']
+            for team in [row['Visitor'], row['Home']]:
+                if team not in team_game_days:
+                    team_game_days[team] = set()
+                team_game_days[team].add(date)
+
         # Suorita analyysi
         team_impact_results = simulate_team_impact(
             schedule_filtered,
