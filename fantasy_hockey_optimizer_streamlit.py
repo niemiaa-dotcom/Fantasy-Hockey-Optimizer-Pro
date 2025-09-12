@@ -200,7 +200,7 @@ else:
                 # Hae päivän pelit
                 day_games = schedule_df[schedule_df['Date'] == date]
                 
-                # Hae pelaajat, joiden joukkueella on peli tänään
+                # Hae pelaajat, joiden joukkueelle on peli tänään
                 available_players = []
                 for _, game in day_games.iterrows():
                     for team in [game['Visitor'], game['Home']]:
@@ -481,8 +481,9 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                     # Optimoi päivän rosteri ja laske aktiiviset pelaajat
                     daily_active = 0
                     if available_players:
-                        _, daily_results = optimize_roster_advanced(
-                            pd.DataFrame([day_games]), 
+                        # KORJAUS: Muuta day_games DataFrameksi oikein
+                        daily_results = optimize_roster_advanced(
+                            schedule_filtered[schedule_filtered['Date'] == date], 
                             st.session_state['roster'], 
                             pos_limits,
                             {team: {date} for team in [game['Visitor'], game['Home']] for _, game in day_games.iterrows()}
@@ -529,8 +530,9 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                         # Optimoi ilman uutta pelaajaa
                         daily_active_without = 0
                         if available_players_without:
-                            _, daily_results_without = optimize_roster_advanced(
-                                pd.DataFrame([day_games]), 
+                            # KORJAUS: Muuta day_games DataFrameksi oikein
+                            daily_results_without = optimize_roster_advanced(
+                                schedule_filtered[schedule_filtered['Date'] == date], 
                                 st.session_state['roster'], 
                                 pos_limits,
                                 {team: {date} for team in [game['Visitor'], game['Home']] for _, game in day_games.iterrows()}
@@ -557,8 +559,9 @@ if not st.session_state['roster'].empty and not schedule_filtered.empty:
                         player_position = None
                         
                         if available_players_with:
-                            _, daily_results_with = optimize_roster_advanced(
-                                pd.DataFrame([day_games]), 
+                            # KORJAUS: Muuta day_games DataFrameksi oikein
+                            daily_results_with = optimize_roster_advanced(
+                                schedule_filtered[schedule_filtered['Date'] == date], 
                                 new_roster, 
                                 pos_limits,
                                 {team: {date} for team in [game['Visitor'], game['Home']] for _, game in day_games.iterrows()}
@@ -723,4 +726,4 @@ with st.expander("📖 Käyttöohjeet"):
 
 # --- SIVUN ALAOSA ---
 st.markdown("---")
-st.markdown("Fantasy Hockey Optimizer Pro v3.5 | Tarkka päiväkohtainen simulaatio")
+st.markdown("Fantasy Hockey Optimizer Pro v3.6 | Korjattu DataFrame-käsittely")
