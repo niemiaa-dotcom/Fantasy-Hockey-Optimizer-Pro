@@ -366,57 +366,43 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
     
     all_dates = sorted(schedule_df['Date'].unique())
     
-    original_player_games = {p: 0 for p in players_info.keys()}
-    for date in all_dates:
-        day_games = schedule_df[schedule_df['Date'] == date]
-        available_players_today = [
-            p['name'] for p in optimize_roster_advanced(
-                day_games, roster_df, limits, team_days)[0][0]['Active'].values()
-        ]
-        
-        for player_name in available_players_today:
-            original_player_games[player_name] += 1
-    
-    original_total_games = sum(original_player_games.values())
+    # Laske alkuperäinen pelimäärä (ilman uusia pelaajia)
+    original_total_games_dict = {}
+    if not roster_df.empty:
+        _, original_total_games_dict, _ = optimize_roster_advanced(schedule_df, roster_df, limits, team_days)
+    original_total_games_by_pos = defaultdict(int)
+    for player_name, games in original_total_games_dict.items():
+        player_pos = roster_df[roster_df['name'] == player_name]['positions'].iloc[0].split('/')[0].strip()
+        original_total_games_by_pos[player_pos] += games
 
     for team in unique_teams:
-        dummy_roster = pd.DataFrame([
-            {'name': 'DUMMY_C', 'team': team, 'positions': 'C', 'fantasy_points_avg': 0},
-            {'name': 'DUMMY_LW', 'team': team, 'positions': 'LW', 'fantasy_points_avg': 0},
-            {'name': 'DUMMY_RW', 'team': team, 'positions': 'RW', 'fantasy_points_avg': 0},
-            {'name': 'DUMMY_D', 'team': team, 'positions': 'D', 'fantasy_points_avg': 0},
-            {'name': 'DUMMY_G', 'team': team, 'positions': 'G', 'fantasy_points_avg': 0}
-        ])
-        
-        temp_roster = pd.concat([roster_df, dummy_roster], ignore_index=True)
-
         for pos in ['C', 'LW', 'RW', 'D', 'G']:
-            temp_roster_pos_sim = temp_roster.copy()
-            
-            # Lisää 0-FP pelaaja, jotta nähdään vaikutus rosterin täyttöasteeseen
-            dummy_name = f'DUMMY_{pos}_{team}'
-            temp_roster_pos_sim.loc[temp_roster_pos_sim['name'] == f'DUMMY_{pos}', 'name'] = dummy_name
-            temp_roster_pos_sim.loc[temp_roster_pos_sim['name'] == dummy_name, 'positions'] = pos
-            
-            _, new_total_games_dict, _ = optimize_roster_advanced(
-                schedule_df,
-                temp_roster_pos_sim,
-                limits,
-                team_days
-            )
+            temp_roster = roster_df.copy()
+            dummy_player = pd.DataFrame([
+                {'name': 'DUMMY_PLAYER', 'team': team, 'positions': pos, 'fantasy_points_avg': 0}
+            ])
+            temp_roster = pd.concat([temp_roster, dummy_player], ignore_index=True)
 
-            simulated_player_games = new_total_games_dict.get(dummy_name, 0)
+            _, new_total_games_dict, _ = optimize_roster_advanced(schedule_df, temp_roster, limits, team_days)
             
-            # Vaikutuksen laskeminen
-            impact_data[team][pos] = simulated_player_games
+            new_total_games_by_pos = defaultdict(int)
+            for player_name, games in new_total_games_dict.items():
+                if player_name in players_info:
+                    player_pos = players_info[player_name]['positions'][0]
+                    new_total_games_by_pos[player_pos] += games
+                elif player_name == 'DUMMY_PLAYER':
+                    new_total_games_by_pos[pos] += games
+
+            impact = new_total_games_by_pos[pos] - original_total_games_by_pos[pos]
+            impact_data[team][pos] = impact
             
     pos_dfs = {}
     for pos in ['C', 'LW', 'RW', 'D', 'G']:
         rows = []
         for team, data in impact_data.items():
-            rows.append({'Joukkue': team, 'Pelipaikka': pos, 'Simuloitu pelimäärä': data.get(pos, 0)})
+            rows.append({'Joukkue': team, 'Pelipaikka': pos, 'Simuloitu pelimäärän muutos': data.get(pos, 0)})
         
-        pos_df = pd.DataFrame(rows).sort_values(by='Simuloitu pelimäärä', ascending=False)
+        pos_df = pd.DataFrame(rows).sort_values(by='Simuloitu pelimäärän muutos', ascending=False)
         pos_dfs[pos] = pos_df
         
     return pos_dfs
@@ -526,6 +512,7 @@ else:
             })
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
+
 
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
@@ -780,5 +767,4 @@ else:
         if st.session_state['team_impact_results'] is not None:
             for pos, df in st.session_state['team_impact_results'].items():
                 st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
-                df.columns = ['Joukkue', 'Pelipaikka', 'Simuloitu pelimäärä']
                 st.dataframe(df, use_container_width=True)
