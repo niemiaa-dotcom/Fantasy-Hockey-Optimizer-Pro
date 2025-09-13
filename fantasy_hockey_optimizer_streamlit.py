@@ -633,7 +633,6 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
 
 ### Joukkueanalyysi 🔍
 
-```python
 st.header("🔍 Joukkueanalyysi")
 st.markdown("""
 Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
