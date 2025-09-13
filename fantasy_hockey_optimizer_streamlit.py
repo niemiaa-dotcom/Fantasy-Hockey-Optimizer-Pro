@@ -473,7 +473,6 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
-
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
 st.subheader("Päivittäinen pelipaikkasaatavuus")
@@ -534,19 +533,25 @@ else:
                 # Simuloitava pelaaja
                 sim_player_name = f'SIM_PLAYER_{pos_check}'
                 
-                # Lisätään simuloitu pelaaja vain, jos hänellä on peli tänään
-                if any(team in day_games['Visitor'].unique() or team in day_games['Home'].unique() for team in st.session_state['roster']['team'].unique()):
+                # Lisätään simuloitu pelaaja vain, jos on pelejä tänään
+                if not day_games.empty:
                     sim_players_list = available_players_today + [sim_player_name]
                     # Lisätään pelaajainfo simuloitua pelaajaa varten
-                    players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check, 'UTIL']}
+                    players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check]}
+                    # Varmista, että maalivahdilla on pelipaikka 'G' eikä 'UTIL'
+                    if pos_check == 'G':
+                        players_info_dict[sim_player_name]['positions'] = ['G']
+                    else:
+                        players_info_dict[sim_player_name]['positions'].append('UTIL')
 
                     # Lasketaan alkuperäinen maksimimäärä
                     original_active_count = get_daily_active_slots(available_players_today, pos_limits)
 
                     # Lasketaan simuloitu maksimimäärä
                     simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
-
+                    
                     # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
+                    # Poista aiempi simulaatio, joka saattoi aiheuttaa virheellisen tuloksen
                     can_fit = simulated_active_count > original_active_count
                     
                     availability_data[pos_check].append(can_fit)
