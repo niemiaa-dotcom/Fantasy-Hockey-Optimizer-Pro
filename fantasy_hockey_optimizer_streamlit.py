@@ -487,29 +487,31 @@ else:
         st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
     else:
         # Pelaajainfo cacheen, jotta sitä ei luoda uudelleen jokaiselle päivälle
-        players_info = {row['name']: {'team': row['team'], 'positions': [p.strip() for p in row['positions'].split('/')]} for _, row in st.session_state['roster'].iterrows()}
+        players_info_dict = {row['name']: {'team': row['team'], 'positions': [p.strip() for p in row['positions'].split('/')]} for _, row in st.session_state['roster'].iterrows()}
 
         @st.cache_data
-        def get_daily_active_slots(players_list, pos_limits, num_attempts=50):
+        def get_daily_active_slots(players_list, pos_limits):
             best_active_players_count = 0
+            num_attempts = 50
             
             for _ in range(num_attempts):
                 shuffled_players = players_list.copy()
                 np.random.shuffle(shuffled_players)
                 active = {pos: [] for pos in pos_limits.keys()}
                 
+                # Sijoitetaan ensin pelaajat parhaille paikoille
                 for player_name in shuffled_players:
                     placed = False
-                    positions = players_info[player_name]['positions']
+                    positions = players_info_dict[player_name]['positions']
                     for pos in positions:
-                        if pos in active and len(active[pos]) < pos_limits[pos]:
+                        if pos in pos_limits and len(active[pos]) < pos_limits[pos] and pos != 'UTIL':
                             active[pos].append(player_name)
                             placed = True
                             break
-                    if not placed and 'UTIL' in active and len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
+                    # Sijoitetaan pelaajat util-paikalle, jos se on ainoa vapaa paikka
+                    if not placed and 'UTIL' in pos_limits and len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
                         active['UTIL'].append(player_name)
-                        placed = True
-
+                
                 current_active_count = sum(len(p) for p in active.values())
                 if current_active_count > best_active_players_count:
                     best_active_players_count = current_active_count
@@ -524,29 +526,36 @@ else:
             day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
             
             available_players_today = [
-                player_name for player_name, info in players_info.items()
+                player_name for player_name, info in players_info_dict.items()
                 if info['team'] in day_games['Visitor'].tolist() or info['team'] in day_games['Home'].tolist()
             ]
 
             for pos_check in positions_to_show:
                 # Simuloitava pelaaja
                 sim_player_name = f'SIM_PLAYER_{pos_check}'
-                sim_players_list = available_players_today + [sim_player_name]
-                players_info[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check, 'C', 'LW', 'RW', 'D']} # Lisää kaikki mahdolliset paikat, jotta Util-paikka huomioidaan
-
-                # Lasketaan alkuperäinen maksimimäärä
-                original_active_count = get_daily_active_slots(available_players_today, pos_limits)
-
-                # Lasketaan simuloitu maksimimäärä
-                simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
-
-                # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
-                can_fit = simulated_active_count > original_active_count
                 
-                availability_data[pos_check].append(can_fit)
+                # Lisätään simuloitu pelaaja vain, jos hänellä on peli tänään
+                if any(team in day_games['Visitor'].unique() or team in day_games['Home'].unique() for team in st.session_state['roster']['team'].unique()):
+                    sim_players_list = available_players_today + [sim_player_name]
+                    # Lisätään pelaajainfo simuloitua pelaajaa varten
+                    players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check, 'UTIL']}
 
-                # Poista simuloitu pelaaja infosta, ettei se vaikuta seuraaviin laskelmiin
-                del players_info[sim_player_name]
+                    # Lasketaan alkuperäinen maksimimäärä
+                    original_active_count = get_daily_active_slots(available_players_today, pos_limits)
+
+                    # Lasketaan simuloitu maksimimäärä
+                    simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
+
+                    # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
+                    can_fit = simulated_active_count > original_active_count
+                    
+                    availability_data[pos_check].append(can_fit)
+
+                    # Poista simuloitu pelaaja infosta, ettei se vaikuta seuraaviin laskelmiin
+                    del players_info_dict[sim_player_name]
+                else:
+                    availability_data[pos_check].append(False) # Ei pelejä, joten ei tilaa
+
 
         availability_df = pd.DataFrame(availability_data, index=dates)
         
