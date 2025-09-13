@@ -48,7 +48,7 @@ if schedule_file_exists and not st.sidebar.button("Lataa uusi aikataulu"):
     st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
 else:
     schedule_file = st.sidebar.file_uploader(
-        "Lataa NHL-peliaikataulu (CSV)", 
+        "Lataa NHL-peliaikataulu (CSV)",
         type=["csv"],
         help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
     )
@@ -66,9 +66,13 @@ else:
         except Exception as e:
             st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
+# Rosterin lataus
 roster_file_exists = False
 try:
-    st.session_state['roster'] = pd.read_csv(ROSTER_FILE)
+    roster_df_from_file = pd.read_csv(ROSTER_FILE)
+    if 'fantasy_points_avg' not in roster_df_from_file.columns:
+        roster_df_from_file['fantasy_points_avg'] = 0.0
+    st.session_state['roster'] = roster_df_from_file
     roster_file_exists = True
 except FileNotFoundError:
     roster_file_exists = False
@@ -77,7 +81,7 @@ if roster_file_exists and not st.sidebar.button("Lataa uusi rosteri"):
     st.sidebar.success("Rosteri ladattu automaattisesti tallennetusta tiedostosta!")
 else:
     roster_file = st.sidebar.file_uploader(
-        "Lataa rosteri (CSV)", 
+        "Lataa rosteri (CSV)",
         type=["csv"],
         help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)"
     )
@@ -85,6 +89,8 @@ else:
         try:
             roster = pd.read_csv(roster_file)
             if not roster.empty and all(col in roster.columns for col in ['name', 'team', 'positions']):
+                if 'fantasy_points_avg' not in roster.columns:
+                    roster['fantasy_points_avg'] = 0.0
                 st.session_state['roster'] = roster
                 roster.to_csv(ROSTER_FILE, index=False)
                 st.sidebar.success("Rosteri ladattu ja tallennettu!")
@@ -495,8 +501,6 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
-
-
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
 st.subheader("Päivittäinen pelipaikkasaatavuus")
@@ -513,7 +517,6 @@ else:
         for _, row in st.session_state['roster'].iterrows():
             positions_list = [p.strip() for p in row['positions'].split('/')]
             players_info_dict[row['name']] = {'team': row['team'], 'positions': positions_list, 'fpa': row.get('fantasy_points_avg', 0)}
-
 
         def get_daily_active_slots(players_list, pos_limits):
             best_active_players_count = 0
@@ -625,9 +628,11 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
         if sim_name and sim_team and sim_positions:
             original_roster_copy = st.session_state['roster'].copy()
             
+            # KORJAUS TÄHÄN: Varmista sarakkeen olemassaolo kopioimalla DataFrame.
+            if 'fantasy_points_avg' not in original_roster_copy.columns:
+                original_roster_copy['fantasy_points_avg'] = 0.0
+
             temp_roster = original_roster_copy.copy()
-            if 'fantasy_points_avg' not in temp_roster.columns:
-                temp_roster['fantasy_points_avg'] = 0.0
             
             if remove_sim_player:
                 temp_roster = temp_roster[temp_roster['name'] != remove_sim_player].copy()
@@ -675,6 +680,10 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             
             original_fp = sum(original_total_games_dict.get(p, 0) * original_roster_copy.loc[original_roster_copy['name'] == p, 'fantasy_points_avg'].iloc[0] for p in original_roster_copy['name'] if not pd.isna(original_roster_copy.loc[original_roster_copy['name'] == p, 'fantasy_points_avg'].iloc[0]))
             
+            # KORJAUS TÄHÄN: Varmista sarakkeen olemassaolo sim_rosterissa.
+            if 'fantasy_points_avg' not in sim_roster.columns:
+                sim_roster['fantasy_points_avg'] = 0.0
+
             new_roster_fp = sum(new_total_games_dict.get(p, 0) * sim_roster.loc[sim_roster['name'] == p, 'fantasy_points_avg'].iloc[0] for p in sim_roster['name'] if not pd.isna(sim_roster.loc[sim_roster['name'] == p, 'fantasy_points_avg'].iloc[0]))
 
             st.subheader(f"Simuloinnin tulos: {sim_name} ({sim_team})")
