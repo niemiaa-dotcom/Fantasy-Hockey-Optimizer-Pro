@@ -475,14 +475,34 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
     with col3:
         sim_positions = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions")
     
-    if st.button("Simuloi pelaajan lisääminen"):
+    # UUSI: Pelaaja poistettavaksi
+    remove_sim_player = st.selectbox(
+        "Pelaaja poistettavaksi rosterista (valinnainen)",
+        [""] + list(st.session_state['roster']['name'])
+    )
+
+    if st.button("Suorita simulaatio"):
         if sim_name and sim_team and sim_positions:
+            
+            # Luo simulaatiorosteri
+            if remove_sim_player:
+                sim_roster = st.session_state['roster'][
+                    st.session_state['roster']['name'] != remove_sim_player
+                ].copy()
+            else:
+                sim_roster = st.session_state['roster'].copy()
+            
             new_player_info = {
                 'name': sim_name,
                 'team': sim_team,
                 'positions': sim_positions
             }
             
+            sim_roster = pd.concat([
+                sim_roster,
+                pd.DataFrame([new_player_info])
+            ], ignore_index=True)
+
             schedule_filtered = st.session_state['schedule'][
                 (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
                 (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
@@ -506,14 +526,9 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
                 original_total = sum(original_total_games_dict.values())
             
             with st.spinner("Lasketaan uuden pelaajan vaikutusta..."):
-                new_roster = pd.concat([
-                    st.session_state['roster'],
-                    pd.DataFrame([new_player_info])
-                ], ignore_index=True)
-                
                 _, new_total_games_dict = optimize_roster_advanced(
                     schedule_filtered,
-                    new_roster,
+                    sim_roster,
                     pos_limits,
                     team_game_days
                 )
@@ -570,7 +585,6 @@ else:
                     team_game_days[team] = set()
                 team_game_days[team].add(date)
 
-        # UUSI: Lisätty painike, joka käynnistää analyysin
         if st.button("Suorita joukkueanalyysi"):
             st.session_state['team_impact_results'] = simulate_team_impact(
                 schedule_filtered,
@@ -579,7 +593,6 @@ else:
                 team_game_days
             )
         
-        # Näytä tulokset taulukoissa vain jos ne on laskettu ja tallennettu
         if st.session_state['team_impact_results'] is not None:
             for pos, df in st.session_state['team_impact_results'].items():
                 st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
