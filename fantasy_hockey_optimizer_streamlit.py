@@ -198,7 +198,7 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_atte
         elif isinstance(positions_str, str):
             positions_list = [p.strip() for p in positions_str.split('/')]
         else:
-            positions_list = positions_str
+            positions_list = positions_list
         
         players_info[player['name']] = {
             'team': player['team'],
@@ -255,42 +255,36 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_atte
                     bench.append(player_name)
             
             # Vaihe 2: Optimoi FP/GP-arvon perusteella
-            # Tämä logiikka muistuttaa aiempaa parannusideaa
             improved = True
             while improved:
                 improved = False
                 
-                # Järjestele penkki parhaiden pelaajien mukaan
-                bench_sorted = sorted(bench, key=lambda name: players_info[name]['fpa'], reverse=True)
+                bench_copy = bench.copy()
+                bench_sorted = sorted(bench_copy, key=lambda name: players_info[name]['fpa'], reverse=True)
                 
                 for bench_player_name in bench_sorted:
                     bench_player_fpa = players_info[bench_player_name]['fpa']
                     bench_player_positions = players_info[bench_player_name]['positions']
                     
+                    swapped = False
                     for active_pos, active_players in active.items():
-                        # Järjestele aktiivisen rosterin pelaajat heikoimpien mukaan
                         active_sorted = sorted([(name, i) for i, name in enumerate(active_players)], key=lambda x: players_info[x[0]]['fpa'])
-
+                        
                         for active_player_name, active_idx in active_sorted:
                             active_player_fpa = players_info[active_player_name]['fpa']
 
-                            # Onko penkkipelaaja parempi?
-                            if bench_player_fpa > active_player_fpa:
-                                # Voiko penkkipelaaja korvata aktiivisen pelaajan samassa paikassa?
-                                if active_pos in bench_player_positions:
-                                    
-                                    # Vaihda pelaajat
-                                    active_players[active_idx] = bench_player_name
-                                    bench.remove(bench_player_name)
-                                    bench.append(active_player_name)
-                                    improved = True
-                                    break
-                            
-                    if improved:
+                            if bench_player_fpa > active_player_fpa and active_pos in bench_player_positions:
+                                active_players[active_idx] = bench_player_name
+                                bench.remove(bench_player_name)
+                                bench.append(active_player_name)
+                                improved = True
+                                swapped = True
+                                break
+                        if swapped:
+                            break
+                    if swapped:
                         break
-                if improved:
-                    break
-            
+
             # Arvioi tämän yrityksen kokonais-FP
             current_fp = 0
             for pos, players in active.items():
@@ -303,8 +297,17 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_atte
                     'active': active.copy(),
                     'bench': bench.copy()
                 }
+            
+            # Jos FP on sama, priorisoi korkeampi aktiivisten pelaajien määrä
+            elif current_fp == best_assignment_fp:
+                current_active_count = sum(len(players) for players in active.values())
+                best_active_count = sum(len(players) for players in best_assignment['active'].values())
+                if current_active_count > best_active_count:
+                    best_assignment = {
+                        'active': active.copy(),
+                        'bench': bench.copy()
+                    }
 
-        # Laske lopullinen pelimäärä ja FP
         if best_assignment is None:
             best_assignment = {
                 'active': {
@@ -446,7 +449,6 @@ else:
             })
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
-
 
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
