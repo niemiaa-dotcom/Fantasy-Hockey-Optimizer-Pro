@@ -477,7 +477,6 @@ else:
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
-Tämä matriisi näyttää päivittäin, kuinka monta vapaata paikkaa sinulla on eri pelipaikoille.
 
 ```python
 if st.session_state['schedule'].empty or st.session_state['roster'].empty:
