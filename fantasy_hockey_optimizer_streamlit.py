@@ -104,6 +104,12 @@ else:
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
 
+# LISÄTTY KOODI TÄHÄN ALLE
+if st.sidebar.button("Tyhjennä koko rosteri"):
+    st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
+    st.sidebar.success("Rosteri tyhjennetty!")
+    st.rerun()
+
 if not st.session_state['roster'].empty:
     st.sidebar.subheader("Nykyinen rosteri")
     st.sidebar.dataframe(st.session_state['roster'])
@@ -174,7 +180,6 @@ pos_limits = {
 }
 
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
-# st.cache_data-dekoraattori poistettu
 def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=200):
     players_info = {}
     for _, player in roster_df.iterrows():
@@ -306,7 +311,6 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_atte
     return daily_results, player_games
 
 # --- UUSI TOIMINNALLISUUS: SIMULOI JOUKKUEEN VAIKUTUS ---
-# st.cache_data-dekoraattori poistettu
 def simulate_team_impact(schedule_df, roster_df, limits, team_days):
     nhl_teams = sorted(list(set(schedule_df['Home'].unique()) | set(schedule_df['Visitor'].unique())))
     positions_to_simulate = ['C', 'LW', 'RW', 'D', 'G']
@@ -494,10 +498,8 @@ else:
     if time_delta.days > 30:
         st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
     else:
-        # Pelaajainfo cacheen, jotta sitä ei luoda uudelleen jokaiselle päivälle
         players_info_dict = {row['name']: {'team': row['team'], 'positions': [p.strip() for p in row['positions'].split('/')]} for _, row in st.session_state['roster'].iterrows()}
 
-        # @st.cache_data-dekoraattori poistettu
         def get_daily_active_slots(players_list, pos_limits):
             best_active_players_count = 0
             num_attempts = 50
@@ -507,7 +509,6 @@ else:
                 np.random.shuffle(shuffled_players)
                 active = {pos: [] for pos in pos_limits.keys()}
                 
-                # Sijoitetaan ensin pelaajat parhaille paikoille
                 for player_name in shuffled_players:
                     placed = False
                     positions = players_info_dict[player_name]['positions']
@@ -516,7 +517,6 @@ else:
                             active[pos].append(player_name)
                             placed = True
                             break
-                    # Sijoitetaan pelaajat util-paikalle, jos se on ainoa vapaa paikka
                     if not placed and 'UTIL' in pos_limits and len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
                         active['UTIL'].append(player_name)
                 
@@ -534,7 +534,6 @@ else:
         for date in dates:
             day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
             
-            # Poista päivät, jolloin pelejä ei ole
             if day_games.empty:
                 continue
 
@@ -546,28 +545,21 @@ else:
             valid_dates.append(date)
 
             for pos_check in positions_to_show:
-                # Simuloitava pelaaja
                 sim_player_name = f'SIM_PLAYER_{pos_check}'
                 
                 sim_players_list = available_players_today + [sim_player_name]
-                # Lisätään pelaajainfo simuloitua pelaajaa varten
                 players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check]}
-                # Varmista, että maalivahdilla on pelipaikka 'G' eikä 'UTIL'
                 if pos_check != 'G':
                     players_info_dict[sim_player_name]['positions'].append('UTIL')
 
-                # Lasketaan alkuperäinen maksimimäärä
                 original_active_count = get_daily_active_slots(available_players_today, pos_limits)
 
-                # Lasketaan simuloitu maksimimäärä
                 simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
                 
-                # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
                 can_fit = simulated_active_count > original_active_count
                 
                 availability_data[pos_check].append(can_fit)
 
-                # Poista simuloitu pelaaja infosta, ettei se vaikuta seuraaviin laskelmiin
                 del players_info_dict[sim_player_name]
 
         availability_df = pd.DataFrame(availability_data, index=valid_dates)
@@ -605,12 +597,10 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
     if st.button("Suorita simulaatio"):
         if sim_name and sim_team and sim_positions:
             
+            sim_roster = st.session_state['roster'].copy()
+            
             if remove_sim_player:
-                sim_roster = st.session_state['roster'][
-                    st.session_state['roster']['name'] != remove_sim_player
-                ].copy()
-            else:
-                sim_roster = st.session_state['roster'].copy()
+                sim_roster = sim_roster[sim_roster['name'] != remove_sim_player].copy()
             
             new_player_info = {
                 'name': sim_name,
