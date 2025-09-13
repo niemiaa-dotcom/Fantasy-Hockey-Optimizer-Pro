@@ -534,7 +534,6 @@ else:
 
 ### Simuloitu vaikutus 🔮
 
-```python
 st.header("🔮 Simuloi uuden pelaajan vaikutus")
 if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
     st.subheader("Lisää uusi pelaaja")
