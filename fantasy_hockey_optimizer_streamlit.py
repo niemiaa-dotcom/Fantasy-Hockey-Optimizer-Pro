@@ -473,12 +473,12 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
----
+#---
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
 st.subheader("Päivittäinen pelipaikkasaatavuus")
-st.markdown("Tämä matriisi näyttää, onko kyseisenä päivänä **mahdollista sijoittaa** pelaaja, joka edustaa kyseistä pelipaikkaa (myös UTIL-paikan kautta).")
+st.markdown("Tämä matriisi näyttää, onko jokaiselle pelipaikalle tilaa kyseisenä päivänä.")
 
 if st.session_state['schedule'].empty or st.session_state['roster'].empty:
     st.warning("Lataa sekä peliaikataulu että rosteri näyttääksesi matriisin.")
@@ -487,216 +487,60 @@ else:
     if time_delta.days > 30:
         st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
     else:
-        # Määritä pelipaikat, jotka sisällytetään matriisiin (poissuljetaan UTIL)
         positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
         availability_data = {pos: [] for pos in positions_to_show}
         dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
+        
+        # Pelaajien tietojen esikäsittely, jotta niitä ei tarvitse käsitellä uudelleen joka päivä
+        players_info = {}
+        for _, player in st.session_state['roster'].iterrows():
+            players_info[player['name']] = {
+                'team': player['team'],
+                'positions': [p.strip() for p in player['positions'].split('/')]
+            }
 
         for date in dates:
+            # Hakee sen päivän pelit
             day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
             
-            # Hae kaikki pelaajat, joilla on peli kyseisenä päivänä
-            players_playing_today = st.session_state['roster'][
-                st.session_state['roster']['team'].isin(list(day_games['Visitor']) + list(day_games['Home']))
-            ].copy() # Käytä kopioita välttääksesi SettingWithCopyWarning
+            # Hakee pelaajat, joilla on peli tänä päivänä
+            available_players_names = set()
+            for _, game in day_games.iterrows():
+                for team in [game['Visitor'], game['Home']]:
+                    for player_name, info in players_info.items():
+                        if info['team'] == team:
+                            available_players_names.add(player_name)
             
-            # Simuloi rosterin täyttöä tälle päivälle
-            # Luo lista kaikista pelaajista, jotka voivat pelata tänään
-            current_roster_for_day = players_playing_today.to_dict('records')
-            
-            # Lasketaan kuinka monta pelaajaa on jo sijoitettu kullekin pelipaikalle
-            # ja kuinka monta pelaajaa on vapaana UTIL-paikalle.
-            
-            # Ensimmäinen läpikäynti: sijoita pelaajat ensisijaisille paikoille
-            assigned_players = set()
-            roster_slots = {pos: 0 for pos in pos_limits.keys()} # Laskee kuinka monta pelaajaa on jo sijoitettu
-            
-            # Listaa pelaajat, jotka ovat pelipaikkoja C, LW, RW, D, G
-            primary_position_players = []
-            for p in current_roster_for_day:
-                p_positions = [pos.strip() for pos in p['positions'].split('/')]
-                for primary_pos in positions_to_show: # Vain C, LW, RW, D, G
-                    if primary_pos in p_positions:
-                        primary_position_players.append({'name': p['name'], 'positions': p_positions})
-                        break # Pelaaja lisätty jo yhteen pääpaikkaan
-            
-            # Yritä sijoittaa pelaajat ensisijaisiin paikkoihin
-            players_placed_primarily = set()
-            for p in primary_position_players:
-                if len(players_placed_primarily) >= sum(pos_limits[pos] for pos in positions_to_show): # Tarkista rajat
-                     break
-                placed = False
-                for pos in p['positions']:
-                    if pos in pos_limits and pos != 'UTIL':
-                        if roster_slots[pos] < pos_limits[pos]:
-                            roster_slots[pos] += 1
-                            players_placed_primarily.add(p['name'])
-                            placed = True
+            # Matriisin laskenta: Tarkista, mahtuuko kyseisen pelipaikan pelaaja rosteriin
+            for pos_check in positions_to_show:
+                # Simuloidaan uuden pelaajan lisäämistä
+                temp_roster = st.session_state['roster'].copy()
+                temp_roster = pd.concat([
+                    temp_roster,
+                    pd.DataFrame([{'name': f'SIM_PLAYER_{pos_check}', 'team': '', 'positions': pos_check}])
+                ], ignore_index=True)
+
+                # Suoritetaan optimointi uudelleen (väliaikaisesti)
+                daily_result, _ = optimize_roster_advanced(
+                    day_games,
+                    temp_roster,
+                    pos_limits,
+                    {}
+                )
+                
+                # Etsitään simuloitu pelaaja
+                simulated_player_was_active = False
+                if daily_result and 'Active' in daily_result[0]:
+                    for players in daily_result[0]['Active'].values():
+                        if f'SIM_PLAYER_{pos_check}' in players:
+                            simulated_player_was_active = True
                             break
-                if not placed:
-                    pass # Pelaaja ei mahtunut ensisijaisiin paikkoihin
+                
+                availability_data[pos_check].append(simulated_player_was_active)
 
-            # Tarkista, mahtuuko tyypillinen pelaaja (ei UTIL)
-            # Jos on vapaita paikkoja missä tahansa ensisijaisessa paikassa
-            # tai jos UTIL-paikkoja on vapaana ja pelaaja on kenttäpelaaja
-            space_available = False
-            
-            # Tarkista ensisijaiset paikat
-            for pos in positions_to_show:
-                if roster_slots[pos] < pos_limits[pos]:
-                    space_available = True
-                    break
-            
-            # Jos ensisijaiset paikat ovat täynnä, tarkista UTIL
-            if not space_available and 'UTIL' in pos_limits and pos_limits['UTIL'] > 0:
-                # Lasketaan pelaajat, jotka on sijoitettu ensisijaisiin paikkoihin
-                # ja tarkistetaan onko vapaata UTIL-paikkaa
-                players_in_primary_slots = roster_slots['C'] + roster_slots['LW'] + roster_slots['RW'] + roster_slots['D'] + roster_slots['G']
-                # Huom:UTIL-paikan vapaiden paikkojen laskenta on monimutkaisempi, koska se voi ottaa eri tyyppisiä pelaajia.
-                # Yksinkertaistettu lähestymistapa: Jos on pelaajia, jotka eivät mahtuneet ensisijaisiin paikkoihin,
-                # ja UTIL-paikkoja on vapana, oletetaan että mahtuu.
-                
-                # Lasketaan pelaajat, jotka pelasi tänään MUTTA eivät mahtuneet ensisijaisiin paikkoihin.
-                non_primary_players_count = len(players_playing_today) - len(players_placed_primarily)
-                
-                # Jos on pelaajia jotka jäi sijoittamatta ensisijaisiin paikkoihin
-                # ja jos UTIL-paikkoja on vapaana (kokonaispelaajien määrä rosterissa < maksimi + UTIL)
-                # Tässä käytetään nyt karkeampaa arviota: jos UTIL-paikkoja on
-                # JA pelaajia on jäljellä, jotka eivät mahtuneet ensisijaisiin paikkoihin.
-                
-                # Simulaatio:
-                # Otetaan kaikki pelaajat, jotka pelaavat tänään.
-                # Yritetään ensin sijoittaa heidät ensisijaisiin paikkoihin.
-                # Jos ensisijaiset paikat täyttyvät, tarkistetaan vapautuvat UTIL-paikat.
-                
-                # Yksinkertaistettu logiikka: Onko jokin pelipaikka täynnä?
-                # Jos jokin pelipaikka (C, LW, RW, D, G) on täynnä, mutta UTIL-paikka on vapaana,
-                # ja pelaaja voi pelata siellä, silloin mahtuu.
-                
-                # Uusi yksinkertaistettu tarkistus:
-                # Onko ketään pelaajaa, jolle löytyisi paikka joko suoraan pelipaikalleen TAI UTIL-paikalle?
-                
-                potential_players_for_slots = []
-                
-                # Kerätään pelaajat, jotka pelaavat tänään ja heidän pelipaikkansa
-                players_today_info = []
-                for _, player in players_playing_today.iterrows():
-                    player_positions = [p.strip() for p in player['positions'].split('/')]
-                    players_today_info.append({'name': player['name'], 'positions': player_positions})
-
-                # Lasketaan vapaat paikat jokaiselle pelipaikalle (mukaan lukien UTIL)
-                filled_slots = {pos: 0 for pos in pos_limits.keys()}
-                
-                # Yritetään ensin täyttää ensisijaiset paikat
-                current_assignment = {} # {pelaaja_nimi: sijoitettu_paikka}
-                
-                # Yritä sijoittaa ensisijaisille paikoille
-                for p_info in players_today_info:
-                    placed = False
-                    for pos in p_info['positions']:
-                        if pos != 'UTIL' and pos in pos_limits:
-                            if filled_slots[pos] < pos_limits[pos]:
-                                filled_slots[pos] += 1
-                                current_assignment[p_info['name']] = pos
-                                placed = True
-                                break
-                    if not placed:
-                        # Jos pelaaja ei mahtunut ensisijaiselle paikalleen, säilytetään hänet vapaana
-                        pass
-
-                # Tarkistetaan UTIL-paikat, jos on vielä vapaita paikkoja
-                # Lasketaan kuinka monta pelaajaa on jo sijoitettu
-                total_assigned_primary = sum(filled_slots[pos] for pos in positions_to_show)
-                
-                # Mahtuuko pelaaja rosteriin?
-                # Joko mahtuu ensisijaiseen paikkaan TAI UTIL-paikalle.
-                
-                can_any_player_fit = False
-                
-                # Tarkista, onko ensisijaisissa paikoissa vapaata tilaa
-                for pos in positions_to_show:
-                    if filled_slots[pos] < pos_limits[pos]:
-                        can_any_player_fit = True
-                        break
-                
-                # Jos ensisijaiset paikat ovat täynnä, tarkista UTIL
-                if not can_any_player_fit and pos_limits.get('UTIL', 0) > 0:
-                    # Kuinka monta pelaajaa on yhteensä, joilla on peli tänään?
-                    num_players_playing_today = len(players_today_info)
-                    # Kuinka monta paikkaa on yhteensä (ensisijaiset + UTIL)
-                    total_available_slots = sum(pos_limits.values())
-                    
-                    # Jos pelaajia on vähemmän kuin paikkoja, silloin mahtuu
-                    if num_players_playing_today <= total_available_slots:
-                        can_any_player_fit = True
-                    else:
-                        # Jos pelaajia on enemmän kuin paikkoja, tarkistetaan mahtuuko pelaaja
-                        # jos joku pelaaja voi siirtyä UTIL-paikalle
-                        
-                        # Kuinka monta paikkaa on jo täytetty ensisijaisilla paikoilla
-                        currently_filled_primary = sum(filled_slots[pos] for pos in positions_to_show)
-                        
-                        # Kuinka monta UTIL-paikkaa on vapaana?
-                        available_util_slots = pos_limits.get('UTIL', 0)
-                        
-                        # Jos pelaajia on yhteensä vähemmän kuin ensisijaiset + UTIL paikat
-                        if num_players_playing_today < currently_filled_primary + available_util_slots:
-                            can_any_player_fit = True
-                        # Jos pelaajia on tasan paikkojen määrä, tarkistetaan voiko joku siirtyä UTIL-paikalle
-                        elif num_players_playing_today == currently_filled_primary + available_util_slots:
-                            # Tarkista, löytyykö pelaajia, jotka voisivat pelata UTIL-paikalla
-                            # Tässä yksinkertaistetaan: jos pelaajia on yhteensä 'vähemmän tai yhtä paljon'
-                            # kuin käytettävissä olevia paikkoja (ensisijaiset + UTIL), oletetaan mahtuvan.
-                            can_any_player_fit = True
-
-                # Jos yksikään pelaaja ei mahdu, tämä päivä on "täynnä"
-                # Päivittäinen matriisi näyttää, voidaanko kyseisen pelipaikan pelaaja sijoittaa
-                # Eli jos voidaan sijoittaa ainakin yksi pelaaja (joka edustaa tätä pelipaikkaa)
-                
-                # Tarkistetaan, onko mahdollista sijoittaa pelaaja tälle pelipaikalle
-                # Tässä yritetään löytää edes yksi pelaaja, joka mahtuisi aktiiviseen rosteriin
-                # joko suoralle paikalle tai UTIL-paikalle.
-                
-                possible_to_fit_player_for_pos = False
-                
-                # Käydään läpi kaikki pelaajat, joilla on peli tänään
-                for p_info in players_today_info:
-                    can_player_fit_directly = False
-                    # Tarkista ensisijaiset paikat
-                    for pos in p_info['positions']:
-                        if pos != 'UTIL' and pos in pos_limits:
-                            if filled_slots[pos] < pos_limits[pos]:
-                                can_player_fit_directly = True
-                                break
-                    
-                    # Jos ei mahtunut suoraan, tarkista UTIL
-                    if not can_player_fit_directly:
-                        # Onko UTIL-paikkoja vapaana?
-                        # Lasketaan kuinka monta pelaajaa on sijoitettu (ensisijaiset + UTIL)
-                        currently_assigned_count = sum(filled_slots.values()) # Tämä on hieman epätarkka, UTIL pitäisi laskea erikseen
-                        
-                        # Uudelleenlaskenta: Kuinka monta paikkaa on täytetty yhteensä
-                        total_filled_slots = sum(filled_slots[p] for p in positions_to_show)
-                        if 'UTIL' in pos_limits:
-                            total_filled_slots += (len(players_today_info) - total_filled_slots) if len(players_today_info) > total_filled_slots else 0 # karkeasti arvio
-                        
-                        if pos_limits.get('UTIL', 0) > 0: # Onko UTIL-paikkoja edes olemassa
-                             # Tarkista, mahtuuko pelaaja, jos ensisijaiset paikat ovat täynnä
-                            if total_filled_slots < sum(pos_limits.values()): # Onko yhteensä paikkoja vapaana
-                                possible_to_fit_player_for_pos = True
-                                break # Riittää että yksi pelaaja mahtuu
-                                
-                    else: # Mahtui suoraan
-                        possible_to_fit_player_for_pos = True
-                        break # Riittää että yksi pelaaja mahtuu
-                        
-                # Tallenna tulos matriisiin
-                availability_data[pos].append(possible_to_fit_player_for_pos)
-                
         availability_df = pd.DataFrame(availability_data, index=dates)
         
         def color_cells(val):
-            # Vihreä jos True (mahtuu), punainen jos False (ei mahdu)
             color = 'green' if val else 'red'
             return f'background-color: {color}'
 
@@ -705,7 +549,7 @@ else:
             use_container_width=True
         )
 
----
+#---
 
 ### Simuloitu vaikutus 🔮
 
@@ -804,7 +648,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
         else:
             st.warning("Syötä kaikki pelaajan tiedot suorittaaksesi simulaation.")
 
----
+#---
 
 ### Joukkueanalyysi 🔍
 
