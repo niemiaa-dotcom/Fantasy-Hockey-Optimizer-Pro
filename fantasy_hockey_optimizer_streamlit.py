@@ -473,9 +473,12 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
-#---
+---
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
+
+st.subheader("Päivittäinen pelipaikkasaatavuus")
+st.markdown("Tämä matriisi näyttää, onko jokaiselle pelipaikalle tilaa kyseisenä päivänä.")
 
 if st.session_state['schedule'].empty or st.session_state['roster'].empty:
     st.warning("Lataa sekä peliaikataulu että rosteri näyttääksesi matriisin.")
@@ -484,45 +487,35 @@ else:
     if time_delta.days > 30:
         st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
     else:
-        st.subheader("Päivittäinen pelipaikkasaatavuus")
-        
-        availability_data = {pos: [] for pos in pos_limits.keys()}
+        # Määritä pelipaikat, jotka sisällytetään matriisiin
+        positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
+        availability_data = {pos: [] for pos in positions_to_show}
         dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
 
         for date in dates:
             day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
-            available_players = st.session_state['roster'][
+            
+            # Hae ne pelaajat, joilla on peli kyseisenä päivänä
+            players_with_games = st.session_state['roster'][
                 st.session_state['roster']['team'].isin(list(day_games['Visitor']) + list(day_games['Home']))
             ]
 
-            roster_subset = available_players.copy()
-            daily_roster_info = {}
-            for _, row in roster_subset.iterrows():
-                daily_roster_info[row['name']] = {
-                    'team': row['team'],
-                    'positions': [p.strip() for p in row['positions'].split('/')]
-                }
+            # Laskee pelaajien määrän per pelipaikka
+            players_per_position = defaultdict(int)
+            for _, player in players_with_games.iterrows():
+                positions = [p.strip() for p in player['positions'].split('/')]
+                for pos in positions:
+                    players_per_position[pos] += 1
             
-            active = {pos: [] for pos in pos_limits.keys()}
-            
-            for _, player in roster_subset.iterrows():
-                placed = False
-                for pos in [p.strip() for p in player['positions'].split('/')]:
-                    if pos in pos_limits and len(active[pos]) < pos_limits[pos]:
-                        active[pos].append(player['name'])
-                        placed = True
-                        break
-                if not placed and 'UTIL' in pos_limits and len(active['UTIL']) < pos_limits['UTIL']:
-                    active['UTIL'].append(player['name'])
-            
-            for pos in pos_limits.keys():
-                free_slots = pos_limits[pos] - len(active[pos])
-                availability_data[pos].append(free_slots)
+            # Tarkista jokaiselle pelipaikalle, mahtuuko pelaaja
+            for pos in positions_to_show:
+                can_fit = players_per_position.get(pos, 0) < pos_limits[pos]
+                availability_data[pos].append(can_fit)
 
         availability_df = pd.DataFrame(availability_data, index=dates)
         
         def color_cells(val):
-            color = 'green' if val > 0 else 'red'
+            color = 'green' if val else 'red'
             return f'background-color: {color}'
 
         st.dataframe(
@@ -530,7 +523,7 @@ else:
             use_container_width=True
         )
 
-#---
+---
 
 ### Simuloitu vaikutus 🔮
 
@@ -629,7 +622,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
         else:
             st.warning("Syötä kaikki pelaajan tiedot suorittaaksesi simulaation.")
 
-#---
+---
 
 ### Joukkueanalyysi 🔍
 
