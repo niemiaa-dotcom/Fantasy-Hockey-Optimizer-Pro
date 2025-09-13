@@ -473,6 +473,8 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
+---
+
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
 st.subheader("Päivittäinen pelipaikkasaatavuus")
@@ -485,44 +487,84 @@ else:
     if time_delta.days > 30:
         st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
     else:
-        # Käytä jo laskettuja optimointituloksia
-        if 'daily_results' not in locals():
-            st.warning("Suorita ensin 'Rosterin optimointi' -laskenta.")
-        else:
-            positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
-            availability_data = {pos: [] for pos in positions_to_show}
-            dates = [result['Date'] for result in daily_results]
-
-            # Tarkista jokaiselle päivälle, mahtuuko kyseisen pelipaikan pelaaja rosteriin
-            for result in daily_results:
-                daily_active = result['Active']
-                daily_bench = result['Bench']
-                
-                # Lasketaan paikkojen täyttöaste
-                filled_slots = {pos: len(players) for pos, players in daily_active.items()}
-
-                for pos_check in positions_to_show:
-                    can_fit = False
-                    
-                    # Tarkista, onko pelipaikalla tilaa
-                    if filled_slots.get(pos_check, 0) < pos_limits[pos_check]:
-                        can_fit = True
-                    # Tarkista, onko UTIL-paikalla tilaa ja onko kyseessä kenttäpelaaja
-                    elif pos_check in ['C', 'LW', 'RW', 'D'] and filled_slots.get('UTIL', 0) < pos_limits.get('UTIL', 0):
-                        can_fit = True
-                    
-                    availability_data[pos_check].append(can_fit)
-
-            availability_df = pd.DataFrame(availability_data, index=dates)
+        # Käytetään Streamlitin sessiomuuttujia (st.session_state) tulosten tallentamiseen
+        # jotta optimointia ei tarvitse ajaa uudelleen pelkästään matriisin vuoksi.
+        
+        # Luodaan uusi optimointifunktio, jota käytetään vain matriisilaskennassa
+        # Se laskee päivän pelaajien sijoittelun ja palauttaa vain aktiiviset paikat
+        def get_daily_active_slots(roster, pos_limits, day_games, num_attempts=50):
+            players_info = {row['name']: {'team': row['team'], 'positions': [p.strip() for p in row['positions'].split('/')]} for _, row in roster.iterrows()}
             
-            def color_cells(val):
-                color = 'green' if val else 'red'
-                return f'background-color: {color}'
+            available_players = []
+            for _, game in day_games.iterrows():
+                for team in [game['Visitor'], game['Home']]:
+                    for player_name, info in players_info.items():
+                        if info['team'] == team:
+                            available_players.append(player_name)
+            
+            best_active_players_count = 0
+            
+            for _ in range(num_attempts):
+                shuffled_players = available_players.copy()
+                np.random.shuffle(shuffled_players)
 
-            st.dataframe(
-                availability_df.style.applymap(color_cells),
-                use_container_width=True
-            )
+                active = {pos: [] for pos in pos_limits.keys()}
+                
+                for player_name in shuffled_players:
+                    placed = False
+                    positions = players_info[player_name]['positions']
+                    for pos in positions:
+                        if pos in active and len(active[pos]) < pos_limits[pos]:
+                            active[pos].append(player_name)
+                            placed = True
+                            break
+                    if not placed:
+                        if len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
+                            active['UTIL'].append(player_name)
+                
+                current_active_count = sum(len(p) for p in active.values())
+                if current_active_count > best_active_players_count:
+                    best_active_players_count = current_active_count
+            
+            return best_active_players_count
+
+        positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
+        availability_data = {pos: [] for pos in positions_to_show}
+        dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
+
+        for date in dates:
+            day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
+            
+            # Matriisin laskenta: Tarkista, mahtuuko kyseisen pelipaikan pelaaja rosteriin
+            for pos_check in positions_to_show:
+                # Simuloidaan uuden pelaajan lisäämistä
+                temp_roster = st.session_state['roster'].copy()
+                temp_roster = pd.concat([
+                    temp_roster,
+                    pd.DataFrame([{'name': f'SIM_PLAYER_{pos_check}', 'team': 'TEMP', 'positions': pos_check}])
+                ], ignore_index=True)
+                
+                # Lasketaan, kuinka monta pelaajaa mahtuu rosteriin ilman simuloitua pelaajaa
+                original_active_count = get_daily_active_slots(st.session_state['roster'], pos_limits, day_games)
+                
+                # Lasketaan, kuinka monta pelaajaa mahtuu rosteriin simuloidun pelaajan kanssa
+                simulated_active_count = get_daily_active_slots(temp_roster, pos_limits, day_games)
+
+                # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
+                can_fit = simulated_active_count > original_active_count
+                
+                availability_data[pos_check].append(can_fit)
+
+        availability_df = pd.DataFrame(availability_data, index=dates)
+        
+        def color_cells(val):
+            color = 'green' if val else 'red'
+            return f'background-color: {color}'
+
+        st.dataframe(
+            availability_df.style.applymap(color_cells),
+            use_container_width=True
+        )
 
 #---
 
