@@ -40,12 +40,9 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
 # Tarkista, onko tallennettu aikataulutiedosto olemassa
 schedule_file_exists = False
 try:
-    if SCHEDULE_FILE in st.secrets:
-        pass
-    else:
-        st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
-        st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date'])
-        schedule_file_exists = True
+    st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
+    st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date'])
+    schedule_file_exists = True
 except FileNotFoundError:
     schedule_file_exists = False
 
@@ -104,9 +101,10 @@ else:
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
 
-# LISÄTTY KOODI TÄHÄN ALLE
 if st.sidebar.button("Tyhjennä koko rosteri"):
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
+    if os.path.exists(ROSTER_FILE):
+        os.remove(ROSTER_FILE)
     st.sidebar.success("Rosteri tyhjennetty!")
     st.rerun()
 
@@ -485,6 +483,7 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
+---
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
