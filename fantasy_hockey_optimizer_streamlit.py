@@ -298,7 +298,12 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
     positions_to_simulate = ['C', 'LW', 'RW', 'D', 'G']
     
     impact_data = []
-    
+
+    # Laske alkuperäisen rosterin kokonaispelimäärä kerran
+    with st.spinner("Lasketaan alkuperäinen kokonaispelimäärä..."):
+        _, original_games = optimize_roster_advanced(schedule_df, roster_df, limits, team_days)
+        original_total = sum(original_games.values())
+
     with st.spinner("Simuloidaan joukkueiden optimaalista vaikutusta..."):
         for team in nhl_teams:
             for position in positions_to_simulate:
@@ -312,19 +317,20 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
                     'positions': positions_str
                 }])
                 
-                # Luo simulaatiorosteri lisäämällä uusi pelaaja
                 sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
                 
-                # Aja optimointi simulaatiorosterilla
-                _, simulated_games = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
+                _, simulated_games_dict = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
                 
-                # Hae ainoastaan simuloidun pelaajan pelimäärä
-                games_played = simulated_games.get(sim_player_name, 0)
+                # Uusi: Laske uusi kokonaispelimäärä
+                simulated_total = sum(simulated_games_dict.values())
                 
+                # Uusi: Laske kokonaispelimäärän muutos
+                total_game_change = simulated_total - original_total
+
                 impact_data.append({
                     'Joukkue': team,
                     'Pelipaikka': position,
-                    'Pelit': games_played
+                    'Kokonaispelimäärän muutos': total_game_change
                 })
 
             if 'UTIL' in limits:
@@ -337,22 +343,23 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
                     'positions': positions_str
                 }])
                 sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
-                _, simulated_games = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
+                _, simulated_games_dict = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
                 
-                games_played = simulated_games.get(sim_player_name, 0)
-                
+                simulated_total = sum(simulated_games_dict.values())
+                total_game_change = simulated_total - original_total
+
                 impact_data.append({
                     'Joukkue': team,
                     'Pelipaikka': 'UTIL',
-                    'Pelit': games_played
+                    'Kokonaispelimäärän muutos': total_game_change
                 })
                 
     impact_df = pd.DataFrame(impact_data)
     
     results_by_position = {}
     for pos in positions_to_simulate + ['UTIL']:
-        pos_df = impact_df[impact_df['Pelipaikka'] == pos].sort_values(by='Pelit', ascending=False)
-        pos_df = pos_df[pos_df['Pelit'] > 0]
+        pos_df = impact_df[impact_df['Pelipaikka'] == pos].sort_values(by='Kokonaispelimäärän muutos', ascending=False)
+        pos_df = pos_df[pos_df['Kokonaispelimäärän muutos'] > 0]
         if not pos_df.empty:
             results_by_position[pos] = pos_df.head(10).reset_index(drop=True)
     
@@ -599,5 +606,5 @@ else:
         if st.session_state['team_impact_results'] is not None:
             for pos, df in st.session_state['team_impact_results'].items():
                 st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
-                df.columns = ['Joukkue', 'Pelipaikka', 'Pelit']
+                df.columns = ['Joukkue', 'Pelipaikka', 'Kokonaispelimäärän muutos']
                 st.dataframe(df, use_container_width=True)
