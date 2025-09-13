@@ -312,10 +312,13 @@ def simulate_team_impact(schedule_df, roster_df, limits, team_days):
                     'positions': positions_str
                 }])
                 
+                # Luo simulaatiorosteri lisäämällä uusi pelaaja
                 sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
                 
+                # Aja optimointi simulaatiorosterilla
                 _, simulated_games = optimize_roster_advanced(schedule_df, sim_roster, limits, team_days)
                 
+                # Hae ainoastaan simuloidun pelaajan pelimäärä
                 games_played = simulated_games.get(sim_player_name, 0)
                 
                 impact_data.append({
