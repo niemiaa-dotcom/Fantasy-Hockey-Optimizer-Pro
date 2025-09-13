@@ -473,6 +473,7 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
+
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
 st.subheader("Päivittäinen pelipaikkasaatavuus")
@@ -520,49 +521,49 @@ else:
         positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
         availability_data = {pos: [] for pos in positions_to_show}
         dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
+        valid_dates = []
 
         for date in dates:
             day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
             
+            # Poista päivät, jolloin pelejä ei ole
+            if day_games.empty:
+                continue
+
             available_players_today = [
                 player_name for player_name, info in players_info_dict.items()
                 if info['team'] in day_games['Visitor'].tolist() or info['team'] in day_games['Home'].tolist()
             ]
 
+            valid_dates.append(date)
+
             for pos_check in positions_to_show:
                 # Simuloitava pelaaja
                 sim_player_name = f'SIM_PLAYER_{pos_check}'
                 
-                # Lisätään simuloitu pelaaja vain, jos on pelejä tänään
-                if not day_games.empty:
-                    sim_players_list = available_players_today + [sim_player_name]
-                    # Lisätään pelaajainfo simuloitua pelaajaa varten
-                    players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check]}
-                    # Varmista, että maalivahdilla on pelipaikka 'G' eikä 'UTIL'
-                    if pos_check == 'G':
-                        players_info_dict[sim_player_name]['positions'] = ['G']
-                    else:
-                        players_info_dict[sim_player_name]['positions'].append('UTIL')
+                sim_players_list = available_players_today + [sim_player_name]
+                # Lisätään pelaajainfo simuloitua pelaajaa varten
+                players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check]}
+                # Varmista, että maalivahdilla on pelipaikka 'G' eikä 'UTIL'
+                if pos_check != 'G':
+                    players_info_dict[sim_player_name]['positions'].append('UTIL')
 
-                    # Lasketaan alkuperäinen maksimimäärä
-                    original_active_count = get_daily_active_slots(available_players_today, pos_limits)
+                # Lasketaan alkuperäinen maksimimäärä
+                original_active_count = get_daily_active_slots(available_players_today, pos_limits)
 
-                    # Lasketaan simuloitu maksimimäärä
-                    simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
-                    
-                    # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
-                    # Poista aiempi simulaatio, joka saattoi aiheuttaa virheellisen tuloksen
-                    can_fit = simulated_active_count > original_active_count
-                    
-                    availability_data[pos_check].append(can_fit)
+                # Lasketaan simuloitu maksimimäärä
+                simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
+                
+                # Jos aktiivisten pelaajien määrä kasvoi, tarkoittaa, että simuloitu pelaaja mahtui rosteriin
+                can_fit = simulated_active_count > original_active_count
+                
+                availability_data[pos_check].append(can_fit)
 
-                    # Poista simuloitu pelaaja infosta, ettei se vaikuta seuraaviin laskelmiin
-                    del players_info_dict[sim_player_name]
-                else:
-                    availability_data[pos_check].append(False) # Ei pelejä, joten ei tilaa
+                # Poista simuloitu pelaaja infosta, ettei se vaikuta seuraaviin laskelmiin
+                del players_info_dict[sim_player_name]
 
 
-        availability_df = pd.DataFrame(availability_data, index=dates)
+        availability_df = pd.DataFrame(availability_data, index=valid_dates)
         
         def color_cells(val):
             color = 'green' if val else 'red'
