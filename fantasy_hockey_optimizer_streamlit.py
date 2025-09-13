@@ -29,6 +29,14 @@ if 'team_impact_results' not in st.session_state:
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
+# Välimuistin tyhjennyspainike
+if st.sidebar.button("Tyhjennä kaikki välimuisti"):
+    st.cache_data.clear()
+    st.session_state['schedule'] = pd.DataFrame()
+    st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions'])
+    st.sidebar.success("Välimuisti tyhjennetty!")
+    st.rerun()
+
 # Tarkista, onko tallennettu aikataulutiedosto olemassa
 schedule_file_exists = False
 try:
@@ -166,7 +174,7 @@ pos_limits = {
 }
 
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
-@st.cache_data
+# st.cache_data-dekoraattori poistettu
 def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_attempts=200):
     players_info = {}
     for _, player in roster_df.iterrows():
@@ -298,7 +306,7 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, team_days, num_atte
     return daily_results, player_games
 
 # --- UUSI TOIMINNALLISUUS: SIMULOI JOUKKUEEN VAIKUTUS ---
-@st.cache_data
+# st.cache_data-dekoraattori poistettu
 def simulate_team_impact(schedule_df, roster_df, limits, team_days):
     nhl_teams = sorted(list(set(schedule_df['Home'].unique()) | set(schedule_df['Visitor'].unique())))
     positions_to_simulate = ['C', 'LW', 'RW', 'D', 'G']
@@ -473,6 +481,7 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
+---
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
@@ -489,7 +498,7 @@ else:
         # Pelaajainfo cacheen, jotta sitä ei luoda uudelleen jokaiselle päivälle
         players_info_dict = {row['name']: {'team': row['team'], 'positions': [p.strip() for p in row['positions'].split('/')]} for _, row in st.session_state['roster'].iterrows()}
 
-        @st.cache_data
+        # @st.cache_data-dekoraattori poistettu
         def get_daily_active_slots(players_list, pos_limits):
             best_active_players_count = 0
             num_attempts = 50
@@ -561,7 +570,6 @@ else:
 
                 # Poista simuloitu pelaaja infosta, ettei se vaikuta seuraaviin laskelmiin
                 del players_info_dict[sim_player_name]
-
 
         availability_df = pd.DataFrame(availability_data, index=valid_dates)
         
