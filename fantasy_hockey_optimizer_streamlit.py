@@ -473,7 +473,7 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
-#---
+---
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
@@ -487,67 +487,44 @@ else:
     if time_delta.days > 30:
         st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
     else:
-        positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
-        availability_data = {pos: [] for pos in positions_to_show}
-        dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
-        
-        # Pelaajien tietojen esikäsittely, jotta niitä ei tarvitse käsitellä uudelleen joka päivä
-        players_info = {}
-        for _, player in st.session_state['roster'].iterrows():
-            players_info[player['name']] = {
-                'team': player['team'],
-                'positions': [p.strip() for p in player['positions'].split('/')]
-            }
+        # Käytä jo laskettuja optimointituloksia
+        if 'daily_results' not in locals():
+            st.warning("Suorita ensin 'Rosterin optimointi' -laskenta.")
+        else:
+            positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
+            availability_data = {pos: [] for pos in positions_to_show}
+            dates = [result['Date'] for result in daily_results]
 
-        for date in dates:
-            # Hakee sen päivän pelit
-            day_games = st.session_state['schedule'][st.session_state['schedule']['Date'].dt.date == date]
-            
-            # Hakee pelaajat, joilla on peli tänä päivänä
-            available_players_names = set()
-            for _, game in day_games.iterrows():
-                for team in [game['Visitor'], game['Home']]:
-                    for player_name, info in players_info.items():
-                        if info['team'] == team:
-                            available_players_names.add(player_name)
-            
-            # Matriisin laskenta: Tarkista, mahtuuko kyseisen pelipaikan pelaaja rosteriin
-            for pos_check in positions_to_show:
-                # Simuloidaan uuden pelaajan lisäämistä
-                temp_roster = st.session_state['roster'].copy()
-                temp_roster = pd.concat([
-                    temp_roster,
-                    pd.DataFrame([{'name': f'SIM_PLAYER_{pos_check}', 'team': '', 'positions': pos_check}])
-                ], ignore_index=True)
-
-                # Suoritetaan optimointi uudelleen (väliaikaisesti)
-                daily_result, _ = optimize_roster_advanced(
-                    day_games,
-                    temp_roster,
-                    pos_limits,
-                    {}
-                )
+            # Tarkista jokaiselle päivälle, mahtuuko kyseisen pelipaikan pelaaja rosteriin
+            for result in daily_results:
+                daily_active = result['Active']
+                daily_bench = result['Bench']
                 
-                # Etsitään simuloitu pelaaja
-                simulated_player_was_active = False
-                if daily_result and 'Active' in daily_result[0]:
-                    for players in daily_result[0]['Active'].values():
-                        if f'SIM_PLAYER_{pos_check}' in players:
-                            simulated_player_was_active = True
-                            break
-                
-                availability_data[pos_check].append(simulated_player_was_active)
+                # Lasketaan paikkojen täyttöaste
+                filled_slots = {pos: len(players) for pos, players in daily_active.items()}
 
-        availability_df = pd.DataFrame(availability_data, index=dates)
-        
-        def color_cells(val):
-            color = 'green' if val else 'red'
-            return f'background-color: {color}'
+                for pos_check in positions_to_show:
+                    can_fit = False
+                    
+                    # Tarkista, onko pelipaikalla tilaa
+                    if filled_slots.get(pos_check, 0) < pos_limits[pos_check]:
+                        can_fit = True
+                    # Tarkista, onko UTIL-paikalla tilaa ja onko kyseessä kenttäpelaaja
+                    elif pos_check in ['C', 'LW', 'RW', 'D'] and filled_slots.get('UTIL', 0) < pos_limits.get('UTIL', 0):
+                        can_fit = True
+                    
+                    availability_data[pos_check].append(can_fit)
 
-        st.dataframe(
-            availability_df.style.applymap(color_cells),
-            use_container_width=True
-        )
+            availability_df = pd.DataFrame(availability_data, index=dates)
+            
+            def color_cells(val):
+                color = 'green' if val else 'red'
+                return f'background-color: {color}'
+
+            st.dataframe(
+                availability_df.style.applymap(color_cells),
+                use_container_width=True
+            )
 
 #---
 
