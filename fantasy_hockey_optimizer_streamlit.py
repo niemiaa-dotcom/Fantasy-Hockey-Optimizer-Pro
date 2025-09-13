@@ -477,8 +477,6 @@ else:
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
-
-```python
 if st.session_state['schedule'].empty or st.session_state['roster'].empty:
     st.warning("Lataa sekä peliaikataulu että rosteri näyttääksesi matriisin.")
 else:
