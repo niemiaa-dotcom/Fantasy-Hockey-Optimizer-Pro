@@ -441,7 +441,6 @@ else:
             st.write("Pelipaikkojen kokonaispelimäärät")
             st.dataframe(pos_df)
 
----
 
 ### Päivittäinen pelipaikkasaatavuus 🗓️
 
