@@ -772,43 +772,44 @@ with tab1:
     else:
         st.info("Lataa rosteri ja peliaikataulu, jotta voit vertailla pelaajia.")
 
-    # Alkuperäinen joukkueanalyysi osio
-    st.markdown("---")
-    st.header("🔍 Joukkueanalyysi")
-    st.markdown("""
-    Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
-    ja näyttää, mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle
-    ottaen huomioon nykyisen rosterisi.
-    """)
-    if st.session_state['schedule'].empty or st.session_state['roster'].empty:
-        st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
-    else:
-        schedule_filtered = st.session_state['schedule'][
-            (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-            (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-        ]
+   ### Joukkueanalyysi 🔍
 
-        if not schedule_filtered.empty:
-            team_game_days = {}
-            for _, row in schedule_filtered.iterrows():
-                date = row['Date']
-                for team in [row['Visitor'], row['Home']]:
-                    if team not in team_game_days:
-                        team_game_days[team] = set()
-                    team_game_days[team].add(date)
+st.header("🔍 Joukkueanalyysi")
+st.markdown("""
+Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
+ja näyttää, mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle
+ottaen huomioon nykyisen rosterisi.
+""")
 
-            if st.button("Suorita joukkueanalyysi"):
-                st.session_state['team_impact_results'] = simulate_team_impact(
-                    schedule_filtered,
-                    st.session_state['roster'],
-                    pos_limits,
-                    team_game_days
-                )
-            
-            if st.session_state['team_impact_results'] is not None:
-                for pos, df in st.session_state['team_impact_results'].items():
-                    st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
-                    st.dataframe(df, use_container_width=True)
+if st.session_state['schedule'].empty or st.session_state['roster'].empty:
+    st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+else:
+    schedule_filtered = st.session_state['schedule'][
+        (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+        (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+    ]
+
+    if not schedule_filtered.empty:
+        team_game_days = {}
+        for _, row in schedule_filtered.iterrows():
+            date = row['Date']
+            for team in [row['Visitor'], row['Home']]:
+                if team not in team_game_days:
+                    team_game_days[team] = set()
+                team_game_days[team].add(date)
+
+        if st.button("Suorita joukkueanalyysi"):
+            st.session_state['team_impact_results'] = simulate_team_impact(
+                schedule_filtered,
+                st.session_state['roster'],
+                pos_limits,
+                team_game_days
+            )
+        
+        if st.session_state['team_impact_results'] is not None:
+            for pos, df in st.session_state['team_impact_results'].items():
+                st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
+                st.dataframe(df, use_container_width=True)
 
 
 with tab2:
