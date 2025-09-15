@@ -394,7 +394,6 @@ tab1, tab2, tab3 = st.tabs(["📊 Pääanalyysi", "🔮 Pelaajavertailu", "🆚 
 
 with tab1:
     st.header("📊 Pääanalyysi")
-    st.markdown("Tarkastele oman rosterisi optimointia ja pelien kokonaismäärää.")
 
     if st.session_state['roster'].empty:
         st.warning("Lataa rosteri nähdäksesi pelaajat")
@@ -424,6 +423,19 @@ with tab1:
                     pos_limits
                 )
             
+            st.subheader("Pelipaikkojen täyttöaste")
+            filled_positions_data = []
+            for result in daily_results:
+                date_str = result['Date'].strftime('%b %d')
+                row = {'Päivä': date_str}
+                for pos in ['C', 'LW', 'RW', 'D', 'G', 'UTIL']:
+                    filled = len(result['Active'].get(pos, []))
+                    total = pos_limits[pos]
+                    row[pos] = f"{filled}/{total}"
+                filled_positions_data.append(row)
+            filled_positions_df = pd.DataFrame(filled_positions_data)
+            st.dataframe(filled_positions_df, use_container_width=True)
+
             st.subheader("Päivittäisten pelien yhteenveto")
             summary_data = []
             for result in daily_results:
