@@ -131,7 +131,7 @@ else:
         try:
             opponent_roster = pd.read_csv(opponent_roster_file)
             if not opponent_roster.empty and all(col in opponent_roster.columns for col in ['name', 'team', 'positions']):
-                if 'fantasy_points_avg' not in opponent.columns:
+                if 'fantasy_points_avg' not in opponent_roster.columns:
                     opponent_roster['fantasy_points_avg'] = 0.0
                 opponent_roster['fantasy_points_avg'] = pd.to_numeric(opponent_roster['fantasy_points_avg'], errors='coerce').fillna(0)
                 st.session_state['opponent_roster'] = opponent_roster
@@ -202,8 +202,9 @@ if not st.session_state['roster'].empty:
 st.sidebar.header("⚙️ Asetukset")
 
 st.sidebar.subheader("Aikaväli")
+default_start_date = datetime(2025, 10, 5).date()
 today = datetime.now().date()
-start_date = st.sidebar.date_input("Alkupäivä", today - timedelta(days=30))
+start_date = st.sidebar.date_input("Alkupäivä", default_start_date)
 end_date = st.sidebar.date_input("Loppupäivä", today)
 
 if start_date > end_date:
@@ -398,12 +399,6 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
     positions_to_check = ['C', 'LW', 'RW', 'D', 'G']
     team_impact = defaultdict(lambda: defaultdict(int))
     
-    # Get players info for all players in the current roster
-    players_info_dict = {}
-    for _, row in roster_df.iterrows():
-        positions_list = [p.strip() for p in row['positions'].split('/')]
-        players_info_dict[row['name']] = {'team': row['team'], 'positions': positions_list, 'fpa': row.get('fantasy_points_avg', 0)}
-
     for team in all_teams:
         for pos_check in positions_to_check:
             # Create a temporary roster with a simulated player
@@ -427,7 +422,6 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
             impact = simulated_total_games - original_total_games
             
             # Subtract the game of the simulated player itself
-            sim_player_games = sim_roster[sim_roster['name'] == sim_player_name]
             sim_games_count = len(schedule_df[
                 (schedule_df['Home'] == team) | (schedule_df['Visitor'] == team)
             ])
@@ -439,7 +433,7 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
     for pos in positions_to_check:
         pos_data = {team: impact[pos] for team, impact in team_impact.items()}
         df = pd.DataFrame(list(pos_data.items()), columns=['Joukkue', 'Lisäpelit']).sort_values('Lisäpelit', ascending=False)
-        results[pos] = df.head(10)
+        results[pos] = df
     
     return results
 
@@ -791,7 +785,7 @@ with tab1:
             
             if st.session_state['team_impact_results'] is not None:
                 for pos, df in st.session_state['team_impact_results'].items():
-                    st.subheader(f"Top 10 joukkuetta pelipaikalle: {pos}")
+                    st.subheader(f"Joukkueet pelipaikalle: {pos}")
                     st.dataframe(df, use_container_width=True)
 
 
