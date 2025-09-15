@@ -433,8 +433,21 @@ with tab1:
                     total = pos_limits[pos]
                     row[pos] = f"{filled}/{total}"
                 filled_positions_data.append(row)
+            
             filled_positions_df = pd.DataFrame(filled_positions_data)
-            st.dataframe(filled_positions_df, use_container_width=True)
+
+            # Värikoodausfunktio
+            def color_code_cells(val):
+                if isinstance(val, str) and '/' in val:
+                    filled, total = map(int, val.split('/'))
+                    if filled < total:
+                        return 'background-color: #f8d7da'  # Punainen
+                    else:
+                        return 'background-color: #d4edda'  # Vihreä
+                return ''
+
+            st.dataframe(filled_positions_df.style.applymap(color_code_cells, subset=pd.IndexSlice[:, ['C', 'LW', 'RW', 'D', 'G', 'UTIL']]), use_container_width=True)
+
 
             st.subheader("Päivittäisten pelien yhteenveto")
             summary_data = []
