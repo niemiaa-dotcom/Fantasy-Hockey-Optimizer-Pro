@@ -386,62 +386,53 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
 
     return daily_results, player_games, total_fantasy_points, total_active_games
 
-def simulate_team_impact(schedule_df, roster_df, pos_limits, team_game_days):
+def simulate_team_impact(schedule_df, roster_df, pos_limits):
+    
+    # Calculate initial active games for the current roster
+    _, _, _, original_total_games = optimize_roster_advanced(
+        schedule_df, roster_df, pos_limits
+    )
+    
+    all_teams = sorted(list(set(schedule_df['Home'].tolist() + schedule_df['Visitor'].tolist())))
+    positions_to_check = ['C', 'LW', 'RW', 'D', 'G']
+    team_impact = defaultdict(lambda: defaultdict(int))
+    
+    # Get players info for all players in the current roster
     players_info_dict = {}
     for _, row in roster_df.iterrows():
         positions_list = [p.strip() for p in row['positions'].split('/')]
         players_info_dict[row['name']] = {'team': row['team'], 'positions': positions_list, 'fpa': row.get('fantasy_points_avg', 0)}
 
-    def get_daily_active_slots(players_list, pos_limits):
-        best_active_players_count = 0
-        num_attempts = 50
-        
-        for _ in range(num_attempts):
-            shuffled_players = players_list.copy()
-            np.random.shuffle(shuffled_players)
-            active = {pos: [] for pos in pos_limits.keys()}
-            
-            for player_name in shuffled_players:
-                placed = False
-                positions = players_info_dict.get(player_name, {}).get('positions', [])
-                for pos in positions:
-                    if pos in pos_limits and len(active[pos]) < pos_limits[pos] and pos != 'UTIL':
-                        active[pos].append(player_name)
-                        placed = True
-                        break
-                if not placed and 'UTIL' in pos_limits and len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
-                    active['UTIL'].append(player_name)
-            
-            current_active_count = sum(len(p) for p in active.values())
-            if current_active_count > best_active_players_count:
-                best_active_players_count = current_active_count
-        
-        return best_active_players_count
-    
-    team_impact = defaultdict(lambda: defaultdict(int))
-    all_teams = sorted(list(set(schedule_df['Home'].tolist() + schedule_df['Visitor'].tolist())))
-    positions_to_check = ['C', 'LW', 'RW', 'D', 'G']
-
     for team in all_teams:
         for pos_check in positions_to_check:
-            original_players_today = [
-                player_name for player_name, info in players_info_dict.items()
-                if info['team'] in schedule_df[schedule_df['Date'].isin(team_game_days.get(team, []))]['Home'].tolist() or info['team'] in schedule_df[schedule_df['Date'].isin(team_game_days.get(team, []))]['Visitor'].tolist()
-            ]
-
-            original_games = get_daily_active_slots(original_players_today, pos_limits)
-            
+            # Create a temporary roster with a simulated player
             sim_player_name = f'SIM_PLAYER_{team}_{pos_check}'
-            players_info_dict[sim_player_name] = {'team': team, 'positions': [pos_check], 'fpa': 100}
-
-            sim_players_list = original_players_today + [sim_player_name]
+            sim_player_row = pd.DataFrame([{
+                'name': sim_player_name, 
+                'team': team, 
+                'positions': pos_check, 
+                'fantasy_points_avg': 100 
+            }])
             
-            simulated_games = get_daily_active_slots(sim_players_list, pos_limits)
+            # Use concat to merge with the existing roster
+            sim_roster = pd.concat([roster_df, sim_player_row], ignore_index=True)
             
-            impact = simulated_games - original_games
-            team_impact[team][pos_check] = impact
+            # Run the optimizer on the simulated roster
+            _, _, _, simulated_total_games = optimize_roster_advanced(
+                schedule_df, sim_roster, pos_limits
+            )
             
-            del players_info_dict[sim_player_name]
+            # Calculate the impact
+            impact = simulated_total_games - original_total_games
+            
+            # Subtract the game of the simulated player itself
+            sim_player_games = sim_roster[sim_roster['name'] == sim_player_name]
+            sim_games_count = len(schedule_df[
+                (schedule_df['Home'] == team) | (schedule_df['Visitor'] == team)
+            ])
+            
+            net_impact = impact - sim_games_count
+            team_impact[team][pos_check] = net_impact
     
     results = {}
     for pos in positions_to_check:
@@ -450,6 +441,7 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits, team_game_days):
         results[pos] = df.head(10)
     
     return results
+
 
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
 tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
@@ -789,20 +781,11 @@ with tab1:
         ]
 
         if not schedule_filtered.empty:
-            team_game_days = {}
-            for _, row in schedule_filtered.iterrows():
-                date = row['Date']
-                for team in [row['Visitor'], row['Home']]:
-                    if team not in team_game_days:
-                        team_game_days[team] = set()
-                    team_game_days[team].add(date)
-
             if st.button("Suorita joukkueanalyysi"):
                 st.session_state['team_impact_results'] = simulate_team_impact(
                     schedule_filtered,
                     st.session_state['roster'],
                     pos_limits,
-                    team_game_days
                 )
             
             if st.session_state['team_impact_results'] is not None:
