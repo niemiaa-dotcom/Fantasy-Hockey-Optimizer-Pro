@@ -91,7 +91,7 @@ creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
 client = gspread.authorize(creds)
 
 # Function to load data from Google Sheets
-def st.sidebar.subheader("Lataa oma rosteri")():
+st.sidebar.subheader("Lataa oma rosteri")
     try:
         # Get the Google Sheet URL from secrets
         sheet_url = st.secrets["google_sheet"]["url"]
