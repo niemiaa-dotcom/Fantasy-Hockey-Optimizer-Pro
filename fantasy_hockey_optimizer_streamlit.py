@@ -140,6 +140,9 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
     st.rerun()
 
+   # LISÄÄ TÄMÄ RIVI
+    time.sleep(5)
+
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
 if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
