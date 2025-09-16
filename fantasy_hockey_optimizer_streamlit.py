@@ -292,7 +292,7 @@ pos_limits = {
 st.sidebar.subheader("Lataa vapaat agentit")
 
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
-def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
+def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
     players_info = {}
     for _, player in roster_df.iterrows():
         positions_str = player['positions']
