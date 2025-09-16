@@ -491,10 +491,6 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
     
     return results
 import pandas as pd
-from collections import defaultdict
-import streamlit as st
-
-import pandas as pd
 import streamlit as st
 from collections import defaultdict
 
@@ -530,6 +526,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
     
     results = free_agents_df.copy()
     results['total_impact'] = 0.0
+    results['games_added'] = 0  # Uusi sarake lisätyille peleille
     
     # Käsittele monipaikkaiset pelaajat
     results['positions_list'] = results['positions'].apply(lambda x: [pos.strip() for pos in x.replace('/', ',').split('/')])
@@ -546,26 +543,23 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
         
         # Etsi suurin lisäpelien määrä pelaajan kaikilta mahdollisilta pelipaikoilta
         for pos in positions:
-            # Varmista, että 'position' on `combined_impact_df` sarakkeessa
             match = combined_impact_df[(combined_impact_df['team'] == team) & (combined_impact_df['position'] == pos)]
             if not match.empty:
                 extra_games = match['extra_games_total'].iloc[0]
                 if extra_games > max_extra_games:
                     max_extra_games = extra_games
         
+        # Päivitä lisäpelit 'games_added'-sarakkeeseen
+        row['games_added'] = max_extra_games
+        
         # Lasketaan kokonaisvaikutus: Lisäpelit * FP/GP
         return max_extra_games * fpa
 
     results['total_impact'] = results.apply(calculate_impact, axis=1)
 
-    # Laske pelaajan omat pelit
-    all_teams = combined_impact_df['team'].unique()
-    team_games = {team: len(schedule_df[(schedule_df['Visitor'] == team) | (schedule_df['Home'] == team)]) for team in all_teams}
-    results['games_in_period'] = results['team'].map(team_games).fillna(0).astype(int)
-    
     # Siivoa väliaikainen sarake ja järjestä sarakkeet
     results.drop(columns=['positions_list'], inplace=True)
-    results = results[['name', 'team', 'positions', 'games_in_period', 'fantasy_points_avg', 'total_impact']]
+    results = results[['name', 'team', 'positions', 'games_added', 'fantasy_points_avg', 'total_impact']]
     
     results = results.sort_values(by='total_impact', ascending=False)
     
