@@ -93,25 +93,9 @@ creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
 client = gspread.authorize(creds)
 
 # Function to load data from Google Sheets
-# Ladataan rosteri
-st.sidebar.subheader("Lataa oma rosteri")
-if st.sidebar.button("Lataa rosteri Google Sheetsistä"):
-    try:
-        roster_df = load_roster_from_gsheets()
-        if not roster_df.empty:
-            st.session_state['roster'] = roster_df
-            st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
-            # Tallenna kopio paikallisesti, jos haluat
-            roster_df.to_csv(ROSTER_FILE, index=False)
-        else:
-            st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
-    except Exception as e:
-        st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
-    st.rerun()
-
-# Ladataan vapaat agentit
+# --- Ladataan vapaat agentit ---
 st.sidebar.subheader("Lataa vapaat agentit")
-if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä"):
+if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
     try:
         free_agents_df = load_free_agents_from_gsheets()
         if not free_agents_df.empty:
@@ -121,6 +105,21 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä"):
             st.sidebar.error("Vapaiden agenttien lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
         st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
+    st.rerun()
+
+# --- Ladataan rosteri ---
+st.sidebar.subheader("Lataa oma rosteri")
+if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
+    try:
+        roster_df = load_roster_from_gsheets()
+        if not roster_df.empty:
+            st.session_state['roster'] = roster_df
+            st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
+            roster_df.to_csv(ROSTER_FILE, index=False)
+        else:
+            st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
+    except Exception as e:
+        st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
     st.rerun()
     
 # Use the function in your app
