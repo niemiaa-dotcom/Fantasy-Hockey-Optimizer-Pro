@@ -494,15 +494,16 @@ import pandas as pd
 from collections import defaultdict
 import streamlit as st
 
-def analyze_free_agents(team_impact_dict, free_agents_df):
+def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df, start_date, end_date):
     """
     Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
     
     Args:
-        team_impact_dict (dict): Sanakirja, joka sisältää joukkuekohtaiset
-            lisäpelit per pelipaikka, eroteltuna pelipaikoittain.
-        free_agents_df (pd.DataFrame): DataFrame, joka sisältää vapaiden agenttien
-            tiedot.
+        team_impact_dict (dict): Sanakirja, joka sisältää joukkuekohtaiset lisäpelit.
+        free_agents_df (pd.DataFrame): DataFrame, joka sisältää vapaiden agenttien tiedot.
+        schedule_df (pd.DataFrame): DataFrame, joka sisältää peliaikataulun.
+        start_date (datetime): Analyysijakson alkupäivä.
+        end_date (datetime): Analyysijakson loppupäivä.
             
     Returns:
         pd.DataFrame: Lajiteltu DataFrame optimaalisimmista vapaista agenteista.
@@ -529,6 +530,20 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
     
     results = free_agents_df.copy()
     results['total_impact'] = 0.0
+    results['games_in_period'] = 0
+
+    # Laske pelimäärät jokaiselle vapaalle agentille
+    filtered_schedule = schedule_df[
+        (schedule_df['Date'] >= pd.to_datetime(start_date)) &
+        (schedule_df['Date'] <= pd.to_datetime(end_date))
+    ]
+    
+    # Käytä tehokasta apply-metodia pelien laskentaan
+    def get_games(row):
+        team = row['team']
+        return len(filtered_schedule[(filtered_schedule['Visitor'] == team) | (filtered_schedule['Home'] == team)])
+
+    results['games_in_period'] = results.apply(get_games, axis=1)
 
     # Käsittele monipaikkaiset pelaajat
     results['positions_list'] = results['positions'].apply(lambda x: [pos.strip() for pos in x.replace('/', ',').split(',')])
@@ -555,13 +570,13 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
 
     results['total_impact'] = results.apply(calculate_impact, axis=1)
 
-    # Siivoa väliaikainen sarake
+    # Siivoa väliaikainen sarake ja järjestä sarakkeet
     results.drop(columns=['positions_list'], inplace=True)
+    results = results[['name', 'team', 'positions', 'games_in_period', 'fantasy_points_avg', 'total_impact']]
     
     results = results.sort_values(by='total_impact', ascending=False)
     
     return results
-
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
 tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
 
@@ -914,18 +929,39 @@ with tab1:
 
 # --- Vapaiden agenttien analyysi ---
 if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
-   st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']: # Huom: Ei .empty-tarkistusta
+   st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']:
     st.header("Vapaiden agenttien analyysi")
+
+    # Suodatusvalikot
+    all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'].unique() for p in player_pos.replace('/', ',').split(','))))
+    selected_pos = st.selectbox("Suodata pelipaikan mukaan:", ["Kaikki"] + all_positions)
     
-    # Voit poistaa tämän if-lauseen, jos haluat analyysin suoritettavan automaattisesti
+    all_teams = sorted(st.session_state['free_agents']['team'].unique())
+    selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
+
     if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
         with st.spinner("Analysoidaan vapaat agentit..."):
-            free_agent_results = analyze_free_agents(st.session_state['team_impact_results'], st.session_state['free_agents'])
+            # Välitä tarvittavat muuttujat funktiolle
+            free_agent_results = analyze_free_agents(
+                st.session_state['team_impact_results'],
+                st.session_state['free_agents'],
+                st.session_state['schedule'],
+                start_date, # Varmista, että nämä muuttujat ovat saatavilla tässä lohkossa
+                end_date
+            )
         
-        if not free_agent_results.empty:
-            st.dataframe(free_agent_results.style.format({'total_impact': "{:.2f}"}))
+        # Suodata tulokset käyttäjän valintojen perusteella
+        filtered_results = free_agent_results.copy()
+        if selected_pos != "Kaikki":
+            filtered_results = filtered_results[filtered_results['positions'].str.contains(selected_pos)]
+
+        if selected_team != "Kaikki":
+            filtered_results = filtered_results[filtered_results['team'] == selected_team]
+
+        if not filtered_results.empty:
+            st.dataframe(filtered_results.style.format({'total_impact': "{:.2f}"}), use_container_width=True)
         else:
-            st.error("Analyysitulosten luominen epäonnistui.")
+            st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
 
 with tab2:
     st.header("Joukkueiden vertailu")
