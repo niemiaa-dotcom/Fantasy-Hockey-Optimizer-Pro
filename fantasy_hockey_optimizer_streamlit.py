@@ -354,18 +354,6 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
         st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
     st.rerun()
 
-# --- Vapaiden agenttien analyysi ---
-if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and st.session_state.get('team_impact_results') is not None and not st.session_state['team_impact_results'].empty:
-    st.header("Vapaiden agenttien analyysi")
-    if st.button("Suorita vapaiden agenttien analyysi"):
-        with st.spinner("Analysoidaan vapaat agentit..."):
-            free_agent_results = analyze_free_agents(st.session_state['team_impact_results'], st.session_state['free_agents'])
-        
-        if not free_agent_results.empty:
-            st.dataframe(free_agent_results.style.format({'total_impact': "{:.2f}"}))
-        else:
-            st.error("Analyysitulosten luominen epäonnistui.")
-
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
 def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
     players_info = {}
@@ -922,6 +910,20 @@ with tab1:
                 for pos, df in st.session_state['team_impact_results'].items():
                     st.subheader(f"Joukkueet pelipaikalle: {pos}")
                     st.dataframe(df, use_container_width=True)
+
+# --- Vapaiden agenttien analyysi ---
+if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and st.session_state.get('team_impact_results') is not None and not st.session_state['team_impact_results'].empty:
+    st.header("Vapaiden agenttien analyysi")
+    
+    # Voit poistaa tämän if-lauseen, jos haluat analyysin suoritettavan automaattisesti
+    if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button"):
+        with st.spinner("Analysoidaan vapaat agentit..."):
+            free_agent_results = analyze_free_agents(st.session_state['team_impact_results'], st.session_state['free_agents'])
+        
+        if not free_agent_results.empty:
+            st.dataframe(free_agent_results.style.format({'total_impact': "{:.2f}"}))
+        else:
+            st.error("Analyysitulosten luominen epäonnistui.")
 
 
 with tab2:
