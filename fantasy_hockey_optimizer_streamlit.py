@@ -89,6 +89,61 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+def analyze_free_agents(team_impact_df, free_agents_df):
+    """
+    Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
+    
+    Tämä funktio laskee jokaisen vapaan agentin kokonaisvaikutuksen
+    hyödyntämällä joukkueanalyysistä saatuja lisäpelimääriä.
+    
+    Args:
+        team_impact_df (pd.DataFrame): DataFrame, joka sisältää joukkuekohtaiset
+                                        lisäpelit per pelipaikka.
+        free_agents_df (pd.DataFrame): DataFrame, joka sisältää vapaiden agenttien
+                                        tiedot (nimi, joukkue, pelipaikka, FP/GP).
+                                        
+    Returns:
+        pd.DataFrame: Lajiteltu DataFrame optimaalisimmista vapaista agenteista.
+    """
+    if team_impact_df.empty or free_agents_df.empty:
+        st.warning("Joukkueanalyysiä tai vapaiden agenttien listaa ei ole ladattu.")
+        return pd.DataFrame()
+        
+    st.subheader("Vapaiden agenttien analyysi")
+    
+    # Valmistellaan tulos-DataFrame
+    results = free_agents_df.copy()
+    results['total_impact'] = 0.0  # Alustetaan kokonaisvaikutus-sarake
+
+    # Yhdistetään vapaiden agenttien tiedot joukkueanalyysiin
+    for index, player in results.iterrows():
+        team = player['team']
+        positions_str = player['positions']
+        
+        # Käsittele monipaikkaiset pelaajat
+        positions_list = [pos.strip() for pos in positions_str.split(',')]
+        
+        max_impact = 0.0
+        
+        for pos in positions_list:
+            # Etsitään oikea lisäpelimäärä joukkueanalyysista
+            try:
+                extra_games = team_impact_df.loc[(team_impact_df['team'] == team) & (team_impact_df['position'] == pos), 'extra_games_total'].iloc[0]
+                if extra_games > max_impact:
+                    max_impact = extra_games
+            except IndexError:
+                # Jos joukkuetta/pelipaikkaa ei löydy, lisäpelejä on 0
+                continue
+                
+        # Lasketaan kokonaisvaikutus
+        if player['fantasy_points_avg'] > 0:
+            results.loc[index, 'total_impact'] = max_impact * player['fantasy_points_avg']
+
+    # Lajitellaan tulokset suurimmasta vaikutuksesta pienimpään
+    results = results.sort_values(by='total_impact', ascending=False)
+    
+    return results
+
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
@@ -284,6 +339,32 @@ pos_limits = {
     'G': g_limit,
     'UTIL': util_limit
 }
+
+# --- Ladataan vapaat agentit ---
+st.sidebar.subheader("Lataa vapaat agentit")
+if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
+    try:
+        free_agents_df = load_free_agents_from_gsheets()
+        if not free_agents_df.empty:
+            st.session_state['free_agents'] = free_agents_df
+            st.sidebar.success("Vapaat agentit ladattu onnistuneesti!")
+        else:
+            st.sidebar.error("Vapaiden agenttien lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
+    except Exception as e:
+        st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
+    st.rerun()
+
+# --- Vapaiden agenttien analyysi ---
+if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and st.session_state.get('team_impact_results') is not None and not st.session_state['team_impact_results'].empty:
+    st.header("Vapaiden agenttien analyysi")
+    if st.button("Suorita vapaiden agenttien analyysi"):
+        with st.spinner("Analysoidaan vapaat agentit..."):
+            free_agent_results = analyze_free_agents(st.session_state['team_impact_results'], st.session_state['free_agents'])
+        
+        if not free_agent_results.empty:
+            st.dataframe(free_agent_results.style.format({'total_impact': "{:.2f}"}))
+        else:
+            st.error("Analyysitulosten luominen epäonnistui.")
 
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
 def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
