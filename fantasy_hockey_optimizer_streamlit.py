@@ -843,7 +843,8 @@ with tab1:
                     st.dataframe(df, use_container_width=True)
 
 # --- Vapaiden agenttien analyysi ---
-if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and st.session_state.get('team_impact_results') is not None and not st.session_state['team_impact_results'].empty:
+if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
+   st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']: # Huom: Ei .empty-tarkistusta
     st.header("Vapaiden agenttien analyysi")
     
     # Voit poistaa tämän if-lauseen, jos haluat analyysin suoritettavan automaattisesti
@@ -855,7 +856,6 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             st.dataframe(free_agent_results.style.format({'total_impact': "{:.2f}"}))
         else:
             st.error("Analyysitulosten luominen epäonnistui.")
-
 
 with tab2:
     st.header("Joukkueiden vertailu")
