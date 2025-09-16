@@ -511,11 +511,11 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
         return pd.DataFrame()
 
     # SUODATUS TÄSSÄ: Jätä pois pelaajat, joiden pelipaikka on "G"
-    free_agents_df = free_agents_df[free_agents_df['positions'] != 'G'].copy()
+    free_agents_df = free_agents_df[~free_agents_df['positions'].str.contains('G')].copy()
     if free_agents_df.empty:
         st.info("Vapaita agentteja ei löytynyt maalivahtien suodatuksen jälkeen.")
         return pd.DataFrame()
-
+        
     team_impact_df_list = []
     for pos, df in team_impact_dict.items():
         if not df.empty and pos != 'G':  # Myös joukkueanalyysista pois maalivahdit
@@ -533,7 +533,9 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
     results['total_impact'] = 0.0
     results['games_added'] = 0.0
     
-    results['positions_list'] = results['positions'].apply(lambda x: [p.strip() for p in x.replace('/', ',').split('/')])
+    # MUUTOS TÄSSÄ
+    # Käsittele monipaikkaiset pelaajat
+    results['positions_list'] = results['positions'].apply(lambda x: [p.strip() for p in str(x).replace('/', ',').split(',')])
 
     def calculate_impact(row):
         team = row['team']
@@ -542,7 +544,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
         
         max_extra_games = 0.0
         
-        if not positions or 'G' in positions: # Jätä pois maalivahdit
+        if not positions:
             return 0.0, 0.0
         
         for pos in positions:
