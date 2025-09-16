@@ -70,14 +70,20 @@ def load_free_agents_from_gsheets():
         sheet = client.open_by_url(sheet_url).sheet1
         data = sheet.get_all_records()
         df = pd.DataFrame(data)
+
+        # 1. Tarkista, että kaikki vaaditut sarakkeet ovat olemassa
         required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
             return pd.DataFrame()
+
+        # 2. Muunna fantasy_points_avg oikeaan muotoon ennen DataFrame-suodatusta
+        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+
+        # 3. Valitse vain vaaditut sarakkeet
         df = df[required_columns]
-        if 'fantasy_points_avg' in df.columns:
-            df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+        
         return df
     except Exception as e:
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
@@ -139,9 +145,6 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
     st.rerun()
-
-   # LISÄÄ TÄMÄ RIVI
-    time.sleep(5)
 
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
