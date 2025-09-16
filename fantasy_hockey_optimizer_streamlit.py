@@ -30,6 +30,7 @@ if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
+# --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
 if st.sidebar.button("Tyhjennä kaikki välimuisti"):
@@ -40,6 +41,7 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.sidebar.success("Välimuisti tyhjennetty!")
     st.rerun()
 
+# Peliaikataulun lataus
 schedule_file_exists = False
 try:
     st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
@@ -91,26 +93,36 @@ creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
 client = gspread.authorize(creds)
 
 # Function to load data from Google Sheets
+# Ladataan rosteri
 st.sidebar.subheader("Lataa oma rosteri")
-
 if st.sidebar.button("Lataa rosteri Google Sheetsistä"):
     try:
-        # Get the Google Sheet URL from secrets
-        sheet_url = st.secrets["roster_sheet"]["url"]
-    
-        # Open the sheet by URL
-        client = get_gspread_client()
-        if client:
-            sheet = client.open_by_url(sheet_url).sheet1
-    
-            # Read all data into a DataFrame
-            data = sheet.get_all_records()
-            st.session_state['roster'] = pd.DataFrame(data)
+        roster_df = load_roster_from_gsheets()
+        if not roster_df.empty:
+            st.session_state['roster'] = roster_df
             st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
-        
+            # Tallenna kopio paikallisesti, jos haluat
+            roster_df.to_csv(ROSTER_FILE, index=False)
+        else:
+            st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
-        st.sidebar.error(f"Virhe Google Sheets -tiedoston lukemisessa: {e}")
+        st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
+    st.rerun()
 
+# Ladataan vapaat agentit
+st.sidebar.subheader("Lataa vapaat agentit")
+if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä"):
+    try:
+        free_agents_df = load_free_agents_from_gsheets()
+        if not free_agents_df.empty:
+            st.session_state['free_agents'] = free_agents_df
+            st.sidebar.success("Vapaat agentit ladattu onnistuneesti!")
+        else:
+            st.sidebar.error("Vapaiden agenttien lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
+    except Exception as e:
+        st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
+    st.rerun()
+    
 # Use the function in your app
 roster_df = load_roster_from_gsheets()
 
