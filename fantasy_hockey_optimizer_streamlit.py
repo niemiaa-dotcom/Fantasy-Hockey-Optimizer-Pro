@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import itertools
 import os
+import gspread
+from google.oauth2.service_account import Credentials
 
 # Aseta sivun konfiguraatio
 st.set_page_config(
@@ -29,7 +31,58 @@ if 'opponent_roster' not in st.session_state:
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
-# --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
+# --- GOOGLE SHEETS LATAUSFUNKTIOT ---
+@st.cache_resource
+def get_gspread_client():
+    try:
+        scopes = ['https://www.googleapis.com/auth/spreadsheets']
+        creds_json = st.secrets["gcp_service_account"]
+        creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
+        client = gspread.authorize(creds)
+        return client
+    except Exception as e:
+        st.error(f"Virhe Google Sheets -tunnistautumisessa. Tarkista secrets.toml-tiedostosi: {e}")
+        return None
+
+def load_roster_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        return pd.DataFrame()
+    try:
+        sheet_url = st.secrets["roster_sheet"]["url"]
+        sheet = client.open_by_url(sheet_url).sheet1
+        data = sheet.get_all_records()
+        df = pd.DataFrame(data)
+        if 'fantasy_points_avg' not in df.columns:
+            df['fantasy_points_avg'] = 0.0
+        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+        return df
+    except Exception as e:
+        st.error(f"Virhe Google Sheets -tiedoston lukemisessa: {e}")
+        return pd.DataFrame()
+
+def load_free_agents_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        return pd.DataFrame()
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]
+        sheet = client.open_by_url(sheet_url).sheet1
+        data = sheet.get_all_records()
+        df = pd.DataFrame(data)
+        required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
+            return pd.DataFrame()
+        df = df[required_columns]
+        if 'fantasy_points_avg' in df.columns:
+            df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+        return df
+    except Exception as e:
+        st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
+        return pd.DataFrame()
+
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
@@ -50,7 +103,7 @@ try:
 except FileNotFoundError:
     schedule_file_exists = False
 
-if schedule_file_exists and not st.sidebar.button("Lataa uusi aikataulu"):
+if schedule_file_exists and not st.sidebar.button("Lataa uusi aikataulu", key="upload_schedule_button"):
     st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
 else:
     schedule_file = st.sidebar.file_uploader(
@@ -72,42 +125,7 @@ else:
         except Exception as e:
             st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
-st.sidebar.subheader("Lataa vapaat agentit")
-if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä"):
-    free_agents_df = load_free_agents_from_gsheets()
-    if not free_agents_df.empty:
-        st.session_state['free_agents'] = free_agents_df
-        st.sidebar.success("Vapaat agentit ladattu onnistuneesti!")
-    st.rerun()
-
 # Rosterin lataus
-import streamlit as st
-import pandas as pd
-import gspread
-from google.oauth2.service_account import Credentials
-
-# Define the necessary scopes and credentials
-scopes = ['https://www.googleapis.com/auth/spreadsheets']
-creds_json = st.secrets["gcp_service_account"]
-creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
-client = gspread.authorize(creds)
-
-# Function to load data from Google Sheets
-# --- Ladataan vapaat agentit ---
-st.sidebar.subheader("Lataa vapaat agentit")
-if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
-    try:
-        free_agents_df = load_free_agents_from_gsheets()
-        if not free_agents_df.empty:
-            st.session_state['free_agents'] = free_agents_df
-            st.sidebar.success("Vapaat agentit ladattu onnistuneesti!")
-        else:
-            st.sidebar.error("Vapaiden agenttien lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
-    except Exception as e:
-        st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
-    st.rerun()
-
-# --- Ladataan rosteri ---
 st.sidebar.subheader("Lataa oma rosteri")
 if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     try:
@@ -121,50 +139,20 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
     st.rerun()
-    
-# Use the function in your app
-roster_df = load_roster_from_gsheets()
 
-if not roster_df.empty:
-    if 'fantasy_points_avg' not in roster_df.columns:
-        roster_df['fantasy_points_avg'] = 0.0
-    st.session_state['roster'] = roster_df
-    st.sidebar.success("Roster loaded automatically from Google Sheets!")
-else:
-    st.sidebar.error("Failed to load roster from Google Sheets.")
-
-def load_free_agents_from_gsheets():
-    client = get_gspread_client()
-    if client is None:
-        return pd.DataFrame()
+# Vapaiden agenttien lataus
+st.sidebar.subheader("Lataa vapaat agentit")
+if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
     try:
-        # Hae vapaiden agenttien URL secrets-tiedostosta
-        sheet_url = st.secrets["free_agents_sheet"]["url"]
-        sheet = client.open_by_url(sheet_url).sheet1
-        
-        # Lue kaikki data taulukosta
-        data = sheet.get_all_records()
-        df = pd.DataFrame(data)
-        
-        # Tarkista ja valitse vain tarvittavat sarakkeet
-        required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
-        
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
-            return pd.DataFrame()
-        
-        # Valitse vain vaaditut sarakkeet
-        df = df[required_columns]
-        
-        # Käsittele puuttuvat FP/GP-arvot
-        if 'fantasy_points_avg' in df.columns:
-            df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
-        
-        return df
+        free_agents_df = load_free_agents_from_gsheets()
+        if not free_agents_df.empty:
+            st.session_state['free_agents'] = free_agents_df
+            st.sidebar.success("Vapaat agentit ladattu onnistuneesti!")
+        else:
+            st.sidebar.error("Vapaiden agenttien lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
-        st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
-        return pd.DataFrame()
+        st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
+    st.rerun()
 
 # Vastustajan rosterin lataus
 opponent_roster_file_exists = False
