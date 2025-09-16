@@ -92,19 +92,24 @@ client = gspread.authorize(creds)
 
 # Function to load data from Google Sheets
 st.sidebar.subheader("Lataa oma rosteri")
+
+if st.sidebar.button("Lataa rosteri Google Sheetsistä"):
     try:
         # Get the Google Sheet URL from secrets
-        sheet_url = st.secrets["google_sheet"]["url"]
-
+        sheet_url = st.secrets["roster_sheet"]["url"]
+    
         # Open the sheet by URL
-        sheet = client.open_by_url(sheet_url).sheet1
-
-        # Read all data into a DataFrame
-        data = sheet.get_all_records()
-        return pd.DataFrame(data)
+        client = get_gspread_client()
+        if client:
+            sheet = client.open_by_url(sheet_url).sheet1
+    
+            # Read all data into a DataFrame
+            data = sheet.get_all_records()
+            st.session_state['roster'] = pd.DataFrame(data)
+            st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
+        
     except Exception as e:
-        st.error(f"Error reading Google Sheet: {e}")
-        return pd.DataFrame()
+        st.sidebar.error(f"Virhe Google Sheets -tiedoston lukemisessa: {e}")
 
 # Use the function in your app
 roster_df = Lataa oma rosteri()
