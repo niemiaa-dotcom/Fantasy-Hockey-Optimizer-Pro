@@ -932,8 +932,7 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             # UUSI KUTSU
             free_agent_results = analyze_free_agents(
                 st.session_state['team_impact_results'],
-                st.session_state['free_agents'],
-                st.session_state['schedule']
+                st.session_state['free_agents']
             )
         
         # Suodata tulokset käyttäjän valintojen perusteella
