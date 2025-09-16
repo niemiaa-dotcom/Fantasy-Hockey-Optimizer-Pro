@@ -112,7 +112,7 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä"):
         st.sidebar.error(f"Virhe Google Sheets -tiedoston lukemisessa: {e}")
 
 # Use the function in your app
-roster_df = Lataa oma rosteri()
+roster_df = load_roster_from_gsheets()
 
 if not roster_df.empty:
     if 'fantasy_points_avg' not in roster_df.columns:
