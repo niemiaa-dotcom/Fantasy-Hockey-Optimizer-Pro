@@ -256,7 +256,8 @@ else:
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
 
-if st.sidebar.button("Tyhjennä koko oma rosteri"):
+# Tyhjennä rosteri -painike
+if st.sidebar.button("Tyhjennä koko oma rosteri", key="clear_roster_button"):
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
     if os.path.exists(ROSTER_FILE):
         os.remove(ROSTER_FILE)
@@ -266,12 +267,14 @@ if st.sidebar.button("Tyhjennä koko oma rosteri"):
 if not st.session_state['roster'].empty:
     st.sidebar.subheader("Nykyinen oma rosteri")
     st.sidebar.dataframe(st.session_state['roster'], use_container_width=True)
-    
+
+    # Poista pelaaja -valikko ja -painike
     remove_player = st.sidebar.selectbox(
-        "Poista pelaaja", 
-        [""] + list(st.session_state['roster']['name'])
+        "Poista pelaaja",
+        [""] + list(st.session_state['roster']['name']),
+        key="remove_player_select"
     )
-    if st.sidebar.button("Poista valittu pelaaja") and remove_player:
+    if st.sidebar.button("Poista valittu pelaaja", key="remove_player_button") and remove_player:
         st.session_state['roster'] = st.session_state['roster'][
             st.session_state['roster']['name'] != remove_player
         ]
@@ -281,7 +284,8 @@ if not st.session_state['roster'].empty:
             st.session_state['roster'].to_csv(ROSTER_FILE, index=False, columns=['name', 'team', 'positions'])
         st.sidebar.success(f"Pelaaja {remove_player} poistettu!")
         st.rerun()
-    
+
+    # Lisää uusi pelaaja -lomake
     st.sidebar.subheader("Lisää uusi pelaaja")
     with st.sidebar.form("add_player_form"):
         new_name = st.text_input("Pelaajan nimi")
@@ -289,7 +293,7 @@ if not st.session_state['roster'].empty:
         new_positions = st.text_input("Pelipaikat (esim. C/LW)")
         new_fpa = st.number_input("FP/GP (Valinnainen)", min_value=0.0, step=0.1, format="%.2f")
         submitted = st.form_submit_button("Lisää pelaaja")
-        
+
         if submitted and new_name and new_team and new_positions:
             new_player = pd.DataFrame({
                 'name': [new_name],
@@ -300,7 +304,7 @@ if not st.session_state['roster'].empty:
             if 'fantasy_points_avg' not in st.session_state['roster'].columns:
                 st.session_state['roster']['fantasy_points_avg'] = 0.0
             st.session_state['roster'] = pd.concat([
-                st.session_state['roster'], 
+                st.session_state['roster'],
                 new_player
             ], ignore_index=True)
             st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
@@ -311,7 +315,7 @@ if not st.session_state['roster'].empty:
 st.sidebar.header("⚙️ Asetukset")
 
 st.sidebar.subheader("Aikaväli")
-default_start_date = datetime(2025, 10, 5).date()
+default_start_date = datetime.now().date()
 today = datetime.now().date()
 start_date = st.sidebar.date_input("Alkupäivä", default_start_date)
 end_date = st.sidebar.date_input("Loppupäivä", today)
@@ -322,14 +326,14 @@ if start_date > end_date:
 st.sidebar.subheader("Pelipaikkojen rajoitukset")
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=3)
-    lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=3)
-    rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", min_value=1, max_value=6, value=3)
-    
+    c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=3, key="c_limit")
+    lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=3, key="lw_limit")
+    rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", min_value=1, max_value=6, value=3, key="rw_limit")
+
 with col2:
-    d_limit = st.number_input("Puolustajat (D)", min_value=1, max_value=8, value=4)
-    g_limit = st.number_input("Maalivahdit (G)", min_value=1, max_value=4, value=2)
-    util_limit = st.number_input("UTIL-paikat", min_value=0, max_value=3, value=1)
+    d_limit = st.number_input("Puolustajat (D)", min_value=1, max_value=8, value=4, key="d_limit")
+    g_limit = st.number_input("Maalivahdit (G)", min_value=1, max_value=4, value=2, key="g_limit")
+    util_limit = st.number_input("UTIL-paikat", min_value=0, max_value=3, value=1, key="util_limit")
 
 pos_limits = {
     'C': c_limit,
@@ -342,6 +346,9 @@ pos_limits = {
 
 # --- Ladataan vapaat agentit ---
 st.sidebar.subheader("Lataa vapaat agentit")
+# POISTA TÄMÄ LOHKO JOS SE ON AINUT TÄMÄN KAPPALEEN SIVUILLA
+
+# Korjattu lohko (liitä tämä vain kerran)
 if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
     try:
         free_agents_df = load_free_agents_from_gsheets()
@@ -362,7 +369,8 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
         if pd.isna(positions_str):
             positions_list = []
         elif isinstance(positions_str, str):
-            positions_list = [p.strip() for p in positions_str.split('/')]
+            # Korjattu rivi, joka käsittelee sekä '/' että ',' erottimia
+            positions_list = [p.strip() for p in positions_str.replace(',', '/').split('/')]
         else:
             positions_list = positions_str
         
@@ -380,17 +388,15 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
     for date in all_dates:
         day_games = schedule_df[schedule_df['Date'] == date]
         
-        available_players = []
-        for _, game in day_games.iterrows():
-            for team in [game['Visitor'], game['Home']]:
-                for player_name, info in players_info.items():
-                    if info['team'] == team and player_name not in [p['name'] for p in available_players]:
-                        available_players.append({
-                            'name': player_name,
-                            'team': team,
-                            'positions': info['positions'],
-                            'fpa': info['fpa']
-                        })
+        available_players_teams = {game['Visitor'] for _, game in day_games.iterrows()} | {game['Home'] for _, game in day_games.iterrows()}
+        available_players_set = {
+            player_name for player_name, info in players_info.items() if info['team'] in available_players_teams
+        }
+        
+        available_players = [
+            {'name': name, 'team': players_info[name]['team'], 'positions': players_info[name]['positions'], 'fpa': players_info[name]['fpa']}
+            for name in available_players_set
+        ]
         
         best_assignment = None
         best_assignment_fp = -1.0
@@ -407,13 +413,16 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
                 player_name = player_info['name']
                 positions_list = player_info['positions']
                 
+                # Sijoita ensin ensisijaisille paikoille
                 for pos in positions_list:
                     if pos in limits and len(active[pos]) < limits[pos]:
                         active[pos].append(player_name)
                         placed = True
                         break
                 
-                if not placed and len(active['UTIL']) < limits['UTIL']:
+                # Jos ei sijoitettu, yritä UTIL-paikkaa
+                if not placed and 'UTIL' in limits and len(active['UTIL']) < limits['UTIL']:
+                    # Tarkista, että pelaaja voi pelata UTIL-paikalla (ei G)
                     if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
                         active['UTIL'].append(player_name)
                         placed = True
@@ -421,25 +430,30 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
                 if not placed:
                     bench.append(player_name)
             
+            # Optimointi: vaihda penkillä olevia parempia pelaajia heikompien tilalle
             improved = True
             while improved:
                 improved = False
                 
-                bench_copy = bench.copy()
-                bench_sorted = sorted(bench_copy, key=lambda name: players_info[name]['fpa'], reverse=True)
+                bench_copy = sorted(bench, key=lambda name: players_info[name]['fpa'], reverse=True)
                 
-                for bench_player_name in bench_sorted:
+                for bench_player_name in bench_copy:
                     bench_player_fpa = players_info[bench_player_name]['fpa']
                     bench_player_positions = players_info[bench_player_name]['positions']
                     
                     swapped = False
                     for active_pos, active_players in active.items():
+                        # Järjestä aktiiviset pelaajat FP/GP:n mukaan
                         active_sorted = sorted([(name, i) for i, name in enumerate(active_players)], key=lambda x: players_info[x[0]]['fpa'])
                         
                         for active_player_name, active_idx in active_sorted:
                             active_player_fpa = players_info[active_player_name]['fpa']
 
-                            if bench_player_fpa > active_player_fpa and active_pos in bench_player_positions:
+                            # Tarkista, voidaanko tehdä parantava vaihto
+                            if (
+                                bench_player_fpa > active_player_fpa and 
+                                active_pos in bench_player_positions
+                            ):
                                 active_players[active_idx] = bench_player_name
                                 bench.remove(bench_player_name)
                                 bench.append(active_player_name)
@@ -451,65 +465,52 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
                     if swapped:
                         break
 
-            current_fp = 0
-            for pos, players in active.items():
-                for player_name in players:
-                    current_fp += players_info[player_name]['fpa']
-
+            # Laske nykyisen kokoonpanon pisteet
+            current_fp = sum(
+                players_info[player_name]['fpa']
+                for players in active.values()
+                for player_name in players
+            )
+            
             if current_fp > best_assignment_fp:
                 best_assignment_fp = current_fp
                 best_assignment = {
-                    'active': active.copy(),
-                    'bench': bench.copy()
+                    'active': {pos: players[:] for pos, players in active.items()},
+                    'bench': bench[:]
                 }
             
-            elif current_fp == best_assignment_fp:
+            elif current_fp == best_assignment_fp and best_assignment:
                 current_active_count = sum(len(players) for players in active.values())
                 best_active_count = sum(len(players) for players in best_assignment['active'].values())
                 if current_active_count > best_active_count:
                     best_assignment = {
-                        'active': active.copy(),
-                        'bench': bench.copy()
+                        'active': {pos: players[:] for pos, players in active.items()},
+                        'bench': bench[:]
                     }
 
         if best_assignment is None:
             best_assignment = {
-                'active': {
-                    'C': [], 'LW': [], 'RW': [], 'D': [], 'G': [], 'UTIL': []
-                },
+                'active': {pos: [] for pos in limits.keys()},
                 'bench': [p['name'] for p in available_players]
             }
             
-        all_player_names = [p['name'] for p in available_players]
-        active_player_names = set()
-        
-        if best_assignment['active'] is not None:
-            for pos, players in best_assignment['active'].items():
-                active_player_names.update(players)
-        
-        final_bench = [name for name in all_player_names if name not in active_player_names]
-        
         daily_results.append({
             'Date': date.date(),
             'Active': best_assignment['active'],
-            'Bench': final_bench
+            'Bench': best_assignment['bench']
         })
         
-        if best_assignment['active'] is not None:
-            for pos, players in best_assignment['active'].items():
-                for player_name in players:
-                    player_games[player_name] += 1
+        for pos, players in best_assignment['active'].items():
+            for player_name in players:
+                player_games[player_name] += 1
     
-    total_fantasy_points = 0
-    for player_name, games_played in player_games.items():
-        if player_name in players_info:
-            fpa = players_info[player_name]['fpa']
-            total_fantasy_points += games_played * fpa
+    total_fantasy_points = sum(
+        player_games[name] * players_info[name]['fpa'] for name in players_info
+    )
     
     total_active_games = sum(player_games.values())
 
     return daily_results, player_games, total_fantasy_points, total_active_games
-
 
 def simulate_team_impact(schedule_df, roster_df, pos_limits):
     
