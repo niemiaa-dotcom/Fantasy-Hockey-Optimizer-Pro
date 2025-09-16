@@ -203,7 +203,7 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
 
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
-if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
+if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button_new"):
     try:
         free_agents_df = load_free_agents_from_gsheets()
         if not free_agents_df.empty:
@@ -346,20 +346,6 @@ pos_limits = {
 
 # --- Ladataan vapaat agentit ---
 st.sidebar.subheader("Lataa vapaat agentit")
-# POISTA TÄMÄ LOHKO JOS SE ON AINUT TÄMÄN KAPPALEEN SIVUILLA
-
-# Korjattu lohko (liitä tämä vain kerran)
-if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button"):
-    try:
-        free_agents_df = load_free_agents_from_gsheets()
-        if not free_agents_df.empty:
-            st.session_state['free_agents'] = free_agents_df
-            st.sidebar.success("Vapaat agentit ladattu onnistuneesti!")
-        else:
-            st.sidebar.error("Vapaiden agenttien lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
-    except Exception as e:
-        st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
-    st.rerun()
 
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
 def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=200):
