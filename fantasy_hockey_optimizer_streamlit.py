@@ -71,41 +71,43 @@ else:
             st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
 # Rosterin lataus
-roster_file_exists = False
-try:
-    roster_df_from_file = pd.read_csv(ROSTER_FILE)
-    if 'fantasy_points_avg' not in roster_df_from_file.columns:
-        roster_df_from_file['fantasy_points_avg'] = 0.0
-    roster_df_from_file['fantasy_points_avg'] = pd.to_numeric(roster_df_from_file['fantasy_points_avg'], errors='coerce').fillna(0)
-    st.session_state['roster'] = roster_df_from_file
-    roster_file_exists = True
-except FileNotFoundError:
-    roster_file_exists = False
+import streamlit as st
+import pandas as pd
+import gspread
+from google.oauth2.service_account import Credentials
 
-if roster_file_exists and not st.sidebar.button("Lataa uusi oma rosteri"):
-    st.sidebar.success("Oma rosteri ladattu automaattisesti tallennetusta tiedostosta!")
+# Define the necessary scopes and credentials
+scopes = ['https://www.googleapis.com/auth/spreadsheets']
+creds_json = st.secrets["gcp_service_account"]
+creds = Credentials.from_service_account_info(creds_json, scopes=scopes)
+client = gspread.authorize(creds)
+
+# Function to load data from Google Sheets
+def load_roster_from_gsheets():
+    try:
+        # Get the Google Sheet URL from secrets
+        sheet_url = st.secrets["google_sheet"]["url"]
+
+        # Open the sheet by URL
+        sheet = client.open_by_url(sheet_url).sheet1
+
+        # Read all data into a DataFrame
+        data = sheet.get_all_records()
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Error reading Google Sheet: {e}")
+        return pd.DataFrame()
+
+# Use the function in your app
+roster_df = load_roster_from_gsheets()
+
+if not roster_df.empty:
+    if 'fantasy_points_avg' not in roster_df.columns:
+        roster_df['fantasy_points_avg'] = 0.0
+    st.session_state['roster'] = roster_df
+    st.sidebar.success("Roster loaded automatically from Google Sheets!")
 else:
-    roster_file = st.sidebar.file_uploader(
-        "Lataa oma rosteri (CSV)",
-        type=["csv"],
-        help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)"
-    )
-    if roster_file is not None:
-        try:
-            roster = pd.read_csv(roster_file)
-            if not roster.empty and all(col in roster.columns for col in ['name', 'team', 'positions']):
-                if 'fantasy_points_avg' not in roster.columns:
-                    roster['fantasy_points_avg'] = 0.0
-                roster['fantasy_points_avg'] = pd.to_numeric(roster['fantasy_points_avg'], errors='coerce').fillna(0)
-                st.session_state['roster'] = roster
-                roster.to_csv(ROSTER_FILE, index=False)
-                st.sidebar.success("Rosteri ladattu ja tallennettu!")
-                st.rerun()
-            else:
-                st.sidebar.error("Rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
-        except Exception as e:
-            st.sidebar.error(f"Virhe rosterin lukemisessa: {str(e)}")
-
+    st.sidebar.error("Failed to load roster from Google Sheets.")
 # Vastustajan rosterin lataus
 opponent_roster_file_exists = False
 try:
