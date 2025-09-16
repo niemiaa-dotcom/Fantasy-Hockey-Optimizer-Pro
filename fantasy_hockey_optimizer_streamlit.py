@@ -490,18 +490,18 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
         results[pos] = df
     
     return results
+
 import pandas as pd
 import streamlit as st
 from collections import defaultdict
 
-def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
+def analyze_free_agents(team_impact_dict, free_agents_df):
     """
     Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
     
     Args:
         team_impact_dict (dict): Sanakirja, joka sisältää joukkuekohtaiset lisäpelit.
         free_agents_df (pd.DataFrame): DataFrame, joka sisältää vapaiden agenttien tiedot.
-        schedule_df (pd.DataFrame): DataFrame, joka sisältää peliaikataulun.
             
     Returns:
         pd.DataFrame: Lajiteltu DataFrame optimaalisimmista vapaista agenteista.
@@ -526,10 +526,10 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
     
     results = free_agents_df.copy()
     results['total_impact'] = 0.0
-    results['games_added'] = 0  # Uusi sarake lisätyille peleille
+    results['games_added'] = 0.0
     
     # Käsittele monipaikkaiset pelaajat
-    results['positions_list'] = results['positions'].apply(lambda x: [pos.strip() for pos in x.replace('/', ',').split('/')])
+    results['positions_list'] = results['positions'].apply(lambda x: [p.strip() for p in x.replace('/', ',').split('/')])
 
     def calculate_impact(row):
         team = row['team']
@@ -539,7 +539,8 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
         max_extra_games = 0.0
         
         if not positions:
-            return 0.0
+            # Palauta 0, jos pelaajalla ei ole pelipaikkoja
+            return 0.0, 0.0
         
         # Etsi suurin lisäpelien määrä pelaajan kaikilta mahdollisilta pelipaikoilta
         for pos in positions:
@@ -549,13 +550,12 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
                 if extra_games > max_extra_games:
                     max_extra_games = extra_games
         
-        # Päivitä lisäpelit 'games_added'-sarakkeeseen
-        row['games_added'] = max_extra_games
-        
         # Lasketaan kokonaisvaikutus: Lisäpelit * FP/GP
-        return max_extra_games * fpa
+        total_impact = max_extra_games * fpa
+        return total_impact, max_extra_games
 
-    results['total_impact'] = results.apply(calculate_impact, axis=1)
+    # TÄRKEÄ MUUTOS: Laske molemmat arvot samalla kertaa
+    results[['total_impact', 'games_added']] = results.apply(calculate_impact, axis=1, result_type='expand')
 
     # Siivoa väliaikainen sarake ja järjestä sarakkeet
     results.drop(columns=['positions_list'], inplace=True)
