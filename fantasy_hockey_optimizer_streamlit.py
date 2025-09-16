@@ -934,13 +934,11 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
 
     if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
         with st.spinner("Analysoidaan vapaat agentit..."):
-            # Välitä tarvittavat muuttujat funktiolle
+            # UUSI KUTSU
             free_agent_results = analyze_free_agents(
                 st.session_state['team_impact_results'],
                 st.session_state['free_agents'],
-                st.session_state['schedule'],
-                start_date, # Varmista, että nämä muuttujat ovat saatavilla tässä lohkossa
-                end_date
+                st.session_state['schedule']
             )
         
         # Suodata tulokset käyttäjän valintojen perusteella
@@ -955,7 +953,6 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             st.dataframe(filtered_results.style.format({'total_impact': "{:.2f}"}), use_container_width=True)
         else:
             st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
-
 with tab2:
     st.header("Joukkueiden vertailu")
     st.markdown("Tämä työkalu auttaa sinua vertailemaan joukkueiden pelimääriä halutulla aikavälillä.")
