@@ -494,6 +494,10 @@ import pandas as pd
 from collections import defaultdict
 import streamlit as st
 
+import pandas as pd
+import streamlit as st
+from collections import defaultdict
+
 def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
     """
     Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
@@ -509,8 +513,6 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
     if not team_impact_dict or free_agents_df.empty:
         st.warning("Joukkueanalyysiä tai vapaiden agenttien listaa ei ole ladattu.")
         return pd.DataFrame()
-
-    st.subheader("Vapaiden agenttien analyysi")
 
     # Yhdistetään joukkueanalyysin tulokset yhdeksi DataFrameksi
     team_impact_df_list = []
@@ -542,24 +544,24 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
         if not positions:
             return 0.0
         
+        # Etsi suurin lisäpelien määrä pelaajan kaikilta mahdollisilta pelipaikoilta
         for pos in positions:
+            # Varmista, että 'position' on `combined_impact_df` sarakkeessa
             match = combined_impact_df[(combined_impact_df['team'] == team) & (combined_impact_df['position'] == pos)]
             if not match.empty:
                 extra_games = match['extra_games_total'].iloc[0]
                 if extra_games > max_extra_games:
                     max_extra_games = extra_games
         
-        # TÄMÄ ON KESKEINEN MUUTOS
-        # Lasketaan fantasy-pisteiden kasvaminen kertomalla lisäpelit pelaajan FP/GP:llä
+        # Lasketaan kokonaisvaikutus: Lisäpelit * FP/GP
         return max_extra_games * fpa
 
     results['total_impact'] = results.apply(calculate_impact, axis=1)
 
-    # Laske myös alkuperäiset pelimäärät (vapaan agentin omat pelit)
-    # HUOM: Tämä on vain tiedon näyttämistä varten, se ei vaikuta total_impact-laskentaan
+    # Laske pelaajan omat pelit
     all_teams = combined_impact_df['team'].unique()
     team_games = {team: len(schedule_df[(schedule_df['Visitor'] == team) | (schedule_df['Home'] == team)]) for team in all_teams}
-    results['games_in_period'] = results['team'].map(team_games)
+    results['games_in_period'] = results['team'].map(team_games).fillna(0).astype(int)
     
     # Siivoa väliaikainen sarake ja järjestä sarakkeet
     results.drop(columns=['positions_list'], inplace=True)
@@ -569,7 +571,6 @@ def analyze_free_agents(team_impact_dict, free_agents_df, schedule_df):
     
     return results
     
-    return results
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
 tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
 
