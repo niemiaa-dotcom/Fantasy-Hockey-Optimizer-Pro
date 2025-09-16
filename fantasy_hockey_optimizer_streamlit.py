@@ -490,7 +490,77 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
         results[pos] = df
     
     return results
+import pandas as pd
+from collections import defaultdict
+import streamlit as st
 
+def analyze_free_agents(team_impact_dict, free_agents_df):
+    """
+    Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
+    
+    Args:
+        team_impact_dict (dict): Sanakirja, joka sisältää joukkuekohtaiset
+            lisäpelit per pelipaikka, eroteltuna pelipaikoittain.
+        free_agents_df (pd.DataFrame): DataFrame, joka sisältää vapaiden agenttien
+            tiedot.
+            
+    Returns:
+        pd.DataFrame: Lajiteltu DataFrame optimaalisimmista vapaista agenteista.
+    """
+    if not team_impact_dict or free_agents_df.empty:
+        st.warning("Joukkueanalyysiä tai vapaiden agenttien listaa ei ole ladattu.")
+        return pd.DataFrame()
+
+    st.subheader("Vapaiden agenttien analyysi")
+
+    # Yhdistetään joukkueanalyysin tulokset yhdeksi DataFrameksi
+    team_impact_df_list = []
+    for pos, df in team_impact_dict.items():
+        if not df.empty:
+            df['position'] = pos
+            team_impact_df_list.append(df)
+    
+    if not team_impact_df_list:
+        st.warning("Joukkueanalyysin tuloksia ei löytynyt.")
+        return pd.DataFrame()
+
+    combined_impact_df = pd.concat(team_impact_df_list, ignore_index=True)
+    combined_impact_df.rename(columns={'Joukkue': 'team', 'Lisäpelit': 'extra_games_total'}, inplace=True)
+    
+    results = free_agents_df.copy()
+    results['total_impact'] = 0.0
+
+    # Käsittele monipaikkaiset pelaajat
+    results['positions_list'] = results['positions'].apply(lambda x: [pos.strip() for pos in x.replace('/', ',').split(',')])
+
+    # Käytä tehokkaampaa .apply()-metodia laskentaan
+    def calculate_impact(row):
+        team = row['team']
+        fpa = row['fantasy_points_avg']
+        positions = row['positions_list']
+        
+        max_impact = 0.0
+        
+        if not positions:
+            return 0.0
+        
+        for pos in positions:
+            match = combined_impact_df[(combined_impact_df['team'] == team) & (combined_impact_df['position'] == pos)]
+            if not match.empty:
+                extra_games = match['extra_games_total'].iloc[0]
+                if extra_games > max_impact:
+                    max_impact = extra_games
+
+        return max_impact * fpa
+
+    results['total_impact'] = results.apply(calculate_impact, axis=1)
+
+    # Siivoa väliaikainen sarake
+    results.drop(columns=['positions_list'], inplace=True)
+    
+    results = results.sort_values(by='total_impact', ascending=False)
+    
+    return results
 
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
 tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
