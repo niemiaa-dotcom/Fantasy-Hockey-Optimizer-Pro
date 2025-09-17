@@ -89,6 +89,11 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+if st.sidebar.button("Nollaa vastustajan rosteri"):
+    st.session_state['opponent_roster'] = None
+    st.experimental_rerun()
+
+
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
@@ -196,10 +201,6 @@ else:
                 st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
         except Exception as e:
             st.sidebar.error(f"Virhe vastustajan rosterin lukemisessa: {str(e)}")
-
-if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state['opponent_roster'] = None
-    st.experimental_rerun()
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
