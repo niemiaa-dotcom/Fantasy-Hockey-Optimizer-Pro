@@ -673,14 +673,18 @@ with tab2:
                     st.session_state['opponent_roster'], 
                     pos_limits
                 )
-
-            st.session_state['team_impact_results'] = {
-                'winner': winner,
-                'my_results': my_results,
-                'opponent_results': opponent_results
-            }
             
-            st.success("Simulaatio valmis!")
+            # TÄRKEÄÄ: Tallennetaan tulokset session tilaan vasta onnistuneen simulaation jälkeen
+            if my_results and opponent_results:
+                st.session_state['team_impact_results'] = {
+                    'winner': winner,
+                    'my_results': my_results,
+                    'opponent_results': opponent_results
+                }
+                st.success("Simulaatio valmis! Tulokset päivitetty.")
+            else:
+                st.session_state['team_impact_results'] = None
+                st.error("Simulaatio epäonnistui. Tarkista, että rosterit ovat oikein.")
             st.rerun()
 
         if st.session_state['team_impact_results'] is not None:
