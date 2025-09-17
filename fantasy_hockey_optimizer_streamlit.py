@@ -89,11 +89,11 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+# Tässä on nollauspainike. Sen sijainti on täysin oikea.
 if st.sidebar.button("Nollaa vastustajan rosteri"):
     st.session_state['opponent_roster'] = None
     st.experimental_rerun()
-
-
+    
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
