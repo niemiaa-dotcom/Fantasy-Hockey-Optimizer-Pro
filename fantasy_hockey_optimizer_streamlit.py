@@ -1,4 +1,5 @@
 import streamlit as st
+import datetime
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -259,10 +260,11 @@ if not st.session_state['roster'].empty:
 st.sidebar.header("⚙️ Asetukset")
 
 st.sidebar.subheader("Aikaväli")
-default_start_date = datetime.now().date()
 today = datetime.now().date()
-start_date = st.sidebar.date_input("Alkupäivä", default_start_date)
-end_date = st.sidebar.date_input("Loppupäivä", today)
+two_weeks_from_now = today + timedelta(days=14)
+
+start_date = st.sidebar.date_input("Alkupäivä", today)
+end_date = st.sidebar.date_input("Loppupäivä", two_weeks_from_now)
 
 if start_date > end_date:
     st.sidebar.error("Aloituspäivä ei voi olla loppupäivän jälkeen")
