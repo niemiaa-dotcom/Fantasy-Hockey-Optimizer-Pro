@@ -686,7 +686,7 @@ with tab2:
             }
             
             st.success("Simulaatio valmis!")
-            st.rerun()
+            # 🔴 EI st.rerun(), muuten jää ikuiseen silmukkaan
 
         if st.session_state['team_impact_results'] is not None:
             winner = st.session_state['team_impact_results']['winner']
