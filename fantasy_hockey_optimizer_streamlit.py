@@ -94,7 +94,7 @@ def load_free_agents_from_gsheets():
 
 # Tässä on nollauspainike. Sen sijainti on täysin oikea.
 if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state['opponent_roster'] = None
+    st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
     st.rerun()
     
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
@@ -105,6 +105,7 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.session_state['schedule'] = pd.DataFrame()
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
     st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
+    st.session_state['team_impact_results'] = None # Tyhjennetään myös vertailutulokset
     st.sidebar.success("Välimuisti tyhjennetty!")
     st.rerun()
 
@@ -150,6 +151,7 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
             st.session_state['roster'] = roster_df
             st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
             roster_df.to_csv(ROSTER_FILE, index=False)
+            st.session_state['team_impact_results'] = None # Tyhjennetään tulokset, jos rosteri muuttuu
         else:
             st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
@@ -170,11 +172,21 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
         st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
     st.rerun()
 
-# Vastustajan rosterin lataus
-if st.sidebar.button("Lataa vastustajan rosteri (CSV)"):
-    pass
-elif 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
-    st.sidebar.success("Vastustajan rosteri ladattu!")
+# Vastustajan rosterin lataus (PÄIVITETTY LATAUSLOGIIKKA)
+st.sidebar.subheader("Lataa vastustajan rosteri")
+opponent_roster_file_exists = False
+try:
+    if os.path.exists(OPPONENT_ROSTER_FILE):
+        st.session_state['opponent_roster'] = pd.read_csv(OPPONENT_ROSTER_FILE)
+        if 'fantasy_points_avg' not in st.session_state['opponent_roster'].columns:
+            st.session_state['opponent_roster']['fantasy_points_avg'] = 0.0
+        st.session_state['opponent_roster']['fantasy_points_avg'] = pd.to_numeric(st.session_state['opponent_roster']['fantasy_points_avg'], errors='coerce').fillna(0)
+        opponent_roster_file_exists = True
+except FileNotFoundError:
+    opponent_roster_file_exists = False
+
+if opponent_roster_file_exists:
+    st.sidebar.success("Vastustajan rosteri ladattu automaattisesti tallennetusta tiedostosta!")
 else:
     opponent_roster_file = st.sidebar.file_uploader(
         "Lataa vastustajan rosteri (CSV)",
@@ -196,11 +208,8 @@ else:
                 st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
         except Exception as e:
             st.sidebar.error(f"Virhe vastustajan rosterin lukemisessa: {str(e)}")
-
-# Nollauspainike on nyt turvallisesti erillään
-if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
-    st.experimental_rerun()
+            st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
+        st.rerun()
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
