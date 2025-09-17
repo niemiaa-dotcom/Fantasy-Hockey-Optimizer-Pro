@@ -31,6 +31,8 @@ if 'opponent_roster' not in st.session_state:
     st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
+if 'free_agents' not in st.session_state:
+    st.session_state['free_agents'] = pd.DataFrame()
 
 # --- GOOGLE SHEETS LATAUSFUNKTIOT ---
 @st.cache_resource
@@ -95,41 +97,42 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.session_state['schedule'] = pd.DataFrame()
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
     st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
+    st.session_state['team_impact_results'] = None
+    st.session_state['free_agents'] = pd.DataFrame()
     st.sidebar.success("Välimuisti tyhjennetty!")
     st.rerun()
 
 # Peliaikataulun lataus
 schedule_file_exists = os.path.exists(SCHEDULE_FILE)
-if schedule_file_exists and st.sidebar.button("Lataa uusi aikataulu", key="upload_schedule_button"):
-    schedule_file_exists = False
-
 if schedule_file_exists:
     try:
-        st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
-        st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date']).dt.date
-        st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
+        if st.session_state['schedule'].empty:
+            schedule_df_from_file = pd.read_csv(SCHEDULE_FILE)
+            schedule_df_from_file['Date'] = pd.to_datetime(schedule_df_from_file['Date']).dt.date
+            st.session_state['schedule'] = schedule_df_from_file
+            st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
     except Exception as e:
         st.sidebar.error(f"Virhe tallennetun aikataulun lukemisessa: {str(e)}")
-else:
-    schedule_file = st.sidebar.file_uploader(
-        "Lataa NHL-peliaikataulu (CSV)",
-        type=["csv"],
-        key="schedule_uploader",
-        help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
-    )
-    if schedule_file is not None:
-        try:
-            schedule = pd.read_csv(schedule_file)
-            if not schedule.empty and all(col in schedule.columns for col in ['Date', 'Visitor', 'Home']):
-                schedule['Date'] = pd.to_datetime(schedule['Date']).dt.date
-                st.session_state['schedule'] = schedule
-                schedule.to_csv(SCHEDULE_FILE, index=False)
-                st.sidebar.success("Peliaikataulu ladattu ja tallennettu!")
-                st.rerun()
-            else:
-                st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home")
-        except Exception as e:
-            st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
+
+schedule_file = st.sidebar.file_uploader(
+    "Lataa NHL-peliaikataulu (CSV)",
+    type=["csv"],
+    key="schedule_uploader",
+    help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
+)
+if schedule_file is not None:
+    try:
+        schedule = pd.read_csv(schedule_file)
+        if not schedule.empty and all(col in schedule.columns for col in ['Date', 'Visitor', 'Home']):
+            schedule['Date'] = pd.to_datetime(schedule['Date']).dt.date
+            st.session_state['schedule'] = schedule
+            schedule.to_csv(SCHEDULE_FILE, index=False)
+            st.sidebar.success("Peliaikataulu ladattu ja tallennettu!")
+            st.rerun()
+        else:
+            st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home")
+    except Exception as e:
+        st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
 # Rosterin lataus
 st.sidebar.subheader("Lataa oma rosteri")
@@ -442,7 +445,7 @@ def simulate_team_impact(schedule_df, my_roster_df, opponent_roster_df, pos_limi
     Palauttaa voittajajoukkueen sekä yksityiskohtaiset tulokset molemmille joukkueille.
     """
     if my_roster_df.empty or opponent_roster_df.empty:
-        return "Täydennä molemmat rosterit ennen simulaatiota.", None, None
+        return "Täydennä molemmat rosterit ennen simulaatiota.", None, None, None, None, None
 
     my_daily_results, my_player_games, my_total_points, my_total_games = optimize_roster_advanced(
         schedule_df, my_roster_df, pos_limits
@@ -462,16 +465,11 @@ def simulate_team_impact(schedule_df, my_roster_df, opponent_roster_df, pos_limi
     else:
         winner = "Tasapeli"
         
-    return winner, {
-        "daily_results": my_daily_results,
-        "player_games": my_player_games,
-        "total_points": my_total_points,
-        "total_games": my_total_games
-    }, {
-        "daily_results": opponent_daily_results,
-        "player_games": opponent_player_games,
-        "total_points": opponent_total_points,
-        "total_games": opponent_total_games
+    return winner, my_total_points, opponent_total_points, my_total_games, opponent_total_games, {
+        "my_daily_results": my_daily_results,
+        "my_player_games": my_player_games,
+        "opponent_daily_results": opponent_daily_results,
+        "opponent_player_games": opponent_player_games
     }
 
 def analyze_free_agents(team_impact_dict, free_agents_df):
@@ -559,8 +557,8 @@ with tab1:
         st.warning("Korjaa päivämääräväli niin että aloituspäivä on ennen loppupäivää")
     else:
         schedule_filtered = st.session_state['schedule'][
-            (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date).date()) &
-            (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date).date())
+            (st.session_state['schedule']['Date'] >= start_date) &
+            (st.session_state['schedule']['Date'] <= end_date)
         ]
         
         if schedule_filtered.empty:
@@ -780,8 +778,8 @@ with tab1:
                 sim_roster_B = pd.concat([temp_roster, pd.DataFrame([new_player_B])], ignore_index=True)
 
                 schedule_filtered = st.session_state['schedule'][
-                    (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date).date()) &
-                    (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date).date())
+                    (st.session_state['schedule']['Date'] >= start_date) &
+                    (st.session_state['schedule']['Date'] <= end_date)
                 ]
                 
                 team_game_days = {}
@@ -858,16 +856,14 @@ with tab1:
         st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
     else:
         schedule_filtered = st.session_state['schedule'][
-            (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date).date()) &
-            (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date).date())
+            (st.session_state['schedule']['Date'] >= start_date) &
+            (st.session_state['schedule']['Date'] <= end_date)
         ]
         if not schedule_filtered.empty:
-            team_impact_data = {}
-            all_teams = set(st.session_state['schedule']['Visitor'].unique()) | set(st.session_state['schedule']['Home'].unique())
-            
             if st.button("Suorita joukkueanalyysi"):
                 with st.spinner("Analysoidaan joukkueiden vaikutusta..."):
                     team_impact_data = {}
+                    all_teams = set(st.session_state['schedule']['Visitor'].unique()) | set(st.session_state['schedule']['Home'].unique())
                     for pos in ['C', 'LW', 'RW', 'D', 'G']:
                         impact_list = []
                         for team in sorted(list(all_teams)):
@@ -888,14 +884,14 @@ with tab1:
                             })
                         team_impact_data[pos] = pd.DataFrame(impact_list).sort_values(by='Lisäpelit', ascending=False)
                     st.session_state['team_impact_results'] = team_impact_data
+                    st.rerun() # Re-run after analysis to show results without second button click
             
             if st.session_state['team_impact_results'] is not None:
                 for pos, df in st.session_state['team_impact_results'].items():
                     st.subheader(f"Joukkueet pelipaikalle: {pos}")
                     st.dataframe(df, use_container_width=True)
             
-    if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
-       st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']:
+    if not st.session_state['free_agents'].empty and st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']:
         st.header("Vapaiden agenttien analyysi")
         
         all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'] for p in str(player_pos).replace('/', ',').split(','))))
@@ -929,14 +925,14 @@ with tab2:
     else:
         if st.button("Suorita joukkuevertailu", key="team_comparison_button"):
             schedule_filtered = st.session_state['schedule'][
-                (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date).date()) &
-                (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date).date())
+                (st.session_state['schedule']['Date'] >= start_date) &
+                (st.session_state['schedule']['Date'] <= end_date)
             ]
             if schedule_filtered.empty:
                 st.warning("Ei pelejä valitulla aikavälillä. Valitse toinen päivämääräväli.")
             else:
                 with st.spinner("Simuloidaan joukkueiden otteluohjelmaa..."):
-                    winner, my_results, opponent_results = simulate_team_impact(
+                    winner, my_fp, opponent_fp, my_total_games, opponent_total_games, _ = simulate_team_impact(
                         schedule_filtered,
                         st.session_state['roster'],
                         st.session_state['opponent_roster'],
@@ -944,11 +940,6 @@ with tab2:
                     )
 
                 st.subheader("Vertailun tulokset")
-                
-                my_fp = my_results['total_points']
-                opponent_fp = opponent_results['total_points']
-                my_total_games = my_results['total_games']
-                opponent_total_games = opponent_results['total_games']
                 
                 st.markdown(f"**Tämän viikon voittaja on todennäköisesti:** **{winner}**")
 
