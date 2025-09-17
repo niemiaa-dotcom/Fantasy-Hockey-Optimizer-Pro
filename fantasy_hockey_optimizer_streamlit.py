@@ -196,7 +196,6 @@ else:
                 st.session_state['opponent_roster'] = opponent_roster
                 opponent_roster.to_csv(OPPONENT_ROSTER_FILE, index=False)
                 st.sidebar.success("Vastustajan rosteri ladattu ja tallennettu!")
-                st.rerun()
             else:
                 st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
         except Exception as e:
