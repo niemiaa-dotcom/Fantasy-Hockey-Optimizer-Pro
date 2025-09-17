@@ -919,7 +919,8 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
     
     # Suodatusvalikot
     all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'].unique() for p in player_pos.replace('/', ',').split(','))))
-    selected_pos = st.selectbox("Suodata pelipaikan mukaan:", ["Kaikki"] + all_positions)
+    # TÄSSÄ MUUTOS: selectboxista multiselectiin
+    selected_pos = st.multiselect("Suodata pelipaikkojen mukaan:", all_positions, default=all_positions)
     
     all_teams = sorted(st.session_state['free_agents']['team'].unique())
     selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
@@ -932,14 +933,18 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             )
         
         filtered_results = free_agent_results.copy()
-        if selected_pos != "Kaikki":
-            filtered_results = filtered_results[filtered_results['positions'].str.contains(selected_pos)]
-
+        
+        # PÄIVITETTY SUODATUSLOGIIKKA
+        if selected_pos: # Tarkistaa, että lista ei ole tyhjä
+            # Suodata tulokset pelaajan pelipaikkojen ja valitun listan perusteella
+            filtered_results = filtered_results[filtered_results['positions'].apply(
+                lambda x: any(pos in x.split('/') for pos in selected_pos)
+            )]
+        
         if selected_team != "Kaikki":
             filtered_results = filtered_results[filtered_results['team'] == selected_team]
-
+            
         if not filtered_results.empty:
-            # MUUTOS TÄSSÄ: Muotoillaan fantasy_points_avg
             st.dataframe(filtered_results.style.format({
                 'total_impact': "{:.2f}",
                 'fantasy_points_avg': "{:.1f}"
