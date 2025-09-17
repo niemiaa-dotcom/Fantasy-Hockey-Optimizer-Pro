@@ -445,52 +445,47 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
 
     return daily_results, player_games, total_fantasy_points, total_active_games
 
-def simulate_team_impact(schedule_df, roster_df, pos_limits):
-    
-    # Calculate initial active games for the current roster
-    _, _, _, original_total_games = optimize_roster_advanced(
-        schedule_df, roster_df, pos_limits
-    )
-        
-    all_teams = sorted(list(set(schedule_df['Home'].tolist() + schedule_df['Visitor'].tolist())))
-    positions_to_check = ['C', 'LW', 'RW', 'D', 'G']
-    team_impact = defaultdict(lambda: defaultdict(int))
-        
-    for team in all_teams:
-        for pos_check in positions_to_check:
-            # Create a temporary roster with a simulated player
-            sim_player_name = f'SIM_PLAYER_{team}_{pos_check}'
-            sim_player_row = pd.DataFrame([{
-                'name': sim_player_name, 
-                'team': team, 
-                'positions': pos_check, 
-                'fantasy_points_avg': 100 
-            }])
-                
-            sim_roster = pd.concat([roster_df, sim_player_row], ignore_index=True)
-                
-            _, _, _, simulated_total_games = optimize_roster_advanced(
-                schedule_df, sim_roster, pos_limits
-            )
-                
-            impact = simulated_total_games - original_total_games
-            
-            # TÄMÄ ON KESKEINEN MUUTOS
-            # Älä vähennä sim-pelaajan omia pelejä, vaan käytä suoraan laskettua eroa
-            net_impact = impact
-            team_impact[team][pos_check] = net_impact
-            
-    results = {}
-    for pos in positions_to_check:
-        pos_data = {team: impact[pos] for team, impact in team_impact.items()}
-        df = pd.DataFrame(list(pos_data.items()), columns=['Joukkue', 'Lisäpelit']).sort_values('Lisäpelit', ascending=False)
-        results[pos] = df
-        
-    return results
+def simulate_team_impact(schedule_df, my_roster_df, opponent_roster_df, pos_limits):
+    """
+    Simuloi oman ja vastustajan joukkueen suorituskykyä annettujen kokoonpanojen ja pelipäivien perusteella.
+    Palauttaa voittajajoukkueen sekä yksityiskohtaiset tulokset molemmille joukkueille.
+    """
+    if my_roster_df.empty or opponent_roster_df.empty:
+        return "Täydennä molemmat rosterit ennen simulaatiota.", None, None
 
-import pandas as pd
-import streamlit as st
-from collections import defaultdict
+    # Suoritetaan optimointi omalle joukkueelle
+    my_daily_results, my_player_games, my_total_points, my_total_games = optimize_roster_advanced(
+        schedule_df, my_roster_df, pos_limits
+    )
+
+    # Suoritetaan optimointi vastustajalle
+    opponent_pos_limits = {
+        'C': 3, 'LW': 3, 'RW': 3, 'D': 4, 'G': 2, 'UTIL': 1
+    }
+    opponent_daily_results, opponent_player_games, opponent_total_points, opponent_total_games = optimize_roster_advanced(
+        schedule_df, opponent_roster_df, opponent_pos_limits
+    )
+
+    # Määrää voittaja
+    if my_total_points > opponent_total_points:
+        winner = "Oma joukkue"
+    elif opponent_total_points > my_total_points:
+        winner = "Vastustaja"
+    else:
+        winner = "Tasapeli"
+        
+    # Palautetaan yksityiskohtaiset tulokset
+    return winner, {
+        "daily_results": my_daily_results,
+        "player_games": my_player_games,
+        "total_points": my_total_points,
+        "total_games": my_total_games
+    }, {
+        "daily_results": opponent_daily_results,
+        "player_games": opponent_player_games,
+        "total_points": opponent_total_points,
+        "total_games": opponent_total_games
+    }
 
 def analyze_free_agents(team_impact_dict, free_agents_df):
     """
