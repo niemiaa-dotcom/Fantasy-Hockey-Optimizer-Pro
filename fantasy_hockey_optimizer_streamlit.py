@@ -718,16 +718,24 @@ with tab2:
             
             col_my, col_opponent = st.columns(2)
             
+            # Oma joukkueen taulukko
             with col_my:
                 st.markdown("#### Oma joukkue")
                 my_roster = st.session_state['roster'].copy()
-                my_roster['Pelit'] = my_roster['name'].map(st.session_state['team_impact_results']['my_results']['player_games'])
+                my_roster['Pelit'] = my_roster['name'].map(st.session_state['team_impact_results']['my_results']['player_games']).fillna(0).astype(int)
+                my_roster['Kokonais FP'] = my_roster['Pelit'] * my_roster['fantasy_points_avg']
+                my_roster = my_roster[['name', 'team', 'positions', 'fantasy_points_avg', 'Pelit', 'Kokonais FP']]
+                my_roster.rename(columns={'name': 'Pelaaja', 'team': 'Joukkue', 'positions': 'Pelipaikat', 'fantasy_points_avg': 'FP/GP'}, inplace=True)
                 st.dataframe(my_roster, use_container_width=True)
             
+            # Vastustajan joukkueen taulukko
             with col_opponent:
                 st.markdown("#### Vastustajan joukkue")
                 opponent_roster = st.session_state['opponent_roster'].copy()
-                opponent_roster['Pelit'] = opponent_roster['name'].map(st.session_state['team_impact_results']['opponent_results']['player_games'])
+                opponent_roster['Pelit'] = opponent_roster['name'].map(st.session_state['team_impact_results']['opponent_results']['player_games']).fillna(0).astype(int)
+                opponent_roster['Kokonais FP'] = opponent_roster['Pelit'] * opponent_roster['fantasy_points_avg']
+                opponent_roster = opponent_roster[['name', 'team', 'positions', 'fantasy_points_avg', 'Pelit', 'Kokonais FP']]
+                opponent_roster.rename(columns={'name': 'Pelaaja', 'team': 'Joukkue', 'positions': 'Pelipaikat', 'fantasy_points_avg': 'FP/GP'}, inplace=True)
                 st.dataframe(opponent_roster, use_container_width=True)
 
 with tab3:
