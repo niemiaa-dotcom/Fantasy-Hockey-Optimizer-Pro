@@ -34,6 +34,8 @@ if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 if 'free_agents' not in st.session_state:
     st.session_state['free_agents'] = pd.DataFrame()
+if 'free_agent_results' not in st.session_state:
+    st.session_state['free_agent_results'] = pd.DataFrame()
 
 # --- GOOGLE SHEETS LATAUSFUNKTIOT ---
 @st.cache_resource
@@ -674,10 +676,10 @@ with tab2:
             elif my_fp < opponent_fp:
                 st.error(f"Vastustajasi saa arviolta **{opponent_fp - my_fp:.2f}** enemmän fantasiapisteitä kuin sinun joukkueesi. Sinun kannattaa harkita rosterisi muutoksia.")
             else:
-                st.info("Fantasiapisteet ovat ennusteen mukaan tasan.")
+                st.info("Ennakoiduissa fantasiapisteissä ei ole eroa.")
 
             st.markdown("---")
-            st.subheader("Yksityiskohtaiset tulokset")
+            st.subheader("Yksityiskohtainen vertailu")
             
             col_my, col_opponent = st.columns(2)
             
