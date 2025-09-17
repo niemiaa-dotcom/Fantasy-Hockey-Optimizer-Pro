@@ -78,10 +78,8 @@ def load_free_agents_from_gsheets():
             st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
             return pd.DataFrame()
 
-        # Muunna 'fantasy_points_avg' numeeriseksi ja täytä puuttuvat arvot nollalla
-        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce')
+        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
         
-        # Järjestä sarakkeet oikein ennen palautusta
         df = df[required_columns]
 
         return df
@@ -89,11 +87,6 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
-# Tässä on nollauspainike. Sen sijainti on täysin oikea.
-if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state['opponent_roster'] = None
-    st.rerun()
-    
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
@@ -106,20 +99,22 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
 # Peliaikataulun lataus
-schedule_file_exists = False
-try:
-    st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
-    st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date'])
-    schedule_file_exists = True
-except FileNotFoundError:
+schedule_file_exists = os.path.exists(SCHEDULE_FILE)
+if schedule_file_exists and st.sidebar.button("Lataa uusi aikataulu", key="upload_schedule_button"):
     schedule_file_exists = False
 
-if schedule_file_exists and not st.sidebar.button("Lataa uusi aikataulu", key="upload_schedule_button"):
-    st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
+if schedule_file_exists:
+    try:
+        st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
+        st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date'])
+        st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
+    except Exception as e:
+        st.sidebar.error(f"Virhe tallennetun aikataulun lukemisessa: {str(e)}")
 else:
     schedule_file = st.sidebar.file_uploader(
         "Lataa NHL-peliaikataulu (CSV)",
         type=["csv"],
+        key="schedule_uploader",
         help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
     )
     if schedule_file is not None:
@@ -151,6 +146,45 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
     st.rerun()
 
+# Vastustajan rosterin lataus
+st.sidebar.subheader("Lataa vastustajan rosteri")
+if st.sidebar.button("Nollaa vastustajan rosteri", key="reset_opponent_roster_button"):
+    st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
+    if os.path.exists(OPPONENT_ROSTER_FILE):
+        os.remove(OPPONENT_ROSTER_FILE)
+    st.sidebar.success("Vastustajan rosteri nollattu!")
+    st.rerun()
+    
+if st.session_state['opponent_roster'].empty and os.path.exists(OPPONENT_ROSTER_FILE):
+    try:
+        opponent_roster_df_from_file = pd.read_csv(OPPONENT_ROSTER_FILE)
+        st.session_state['opponent_roster'] = opponent_roster_df_from_file
+        st.sidebar.success("Vastustajan rosteri ladattu automaattisesti tallennetusta tiedostosta!")
+    except Exception as e:
+        st.sidebar.error(f"Virhe tallennetun vastustajan rosterin lukemisessa: {str(e)}")
+
+opponent_roster_file = st.sidebar.file_uploader(
+    "Lataa vastustajan rosteri (CSV)",
+    type=["csv"],
+    key="opponent_roster_uploader",
+    help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)"
+)
+if opponent_roster_file is not None:
+    try:
+        opponent_roster = pd.read_csv(opponent_roster_file)
+        if not opponent_roster.empty and all(col in opponent_roster.columns for col in ['name', 'team', 'positions']):
+            if 'fantasy_points_avg' not in opponent_roster.columns:
+                opponent_roster['fantasy_points_avg'] = 0.0
+            opponent_roster['fantasy_points_avg'] = pd.to_numeric(opponent_roster['fantasy_points_avg'], errors='coerce').fillna(0)
+            st.session_state['opponent_roster'] = opponent_roster
+            opponent_roster.to_csv(OPPONENT_ROSTER_FILE, index=False)
+            st.sidebar.success("Vastustajan rosteri ladattu ja tallennettu!")
+            st.rerun()
+        else:
+            st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
+    except Exception as e:
+        st.sidebar.error(f"Virhe vastustajan rosterin lukemisessa: {str(e)}")
+
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
 if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button_new"):
@@ -164,40 +198,6 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
     except Exception as e:
         st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
     st.rerun()
-
-# Vastustajan rosterin lataus
-if st.sidebar.button("Lataa vastustajan rosteri (CSV)"):
-    # Tämä painike käynnistää latausprosessin
-    pass
-elif 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
-    st.sidebar.success("Vastustajan rosteri ladattu!")
-else:
-    # Täällä on tiedostojen latauslogiikka
-    opponent_roster_file = st.sidebar.file_uploader(
-        "Lataa vastustajan rosteri (CSV)",
-        type=["csv"],
-        key="opponent_roster_uploader",
-        help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)"
-    )
-    if opponent_roster_file is not None:
-        try:
-            opponent_roster = pd.read_csv(opponent_roster_file)
-            if not opponent_roster.empty and all(col in opponent_roster.columns for col in ['name', 'team', 'positions']):
-                if 'fantasy_points_avg' not in opponent_roster.columns:
-                    opponent_roster['fantasy_points_avg'] = 0.0
-                opponent_roster['fantasy_points_avg'] = pd.to_numeric(opponent_roster['fantasy_points_avg'], errors='coerce').fillna(0)
-                st.session_state['opponent_roster'] = opponent_roster
-                opponent_roster.to_csv(OPPONENT_ROSTER_FILE, index=False)
-                st.sidebar.success("Vastustajan rosteri ladattu ja tallennettu!")
-            else:
-                st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
-        except Exception as e:
-            st.sidebar.error(f"Virhe vastustajan rosterin lukemisessa: {str(e)}")
-
-# Nollauspainike on nyt turvallisesti erillään
-if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state['opponent_roster'] = None
-    st.experimental_rerun()
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
@@ -291,9 +291,6 @@ pos_limits = {
     'UTIL': util_limit
 }
 
-# --- Ladataan vapaat agentit ---
-st.sidebar.subheader("Lataa vapaat agentit")
-
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
 def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
     players_info = {}
@@ -302,7 +299,6 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
         if pd.isna(positions_str):
             positions_list = []
         elif isinstance(positions_str, str):
-            # Korjattu rivi, joka käsittelee sekä '/' että ',' erottimia
             positions_list = [p.strip() for p in positions_str.replace(',', '/').split('/')]
         else:
             positions_list = positions_str
@@ -490,7 +486,6 @@ def simulate_team_impact(schedule_df, my_roster_df, opponent_roster_df, pos_limi
 def analyze_free_agents(team_impact_dict, free_agents_df):
     """
     Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
-    
     Args:
         team_impact_dict (dict): Sanakirja, joka sisältää joukkuekohtaiset lisäpelit.
         free_agents_df (pd.DataFrame): DataFrame, joka sisältää vapaiden agenttien tiedot.
@@ -733,7 +728,7 @@ with tab1:
                     
                     availability_data[pos_check].append(can_fit)
 
-                    del players_info_dict[sim_player_name]
+                del players_info_dict[sim_player_name]
 
             availability_df = pd.DataFrame(availability_data, index=valid_dates)
             
@@ -783,7 +778,7 @@ with tab1:
         removed_fpa = 0.0
         if remove_sim_player and not st.session_state['roster'].empty:
             removed_player_info = st.session_state['roster'][st.session_state['roster']['name'] == remove_sim_player]
-            if 'fantasy_points_avg' in removed_player_info.columns and not pd.isna(removed_player_info['fantasy_points_avg'].iloc[0]):
+            if not removed_player_info.empty and 'fantasy_points_avg' in removed_player_info.columns and not pd.isna(removed_player_info['fantasy_points_avg'].iloc[0]):
                 removed_fpa_default = float(removed_player_info['fantasy_points_avg'].iloc[0])
             else:
                 removed_fpa_default = 0.0
@@ -791,7 +786,6 @@ with tab1:
 
         if st.button("Suorita vertailu"):
             if sim_name_A and sim_team_A and sim_positions_A and sim_name_B and sim_team_B and sim_positions_B:
-                
                 original_roster_copy = st.session_state['roster'].copy()
                 if 'fantasy_points_avg' not in original_roster_copy.columns:
                     original_roster_copy['fantasy_points_avg'] = 0.0
@@ -800,14 +794,12 @@ with tab1:
                 if remove_sim_player:
                     temp_roster = temp_roster[temp_roster['name'] != remove_sim_player].copy()
                 
-                # Pelaaja A:n simulointi
                 new_player_A = {'name': sim_name_A, 'team': sim_team_A, 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A}
                 sim_roster_A = pd.concat([temp_roster, pd.DataFrame([new_player_A])], ignore_index=True)
-
-                # Pelaaja B:n simulointi
+                
                 new_player_B = {'name': sim_name_B, 'team': sim_team_B, 'positions': sim_positions_B, 'fantasy_points_avg': sim_fpa_B}
                 sim_roster_B = pd.concat([temp_roster, pd.DataFrame([new_player_B])], ignore_index=True)
-                
+
                 schedule_filtered = st.session_state['schedule'][
                     (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
                     (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
@@ -823,16 +815,16 @@ with tab1:
 
                 with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää ja pisteitä..."):
                     _, original_total_games_dict, original_fp, _ = optimize_roster_advanced(
-                        schedule_filtered,
-                        st.session_state['roster'],
+                        schedule_filtered, 
+                        st.session_state['roster'], 
                         pos_limits
                     )
-                    original_total_games = sum(original_total_games_dict.values())
+                original_total_games = sum(original_total_games_dict.values())
                 
                 with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
                     _, total_games_A_dict, new_fp_A, _ = optimize_roster_advanced(
-                        schedule_filtered,
-                        sim_roster_A,
+                        schedule_filtered, 
+                        sim_roster_A, 
                         pos_limits
                     )
                     new_total_games_A = sum(total_games_A_dict.values())
@@ -840,15 +832,14 @@ with tab1:
                 
                 with st.spinner(f"Lasketaan {sim_name_B}:n vaikutusta..."):
                     _, total_games_B_dict, new_fp_B, _ = optimize_roster_advanced(
-                        schedule_filtered,
-                        sim_roster_B,
+                        schedule_filtered, 
+                        sim_roster_B, 
                         pos_limits
                     )
                     new_total_games_B = sum(total_games_B_dict.values())
                     player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
-
+                    
                 st.subheader("Vertailun tulokset")
-                
                 col_vertailu_1, col_vertailu_2 = st.columns(2)
                 
                 with col_vertailu_1:
@@ -856,26 +847,24 @@ with tab1:
                     st.metric("Pelien muutos", f"{new_total_games_A - original_total_games}", help="Pelaajan lisäämisen vaikutus kokonaispelimäärään")
                     st.metric("Omat pelit", player_A_impact_days)
                     st.metric("Fantasiapiste-ero", f"{new_fp_A - original_fp:.2f}", help="Pelaajan lisäämisen vaikutus fantasiapisteisiin")
-                    
+                
                 with col_vertailu_2:
                     st.markdown(f"**Pelaaja B: {sim_name_B}**")
                     st.metric("Pelien muutos", f"{new_total_games_B - original_total_games}", help="Pelaajan lisäämisen vaikutus kokonaispelimäärään")
                     st.metric("Omat pelit", player_B_impact_days)
                     st.metric("Fantasiapiste-ero", f"{new_fp_B - original_fp:.2f}", help="Pelaajan lisäämisen vaikutus fantasiapisteisiin")
-                    
+
                 st.markdown("---")
-                
                 st.subheader("Yhteenveto")
                 games_A_vs_B = (new_total_games_A - original_total_games) - (new_total_games_B - original_total_games)
                 fp_A_vs_B = (new_fp_A - original_fp) - (new_fp_B - original_fp)
-
+                
                 if fp_A_vs_B > 0:
                     st.success(f"{sim_name_A} on parempi vaihtoehto! Rosterisi kokonais-FP olisi arviolta **{fp_A_vs_B:.2f}** pistettä suurempi kuin {sim_name_B}:llä.")
                 elif fp_A_vs_B < 0:
                     st.error(f"{sim_name_B} on parempi vaihtoehto! Rosterisi kokonais-FP olisi arviolta **{abs(fp_A_vs_B):.2f}** pistettä suurempi kuin {sim_name_A}:lla.")
                 else:
                     st.info("Fantasiapisteissä ei ole eroa näiden pelaajien välillä.")
-
             else:
                 st.warning("Syötä molempien pelaajien tiedot suorittaaksesi vertailun.")
     else:
@@ -885,9 +874,7 @@ with tab1:
     st.markdown("---")
     st.header("🔍 Joukkueanalyysi")
     st.markdown("""
-    Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
-    ja näyttää, mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle
-    ottaen huomioon nykyisen rosterisi.
+    Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää, mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
     """)
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
         st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
@@ -896,233 +883,121 @@ with tab1:
             (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
             (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
         ]
-
         if not schedule_filtered.empty:
+            team_impact_data = {}
+            all_teams = set(st.session_state['schedule']['Visitor'].unique()) | set(st.session_state['schedule']['Home'].unique())
+            
             if st.button("Suorita joukkueanalyysi"):
-                st.session_state['team_impact_results'] = simulate_team_impact(
-                    schedule_filtered,
-                    st.session_state['roster'],
-                    pos_limits
-                )
+                with st.spinner("Analysoidaan joukkueiden vaikutusta..."):
+                    # Simuloi jokaisen joukkueen vaikutus erikseen ja tallenna tulokset
+                    team_impact_data = {}
+                    for pos in ['C', 'LW', 'RW', 'D', 'G']:
+                        impact_list = []
+                        for team in sorted(list(all_teams)):
+                            # Luo simuloitu rosteri lisäämällä kuvitteellinen pelaaja
+                            temp_roster = st.session_state['roster'].copy()
+                            new_player = {'name': f'Simu_{pos}_{team}', 'team': team, 'positions': pos, 'fantasy_points_avg': 10.0}
+                            if 'fantasy_points_avg' not in temp_roster.columns:
+                                temp_roster['fantasy_points_avg'] = 0.0
+                            temp_roster = pd.concat([temp_roster, pd.DataFrame([new_player])], ignore_index=True)
+                            
+                            # Aja optimointi alkuperäiselle ja simuloidulle rosterille
+                            _, original_total_games, _, _ = optimize_roster_advanced(schedule_filtered, st.session_state['roster'], pos_limits)
+                            _, simulated_total_games, _, _ = optimize_roster_advanced(schedule_filtered, temp_roster, pos_limits)
+                            
+                            extra_games = sum(simulated_total_games.values()) - sum(original_total_games.values())
+                            
+                            impact_list.append({
+                                'Joukkue': team,
+                                'Lisäpelit': extra_games
+                            })
+                        team_impact_data[pos] = pd.DataFrame(impact_list).sort_values(by='Lisäpelit', ascending=False)
+                    st.session_state['team_impact_results'] = team_impact_data
             
             if st.session_state['team_impact_results'] is not None:
                 for pos, df in st.session_state['team_impact_results'].items():
                     st.subheader(f"Joukkueet pelipaikalle: {pos}")
                     st.dataframe(df, use_container_width=True)
-
+            
 # --- Vapaiden agenttien analyysi ---
 if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
    st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']:
     st.header("Vapaiden agenttien analyysi")
     
     # Suodatusvalikot
-    all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'].unique() for p in player_pos.replace('/', ',').split(','))))
-    # TÄSSÄ MUUTOS: selectboxista multiselectiin
-    selected_pos = st.multiselect("Suodata pelipaikkojen mukaan:", all_positions, default=all_positions)
+    all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'] for p in str(player_pos).replace('/', ',').split(','))))
     
-    all_teams = sorted(st.session_state['free_agents']['team'].unique())
-    selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
+    col1, col2 = st.columns(2)
+    with col1:
+        selected_positions = st.multiselect("Suodata pelipaikoittain", all_positions, default=all_positions)
+    with col2:
+        top_n = st.number_input("Näytä N parasta", min_value=1, value=20)
+    
+    
+    filtered_free_agents = st.session_state['free_agents']
+    if selected_positions:
+        filtered_free_agents = filtered_free_agents[
+            filtered_free_agents['positions'].apply(lambda x: any(pos in selected_positions for pos in str(x).replace('/', ',').split(',')))
+        ]
+    
+    with st.spinner("Analysoidaan vapaiden agenttien vaikutusta..."):
+        free_agent_impact_df = analyze_free_agents(st.session_state['team_impact_results'], filtered_free_agents)
 
-    if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
-        with st.spinner("Analysoidaan vapaat agentit..."):
-            free_agent_results = analyze_free_agents(
-                st.session_state['team_impact_results'],
-                st.session_state['free_agents']
-            )
-        
-        filtered_results = free_agent_results.copy()
-        
-        # PÄIVITETTY SUODATUSLOGIIKKA
-        if selected_pos: # Tarkistaa, että lista ei ole tyhjä
-            # Suodata tulokset pelaajan pelipaikkojen ja valitun listan perusteella
-            filtered_results = filtered_results[filtered_results['positions'].apply(
-                lambda x: any(pos in x.split('/') for pos in selected_pos)
-            )]
-        
-        if selected_team != "Kaikki":
-            filtered_results = filtered_results[filtered_results['team'] == selected_team]
-            
-        if not filtered_results.empty:
-            st.dataframe(filtered_results.style.format({
-                'total_impact': "{:.2f}",
-                'fantasy_points_avg': "{:.1f}"
-            }), use_container_width=True)
-        else:
-            st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
-with tab2:
-    st.header("Joukkueiden vertailu")
-    st.markdown("Tämä työkalu auttaa sinua vertailemaan joukkueiden pelimääriä halutulla aikavälillä.")
-    
-    if st.session_state['schedule'].empty:
-        st.warning("Lataa peliaikataulu aloittaaksesi joukkueiden vertailun.")
+    if not free_agent_impact_df.empty:
+        st.dataframe(free_agent_impact_df.head(top_n), use_container_width=True)
     else:
-        all_teams = sorted(list(set(st.session_state['schedule']['Home'].tolist() + st.session_state['schedule']['Visitor'].tolist())))
+        st.info("Valituilla kriteereillä ei löytynyt vapaita agentteja.")
         
-        st.subheader("Valitse joukkueet")
-        colA, colB = st.columns(2)
-        
-        with colA:
-            team_A = st.selectbox("Joukkue A", options=[""] + all_teams, key='team_A_vertailu')
-        
-        with colB:
-            team_B = st.selectbox("Joukkue B", options=[""] + all_teams, key='team_B_vertailu')
-
-        if team_A and team_B:
+with tab2:
+    st.header("🆚 Joukkueiden vertailu")
+    
+    if st.session_state['roster'].empty or st.session_state['opponent_roster'].empty or st.session_state['schedule'].empty:
+        st.warning("Lataa molemmat rosterit ja peliaikataulu suorittaaksesi vertailun.")
+    else:
+        if st.button("Suorita joukkuevertailu", key="team_comparison_button"):
             schedule_filtered = st.session_state['schedule'][
                 (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
                 (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
             ]
-            
-            games_A = schedule_filtered[
-                (schedule_filtered['Home'] == team_A) | (schedule_filtered['Visitor'] == team_A)
-            ]
-            games_B = schedule_filtered[
-                (schedule_filtered['Home'] == team_B) | (schedule_filtered['Visitor'] == team_B)
-            ]
-            
-            games_A_count = len(games_A)
-            games_B_count = len(games_B)
-            
-            st.subheader("Vertailun tulokset")
-            st.markdown(f"**Pelimäärät välillä {start_date} - {end_date}**")
-            
-            col_res_A, col_res_B = st.columns(2)
-            
-            with col_res_A:
-                st.metric(f"**{team_A}**", f"{games_A_count} peliä")
-            
-            with col_res_B:
-                st.metric(f"**{team_B}**", f"{games_B_count} peliä")
-                
-            st.markdown("---")
-            
-            st.subheader("Päivittäinen pelimäärä-analyysi")
-            st.markdown("Alla olevasta taulukosta näet kumpi joukkue pelaa minäkin päivänä.")
-            
-            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-            daily_analysis_data = []
-            
-            for date in date_range:
-                date_str = date.strftime('%Y-%m-%d')
-                
-                plays_A = date in games_A['Date'].values
-                plays_B = date in games_B['Date'].values
-                
-                status_A = "✅" if plays_A else "❌"
-                status_B = "✅" if plays_B else "❌"
+            if schedule_filtered.empty:
+                st.warning("Ei pelejä valitulla aikavälillä. Valitse toinen päivämääräväli.")
+            else:
+                with st.spinner("Simuloidaan joukkueiden otteluohjelmaa..."):
+                    winner, my_results, opponent_results = simulate_team_impact(
+                        schedule_filtered,
+                        st.session_state['roster'],
+                        st.session_state['opponent_roster'],
+                        pos_limits
+                    )
 
-                daily_analysis_data.append({
-                    "Päivä": date_str,
-                    f"Joukkue A: {team_A}": status_A,
-                    f"Joukkue B: {team_B}": status_B
-                })
-            
-            analysis_df = pd.DataFrame(daily_analysis_data)
-            
-            def highlight_winner(row):
-                if row[f'Joukkue A: {team_A}'] == '✅' and row[f'Joukkue B: {team_B}'] == '❌':
-                    return [f'background-color: lightgreen'] * len(row)
-                elif row[f'Joukkue A: {team_A}'] == '❌' and row[f'Joukkue B: {team_B}'] == '✅':
-                    return [f'background-color: lightblue'] * len(row)
-                elif row[f'Joukkue A: {team_A}'] == '✅' and row[f'Joukkue B: {team_B}'] == '✅':
-                    return [f'background-color: lightyellow'] * len(row)
+                st.subheader("Vertailun tulokset")
+                
+                my_fp = my_results['total_points']
+                opponent_fp = opponent_results['total_points']
+                my_total_games = my_results['total_games']
+                opponent_total_games = opponent_results['total_games']
+                
+                st.markdown(f"**Tämän viikon voittaja on todennäköisesti:** **{winner}**")
+
+                st.markdown("---")
+                
+                vertailu_fp_col1, vertailu_fp_col2 = st.columns(2)
+                with vertailu_fp_col1:
+                    st.metric("Oman joukkueen FP", f"{my_fp:.2f}")
+                with vertailu_fp_col2:
+                    st.metric("Vastustajan FP", f"{opponent_fp:.2f}")
+
+
+                if my_total_games > opponent_total_games:
+                    st.success(f"Oma joukkueesi saa arviolta **{my_total_games - opponent_total_games}** enemmän aktiivisia pelejä kuin vastustaja.")
+                elif my_total_games < opponent_total_games:
+                    st.error(f"Vastustajan joukkue saa arviolta **{opponent_total_games - my_total_games}** enemmän aktiivisia pelejä kuin sinun joukkueesi.")
                 else:
-                    return [''] * len(row)
+                    st.info("Ennakoiduissa aktiivisissa peleissä ei ole eroa.")
 
-            st.dataframe(analysis_df.style.apply(highlight_winner, axis=1), use_container_width=True)
-
-        else:
-            st.info("Valitse kaksi joukkuetta vertaillaksesi niitä.")
-
-with tab3:
-    st.header("🆚 Joukkuevertailu")
-    st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
-    
-    if st.session_state['roster'].empty or st.session_state['opponent_roster'].empty:
-        st.warning("Lataa molemmat rosterit vertailua varten.")
-    elif st.session_state['schedule'].empty:
-        st.warning("Lataa peliaikataulu vertailua varten.")
-    else:
-        schedule_filtered = st.session_state['schedule'][
-            (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-            (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-        ]
-
-        if schedule_filtered.empty:
-            st.warning("Ei pelejä valitulla aikavälillä.")
-        else:
-            if st.button("Suorita joukkuevertailu", key="roster_compare_button"):
-                with st.spinner("Vertailu käynnissä..."):
-                    
-                    # Lasketaan oma rosteri
-                    _, my_games_dict, my_fp, my_total_games = optimize_roster_advanced(
-                        schedule_filtered, st.session_state['roster'], pos_limits
-                    )
-                    
-                    # Lasketaan vastustajan rosteri
-                    _, opponent_games_dict, opponent_fp, opponent_total_games = optimize_roster_advanced(
-                        schedule_filtered, st.session_state['opponent_roster'], pos_limits
-                    )
-
-                    # Kootaan omien pelaajien tiedot DataFrameen
-                    my_players_data = []
-                    for name, games in my_games_dict.items():
-                        fpa = st.session_state['roster'][st.session_state['roster']['name'] == name]['fantasy_points_avg'].iloc[0] if not st.session_state['roster'][st.session_state['roster']['name'] == name].empty else 0
-                        total_fp_player = games * fpa
-                        my_players_data.append({
-                            'Pelaaja': name,
-                            'Aktiiviset pelit': games,
-                            'Ennakoidut FP': round(total_fp_player, 2)
-                        })
-                    my_df = pd.DataFrame(my_players_data).sort_values(by='Ennakoidut FP', ascending=False)
-
-                    # Kootaan vastustajan pelaajien tiedot DataFrameen
-                    opponent_players_data = []
-                    for name, games in opponent_games_dict.items():
-                        fpa = st.session_state['opponent_roster'][st.session_state['opponent_roster']['name'] == name]['fantasy_points_avg'].iloc[0] if not st.session_state['opponent_roster'][st.session_state['opponent_roster']['name'] == name].empty else 0
-                        total_fp_player = games * fpa
-                        opponent_players_data.append({
-                            'Pelaaja': name,
-                            'Aktiiviset pelit': games,
-                            'Ennakoidut FP': round(total_fp_player, 2)
-                        })
-                    opponent_df = pd.DataFrame(opponent_players_data).sort_values(by='Ennakoidut FP', ascending=False)
-                    
-                    st.subheader("Yksityiskohtainen vertailu")
-                    col1_detail, col2_detail = st.columns(2)
-                    with col1_detail:
-                        st.markdown("**Oma joukkueesi**")
-                        st.dataframe(my_df, use_container_width=True)
-                    with col2_detail:
-                        st.markdown("**Vastustajan joukkue**")
-                        st.dataframe(opponent_df, use_container_width=True)
-                        
-                    st.subheader("Yhteenveto")
-                    vertailu_col1, vertailu_col2 = st.columns(2)
-                    with vertailu_col1:
-                        st.metric("Oman joukkueen aktiiviset pelit", my_total_games)
-                    with vertailu_col2:
-                        st.metric("Vastustajan aktiiviset pelit", opponent_total_games)
-
-                    st.markdown("---")
-                    
-                    vertailu_fp_col1, vertailu_fp_col2 = st.columns(2)
-                    with vertailu_fp_col1:
-                        st.metric("Oman joukkueen FP", f"{my_fp:.2f}")
-                    with vertailu_fp_col2:
-                        st.metric("Vastustajan FP", f"{opponent_fp:.2f}")
-
-
-                    if my_total_games > opponent_total_games:
-                        st.success(f"Oma joukkueesi saa arviolta **{my_total_games - opponent_total_games}** enemmän aktiivisia pelejä kuin vastustaja.")
-                    elif my_total_games < opponent_total_games:
-                        st.error(f"Vastustajan joukkue saa arviolta **{opponent_total_games - my_total_games}** enemmän aktiivisia pelejä kuin sinun joukkueesi.")
-                    else:
-                        st.info("Ennakoiduissa aktiivisissa peleissä ei ole eroa.")
-
-                    if my_fp > opponent_fp:
-                        st.success(f"Oma joukkueesi saa arviolta **{my_fp - opponent_fp:.2f}** enemmän fantasiapisteitä kuin vastustaja. Hyvin todennäköisesti voitat tämän viikon!")
-                    elif my_fp < opponent_fp:
-                        st.error(f"Vastustajasi saa arviolta **{opponent_fp - my_fp:.2f}** enemmän fantasiapisteitä kuin sinun joukkueesi. Sinun kannattaa harkita rosterisi muutoksia.")
-                    else:
-                        st.info("Ennakoiduissa fantasiapisteissä ei ole eroa.")
+                if my_fp > opponent_fp:
+                    st.success(f"Oma joukkueesi saa arviolta **{my_fp - opponent_fp:.2f}** enemmän fantasiapisteitä kuin vastustaja. Hyvin todennäköisesti voitat tämän viikon!")
+                elif my_fp < opponent_fp:
+                    st.error(f"Vastustajasi saa arviolta **{opponent_fp - my_fp:.2f}** enemmän fantasiapisteitä kuin sinun joukkueesi. Sinun olisi harkittava rosterin muutoksia.")
+                else:
+                    st.info("Ennakoiduissa fantasiapisteissä ei ole eroa.")
