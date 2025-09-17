@@ -448,11 +448,11 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
     _, _, _, original_total_games = optimize_roster_advanced(
         schedule_df, roster_df, pos_limits
     )
-    
+        
     all_teams = sorted(list(set(schedule_df['Home'].tolist() + schedule_df['Visitor'].tolist())))
     positions_to_check = ['C', 'LW', 'RW', 'D', 'G']
     team_impact = defaultdict(lambda: defaultdict(int))
-    
+        
     for team in all_teams:
         for pos_check in positions_to_check:
             # Create a temporary roster with a simulated player
@@ -463,32 +463,26 @@ def simulate_team_impact(schedule_df, roster_df, pos_limits):
                 'positions': pos_check, 
                 'fantasy_points_avg': 100 
             }])
-            
-            # Use concat to merge with the existing roster
+                
             sim_roster = pd.concat([roster_df, sim_player_row], ignore_index=True)
-            
-            # Run the optimizer on the simulated roster
+                
             _, _, _, simulated_total_games = optimize_roster_advanced(
                 schedule_df, sim_roster, pos_limits
             )
-            
-            # Calculate the impact
+                
             impact = simulated_total_games - original_total_games
             
-            # Subtract the game of the simulated player itself
-            sim_games_count = len(schedule_df[
-                (schedule_df['Home'] == team) | (schedule_df['Visitor'] == team)
-            ])
-            
+            # TÄMÄ ON KESKEINEN MUUTOS
+            # Älä vähennä sim-pelaajan omia pelejä, vaan käytä suoraan laskettua eroa
             net_impact = impact
             team_impact[team][pos_check] = net_impact
-    
+            
     results = {}
     for pos in positions_to_check:
         pos_data = {team: impact[pos] for team, impact in team_impact.items()}
         df = pd.DataFrame(list(pos_data.items()), columns=['Joukkue', 'Lisäpelit']).sort_values('Lisäpelit', ascending=False)
         results[pos] = df
-    
+        
     return results
 
 import pandas as pd
