@@ -160,30 +160,38 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
         st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
     st.rerun()
 
-# Vastustajan rosterin lataus
-if st.sidebar.button("Lataa vastustajan rosteri (CSV)"):
-    # Tämä painike käynnistää latausprosessin
-    pass
-elif 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
+# Vastustajan rosterin lataus - KORJATTU VERSIO
+st.sidebar.subheader("Lataa vastustajan rosteri")
+
+if 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
     st.sidebar.success("Vastustajan rosteri ladattu!")
+    
+    # Näytä latauspainike vain jos rosteri on jo ladattu
+    if st.sidebar.button("Lataa uusi vastustajan rosteri"):
+        st.session_state['opponent_roster'] = None
+        st.rerun()
 else:
-    # Täällä on tiedostojen latauslogiikka
+    # Näytä tiedostolataaja
+    st.sidebar.info("Lataa vastustajan rosteri CSV-tiedostona")
     opponent_roster_file = st.sidebar.file_uploader(
-        "Lataa vastustajan rosteri (CSV)",
+        "Valitse CSV-tiedosto",
         type=["csv"],
         key="opponent_roster_uploader",
         help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)"
     )
+    
     if opponent_roster_file is not None:
         try:
             opponent_roster = pd.read_csv(opponent_roster_file)
             if not opponent_roster.empty and all(col in opponent_roster.columns for col in ['name', 'team', 'positions']):
                 if 'fantasy_points_avg' not in opponent_roster.columns:
                     opponent_roster['fantasy_points_avg'] = 0.0
+                    st.sidebar.info("Lisätty puuttuva 'fantasy_points_avg'-sarake oletusarvolla 0.0")
                 opponent_roster['fantasy_points_avg'] = pd.to_numeric(opponent_roster['fantasy_points_avg'], errors='coerce').fillna(0)
                 st.session_state['opponent_roster'] = opponent_roster
                 opponent_roster.to_csv(OPPONENT_ROSTER_FILE, index=False)
                 st.sidebar.success("Vastustajan rosteri ladattu ja tallennettu!")
+                st.rerun()
             else:
                 st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
         except Exception as e:
