@@ -97,6 +97,7 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
     st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
     st.session_state['team_impact_results'] = None
+    st.session_state['free_agent_results'] = pd.DataFrame()
     st.sidebar.success("Välimuisti tyhjennetty!")
     st.rerun()
 
@@ -679,7 +680,7 @@ with tab2:
                 st.info("Ennakoiduissa fantasiapisteissä ei ole eroa.")
 
             st.markdown("---")
-            st.subheader("Yksityiskohtainen vertailu")
+            st.subheader("Yksityiskohtaiset tulokset")
             
             col_my, col_opponent = st.columns(2)
             
