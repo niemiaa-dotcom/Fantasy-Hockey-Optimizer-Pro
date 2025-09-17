@@ -197,6 +197,9 @@ else:
         except Exception as e:
             st.sidebar.error(f"Virhe vastustajan rosterin lukemisessa: {str(e)}")
 
+if st.sidebar.button("Nollaa vastustajan rosteri"):
+    st.session_state['opponent_roster'] = None
+    st.experimental_rerun()
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
