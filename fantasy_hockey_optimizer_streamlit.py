@@ -726,7 +726,7 @@ with tab2:
                 my_roster['Kokonais FP'] = my_roster['Pelit'] * my_roster['fantasy_points_avg']
                 my_roster = my_roster[['name', 'team', 'positions', 'fantasy_points_avg', 'Pelit', 'Kokonais FP']]
                 my_roster.rename(columns={'name': 'Pelaaja', 'team': 'Joukkue', 'positions': 'Pelipaikat', 'fantasy_points_avg': 'FP/GP'}, inplace=True)
-                st.dataframe(my_roster, use_container_width=True)
+                st.dataframe(my_roster, use_container_width=True, hide_index=True)
             
             # Vastustajan joukkueen taulukko
             with col_opponent:
@@ -736,7 +736,7 @@ with tab2:
                 opponent_roster['Kokonais FP'] = opponent_roster['Pelit'] * opponent_roster['fantasy_points_avg']
                 opponent_roster = opponent_roster[['name', 'team', 'positions', 'fantasy_points_avg', 'Pelit', 'Kokonais FP']]
                 opponent_roster.rename(columns={'name': 'Pelaaja', 'team': 'Joukkue', 'positions': 'Pelipaikat', 'fantasy_points_avg': 'FP/GP'}, inplace=True)
-                st.dataframe(opponent_roster, use_container_width=True)
+                st.dataframe(opponent_roster, use_container_width=True, hide_index=True)
 
 with tab3:
     st.header("🔍 Vapaat agentit")
