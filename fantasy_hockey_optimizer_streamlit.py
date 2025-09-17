@@ -538,7 +538,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
     return results
     
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
-tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
+tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu"])
 
 with tab1:
     st.header("📊 Nykyinen rosteri")
@@ -636,92 +636,92 @@ with tab1:
                 st.write("Pelipaikkojen kokonaispelimäärät")
                 st.dataframe(pos_df)
 
-    st.subheader("Päivittäinen pelipaikkasaatavuus")
-    st.markdown("Tämä matriisi näyttää, onko rosteriin mahdollista lisätä uusi pelaaja kyseiselle pelipaikalle.")
+        st.subheader("Päivittäinen pelipaikkasaatavuus")
+        st.markdown("Tämä matriisi näyttää, onko rosteriin mahdollista lisätä uusi pelaaja kyseiselle pelipaikalle.")
 
-    if st.session_state['schedule'].empty or st.session_state['roster'].empty:
-        st.warning("Lataa sekä peliaikataulu että rosteri näyttääksesi matriisin.")
-    else:
-        time_delta = end_date - start_date
-        if time_delta.days > 30:
-            st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
+        if st.session_state['schedule'].empty or st.session_state['roster'].empty:
+            st.warning("Lataa sekä peliaikataulu että rosteri näyttääksesi matriisin.")
         else:
-            players_info_dict = {}
-            for _, row in st.session_state['roster'].iterrows():
-                positions_list = [p.strip() for p in row['positions'].split('/')]
-                players_info_dict[row['name']] = {'team': row['team'], 'positions': positions_list, 'fpa': row.get('fantasy_points_avg', 0)}
+            time_delta = end_date - start_date
+            if time_delta.days > 30:
+                st.info("Päivittäinen saatavuusmatriisi näytetään vain enintään 30 päivän aikavälillä.")
+            else:
+                players_info_dict = {}
+                for _, row in st.session_state['roster'].iterrows():
+                    positions_list = [p.strip() for p in row['positions'].split('/')]
+                    players_info_dict[row['name']] = {'team': row['team'], 'positions': positions_list, 'fpa': row.get('fantasy_points_avg', 0)}
 
-            def get_daily_active_slots(players_list, pos_limits):
-                best_active_players_count = 0
-                num_attempts = 50
+                def get_daily_active_slots(players_list, pos_limits):
+                    best_active_players_count = 0
+                    num_attempts = 50
+                    
+                    for _ in range(num_attempts):
+                        shuffled_players = players_list.copy()
+                        np.random.shuffle(shuffled_players)
+                        active = {pos: [] for pos in pos_limits.keys()}
+                        
+                        for player_name in shuffled_players:
+                            placed = False
+                            positions = players_info_dict.get(player_name, {}).get('positions', [])
+                            for pos in positions:
+                                if pos in pos_limits and len(active[pos]) < pos_limits[pos] and pos != 'UTIL':
+                                    active[pos].append(player_name)
+                                    placed = True
+                                    break
+                            if not placed and 'UTIL' in pos_limits and len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
+                                active['UTIL'].append(player_name)
+                        
+                        current_active_count = sum(len(p) for p in active.values())
+                        if current_active_count > best_active_players_count:
+                            best_active_players_count = current_active_count
+                    
+                    return best_active_players_count
+                    
+                positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
+                availability_data = {pos: [] for pos in positions_to_show}
+                dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
+                valid_dates = []
+
+                for date in dates:
+                    day_games = st.session_state['schedule'][st.session_state['schedule']['Date'] == date]
+                    
+                    if day_games.empty:
+                        continue
+
+                    available_players_today = [
+                        player_name for player_name, info in players_info_dict.items()
+                        if info['team'] in day_games['Visitor'].tolist() or info['team'] in day_games['Home'].tolist()
+                    ]
+
+                    valid_dates.append(date)
+
+                    for pos_check in positions_to_show:
+                        sim_player_name = f'SIM_PLAYER_{pos_check}'
+                        
+                        sim_players_list = available_players_today + [sim_player_name]
+                        players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check], 'fpa': 0}
+                        if pos_check in ['C', 'LW', 'RW', 'D']:
+                            players_info_dict[sim_player_name]['positions'].append('UTIL')
+
+                        original_active_count = get_daily_active_slots(available_players_today, pos_limits)
+                        simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
+                        
+                        can_fit = simulated_active_count > original_active_count
+                        
+                        availability_data[pos_check].append(can_fit)
+
+                    del players_info_dict[sim_player_name]
+
+                availability_df = pd.DataFrame(availability_data, index=valid_dates)
                 
-                for _ in range(num_attempts):
-                    shuffled_players = players_list.copy()
-                    np.random.shuffle(shuffled_players)
-                    active = {pos: [] for pos in pos_limits.keys()}
-                    
-                    for player_name in shuffled_players:
-                        placed = False
-                        positions = players_info_dict.get(player_name, {}).get('positions', [])
-                        for pos in positions:
-                            if pos in pos_limits and len(active[pos]) < pos_limits[pos] and pos != 'UTIL':
-                                active[pos].append(player_name)
-                                placed = True
-                                break
-                        if not placed and 'UTIL' in pos_limits and len(active['UTIL']) < pos_limits['UTIL'] and any(p in ['C', 'LW', 'RW', 'D'] for p in positions):
-                            active['UTIL'].append(player_name)
-                    
-                    current_active_count = sum(len(p) for p in active.values())
-                    if current_active_count > best_active_players_count:
-                        best_active_players_count = current_active_count
-                
-                return best_active_players_count
-                
-            positions_to_show = ['C', 'LW', 'RW', 'D', 'G']
-            availability_data = {pos: [] for pos in positions_to_show}
-            dates = [start_date + timedelta(days=i) for i in range(time_delta.days + 1)]
-            valid_dates = []
+                def color_cells(val):
+                    color = 'green' if val else 'red'
+                    return f'background-color: {color}'
 
-            for date in dates:
-                day_games = st.session_state['schedule'][st.session_state['schedule']['Date'] == date]
-                
-                if day_games.empty:
-                    continue
-
-                available_players_today = [
-                    player_name for player_name, info in players_info_dict.items()
-                    if info['team'] in day_games['Visitor'].tolist() or info['team'] in day_games['Home'].tolist()
-                ]
-
-                valid_dates.append(date)
-
-                for pos_check in positions_to_show:
-                    sim_player_name = f'SIM_PLAYER_{pos_check}'
-                    
-                    sim_players_list = available_players_today + [sim_player_name]
-                    players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check], 'fpa': 0}
-                    if pos_check in ['C', 'LW', 'RW', 'D']:
-                        players_info_dict[sim_player_name]['positions'].append('UTIL')
-
-                    original_active_count = get_daily_active_slots(available_players_today, pos_limits)
-                    simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
-                    
-                    can_fit = simulated_active_count > original_active_count
-                    
-                    availability_data[pos_check].append(can_fit)
-
-                del players_info_dict[sim_player_name]
-
-            availability_df = pd.DataFrame(availability_data, index=valid_dates)
-            
-            def color_cells(val):
-                color = 'green' if val else 'red'
-                return f'background-color: {color}'
-
-            st.dataframe(
-                availability_df.style.applymap(color_cells),
-                use_container_width=True
-            )
+                st.dataframe(
+                    availability_df.style.applymap(color_cells),
+                    use_container_width=True
+                )
 
     st.header("🔮 Simuloi uuden pelaajan vaikutus")
     if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
@@ -894,32 +894,32 @@ with tab1:
                     st.subheader(f"Joukkueet pelipaikalle: {pos}")
                     st.dataframe(df, use_container_width=True)
             
-if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
-   st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']:
-    st.header("Vapaiden agenttien analyysi")
-    
-    all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'] for p in str(player_pos).replace('/', ',').split(','))))
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        selected_positions = st.multiselect("Suodata pelipaikoittain", all_positions, default=all_positions)
-    with col2:
-        top_n = st.number_input("Näytä N parasta", min_value=1, value=20)
-    
-    
-    filtered_free_agents = st.session_state['free_agents']
-    if selected_positions:
-        filtered_free_agents = filtered_free_agents[
-            filtered_free_agents['positions'].apply(lambda x: any(pos in selected_positions for pos in str(x).replace('/', ',').split(',')))
-        ]
-    
-    with st.spinner("Analysoidaan vapaiden agenttien vaikutusta..."):
-        free_agent_impact_df = analyze_free_agents(st.session_state['team_impact_results'], filtered_free_agents)
+    if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
+       st.session_state.get('team_impact_results') is not None and st.session_state['team_impact_results']:
+        st.header("Vapaiden agenttien analyysi")
+        
+        all_positions = sorted(list(set(p.strip() for player_pos in st.session_state['free_agents']['positions'] for p in str(player_pos).replace('/', ',').split(','))))
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_positions = st.multiselect("Suodata pelipaikoittain", all_positions, default=all_positions)
+        with col2:
+            top_n = st.number_input("Näytä N parasta", min_value=1, value=20)
+        
+        
+        filtered_free_agents = st.session_state['free_agents']
+        if selected_positions:
+            filtered_free_agents = filtered_free_agents[
+                filtered_free_agents['positions'].apply(lambda x: any(pos in selected_positions for pos in str(x).replace('/', ',').split(',')))
+            ]
+        
+        with st.spinner("Analysoidaan vapaiden agenttien vaikutusta..."):
+            free_agent_impact_df = analyze_free_agents(st.session_state['team_impact_results'], filtered_free_agents)
 
-    if not free_agent_impact_df.empty:
-        st.dataframe(free_agent_impact_df.head(top_n), use_container_width=True)
-    else:
-        st.info("Valituilla kriteereillä ei löytynyt vapaita agentteja.")
+        if not free_agent_impact_df.empty:
+            st.dataframe(free_agent_impact_df.head(top_n), use_container_width=True)
+        else:
+            st.info("Valituilla kriteereillä ei löytynyt vapaita agentteja.")
         
 with tab2:
     st.header("🆚 Joukkueiden vertailu")
