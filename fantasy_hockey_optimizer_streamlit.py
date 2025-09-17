@@ -92,7 +92,7 @@ def load_free_agents_from_gsheets():
 # Tässä on nollauspainike. Sen sijainti on täysin oikea.
 if st.sidebar.button("Nollaa vastustajan rosteri"):
     st.session_state['opponent_roster'] = None
-    st.experimental_rerun()
+    st.rerun()
     
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
