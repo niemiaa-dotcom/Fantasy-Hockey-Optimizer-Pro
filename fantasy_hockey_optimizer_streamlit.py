@@ -5,7 +5,6 @@ import numpy as np
 from datetime import datetime, timedelta
 from collections import defaultdict
 import itertools
-import os
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -565,9 +564,4 @@ with tab1:
                         if pos_clean in ['C', 'LW', 'RW', 'D', 'G']:
                             if pos_clean not in position_data:
                                 position_data[pos_clean] = 0
-                            position_data[pos_clean] += total_games.get(row['name'], 0)
-                pos_df = pd.DataFrame({
-                    'Pelipaikka': list(position_data.keys()),
-                    'Pelit': list(position_data.values())
-                })
-                st.write("
+                            position_data[pos_clean] += total_games.get(row
