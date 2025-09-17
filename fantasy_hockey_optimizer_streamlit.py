@@ -662,7 +662,11 @@ with tab2:
     st.header("🆚 Joukkueiden vertailu")
     st.markdown("Syötä oma ja vastustajan rosteri sivupalkista suorittaaksesi vertailun.")
     
-    if st.session_state['schedule'].empty or st.session_state['roster'].empty or st.session_state['opponent_roster'].empty:
+    if (
+        st.session_state['schedule'].empty 
+        or st.session_state['roster'].empty 
+        or st.session_state['opponent_roster'].empty
+    ):
         st.warning("Lataa peliaikataulu, oma rosteri ja vastustajan rosteri ennen vertailua.")
     else:
         schedule_filtered = st.session_state['schedule'][
@@ -684,64 +688,13 @@ with tab2:
                 'my_results': my_results,
                 'opponent_results': opponent_results
             }
-            
             st.success("Simulaatio valmis!")
-            # 🔴 EI st.rerun(), muuten jää ikuiseen silmukkaan
 
+        # Näytetään tulokset, jos simulaatio on jo ajettu
         if st.session_state['team_impact_results'] is not None:
             winner = st.session_state['team_impact_results']['winner']
             my_fp = st.session_state['team_impact_results']['my_results']['total_points']
-            opponent_fp = st.session_state['team_impact_results']['opponent_results']['total_points']
-            my_total_games = st.session_state['team_impact_results']['my_results']['total_games']
-            opponent_total_games = st.session_state['team_impact_results']['opponent_results']['total_games']
-            
-            st.subheader("📊 Vertailun yhteenveto")
-            st.markdown(f"**Tämän viikon voittaja on todennäköisesti:** **{winner}**")
-
-            vertailu_fp_col1, vertailu_fp_col2 = st.columns(2)
-            with vertailu_fp_col1:
-                st.metric("Oman joukkueen FP", f"{my_fp:.2f}")
-            with vertailu_fp_col2:
-                st.metric("Vastustajan FP", f"{opponent_fp:.2f}")
-
-            if my_total_games > opponent_total_games:
-                st.success(f"Oma joukkueesi saa arviolta **{my_total_games - opponent_total_games}** enemmän aktiivisia pelejä kuin vastustaja.")
-            elif my_total_games < opponent_total_games:
-                st.error(f"Vastustajan joukkue saa arviolta **{opponent_total_games - my_total_games}** enemmän aktiivisia pelejä kuin sinun joukkueesi.")
-            else:
-                st.info("Ennakoiduissa aktiivisissa peleissä ei ole eroa.")
-
-            if my_fp > opponent_fp:
-                st.success(f"Oma joukkueesi saa arviolta **{my_fp - opponent_fp:.2f}** enemmän fantasiapisteitä kuin vastustaja. Hyvin todennäköisesti voitat tämän viikon!")
-            elif my_fp < opponent_fp:
-                st.error(f"Vastustajasi saa arviolta **{opponent_fp - my_fp:.2f}** enemmän fantasiapisteitä kuin sinun joukkueesi. Sinun kannattaa harkita rosterisi muutoksia.")
-            else:
-                st.info("Fantasiapisteet ovat ennusteen mukaan tasan.")
-
-            st.markdown("---")
-            st.subheader("Yksityiskohtaiset tulokset")
-            
-            col_my, col_opponent = st.columns(2)
-            
-            # Oma joukkueen taulukko
-            with col_my:
-                st.markdown("#### Oma joukkue")
-                my_roster = st.session_state['roster'].copy()
-                my_roster['Pelit'] = my_roster['name'].map(st.session_state['team_impact_results']['my_results']['player_games']).fillna(0).astype(int)
-                my_roster['Kokonais FP'] = my_roster['Pelit'] * my_roster['fantasy_points_avg']
-                my_roster = my_roster[['name', 'team', 'positions', 'fantasy_points_avg', 'Pelit', 'Kokonais FP']]
-                my_roster.rename(columns={'name': 'Pelaaja', 'team': 'Joukkue', 'positions': 'Pelipaikat', 'fantasy_points_avg': 'FP/GP'}, inplace=True)
-                st.dataframe(my_roster, use_container_width=True)
-            
-            # Vastustajan joukkueen taulukko
-            with col_opponent:
-                st.markdown("#### Vastustajan joukkue")
-                opponent_roster = st.session_state['opponent_roster'].copy()
-                opponent_roster['Pelit'] = opponent_roster['name'].map(st.session_state['team_impact_results']['opponent_results']['player_games']).fillna(0).astype(int)
-                opponent_roster['Kokonais FP'] = opponent_roster['Pelit'] * opponent_roster['fantasy_points_avg']
-                opponent_roster = opponent_roster[['name', 'team', 'positions', 'fantasy_points_avg', 'Pelit', 'Kokonais FP']]
-                opponent_roster.rename(columns={'name': 'Pelaaja', 'team': 'Joukkue', 'positions': 'Pelipaikat', 'fantasy_points_avg': 'FP/GP'}, inplace=True)
-                st.dataframe(opponent_roster, use_container_width=True)
+            opponent_fp = st.session_
 
 with tab3:
     st.header("🔍 Vapaat agentit")
