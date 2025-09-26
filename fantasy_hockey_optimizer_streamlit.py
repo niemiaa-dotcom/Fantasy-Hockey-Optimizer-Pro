@@ -102,21 +102,21 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             return pd.DataFrame(data)
 
         elif roster_type == 'free_agents':
-            # Haetaan vapaat agentit (top-200)
-            free_agents = lg.free_agents(limit=200) 
-            
-            for p in free_agents:
-                data.append({
-                    'name': p.name,
-                    'team': p.editorial_team_abbr, 
-                    'positions': "/".join(p.eligible_positions), 
-                    'fantasy_points_avg': 0.0 # TÄMÄ ON TÄLLÄ HETKELLÄ PLACEHOLDER.
-                })
-            
-            st.success("Vapaat agentit ladattu onnistuneesti!")
-            return pd.DataFrame(data)
-            
-    except Exception as e:
+        # Haetaan vapaat agentit (top-200)
+             free_agents = lg.free_agents(limit=200) 
+             
+             for p in free_agents:
+                 data.append({
+                     'name': p.name,
+                     'team': p.editorial_team_abbr, 
+                     'positions': "/".join(p.eligible_positions), 
+                     'fantasy_points_avg': 0.0 # TÄMÄ ON TÄLLÄ HETKELLÄ PLACEHOLDER.
+                 })
+             
+             st.success("Vapaat agentit ladattu onnistuneesti!")
+             return pd.DataFrame(data)
+             
+    except Exception as e: # <--- TÄMÄ RIVI ON KORJATTU. Poista ylimääräinen sisennys.
         # Jos virhe liittyy autentikointiin tai puuttuviin tunnuksiin
         if "Authentication failed" in str(e) or "access token is missing" in str(e) or "Client ID, secret, and refresh token are required" in str(e):
              st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
