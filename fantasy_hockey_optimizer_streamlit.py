@@ -63,14 +63,18 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             return pd.DataFrame()
 
         # 2. Alustetaan Yahoo Fantasy Context
+        st.info("Yritetään luoda Yahoo Context. Jos juuttuu tähän, tarkista secrets.toml ja Refresh Token.") 
         sc = Context(
             client_id=st.secrets["yahoo"]["client_id"],
             client_secret=st.secrets["yahoo"]["client_secret"],
             refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
         )
+        st.info("Context luotu. Yritetään hakea liiga suoraan ID:llä...") 
         
         # 3. LIIGAN HAKU (Käytetään suoraa league() metodia)
         lg = sc.league(league_id)
+        st.info(f"Liiga ID:llä {league_id} ladattu. Haetaan dataa...") 
+        
         data = []
         
         # 4. DATAN KÄSITTELY
@@ -97,28 +101,7 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
 
         elif roster_type == 'free_agents':
             # Haetaan vapaat agentit (top-200)
-            free_agents = lg.free_agents(limit=200) 
-            
-            for p in free_agents:
-                data.append({
-                    'name': p.name,
-                    'team': p.editorial_team_abbr, 
-                    'positions': "/".join(p.eligible_positions), 
-                    'fantasy_points_avg': 0.0 # PLACEHOLDER
-                })
-            
-            st.success("Vapaat agentit ladattu onnistuneesti!")
-            return pd.DataFrame(data)
-            
-    except Exception as e:
-        # Yleinen virheen käsittely
-        if "Authentication failed" in str(e) or "access token is missing" in str(e) or "Client ID, secret, and refresh token are required" in str(e):
-            st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
-        else:
-            st.error(f"Virhe Yahoo-datan latauksessa: {e}")
-            st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
-        return pd.DataFrame()
-
+            free_agents = lg.free_agents(
 # --- GOOGLE SHEETS LATAUSFUNKTIOT (Muokkaamaton) ---
 @st.cache_resource
 def get_gspread_client():
