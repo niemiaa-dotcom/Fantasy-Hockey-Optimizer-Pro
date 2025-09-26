@@ -42,7 +42,6 @@ if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
 # --- YAHOO FANTASY FUNKTIO (KORJATTU) ---
-# --- YAHOO FANTASY FUNKTIO (Lopullinen korjattu rakenne) ---
 
 @st.cache_data(show_spinner="Ladataan dataa Yahoo Fantasysta...")
 def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: str):
