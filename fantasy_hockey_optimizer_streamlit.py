@@ -8,13 +8,33 @@ import itertools
 import os
 import gspread
 from google.oauth2.service_account import Credentials
+import requests
+from requests_oauthlib import OAuth1
+import json
+import time
+from urllib.parse import parse_qs
 
-# Yritä tuoda 'yahoofantasy' kirjasto. Tämä epäonnistuu, jos sitä ei ole asennettu.
-try:
-    from yahoofantasy import Context
-    YAHOO_FANTASY_AVAILABLE = True
-except ImportError:
-    YAHOO_FANTASY_AVAILABLE = False
+# Yahoo Fantasy API -asetukset
+YAHOO_OAUTH_REQUEST_TOKEN_URL = 'https://api.login.yahoo.com/oauth/v2/get_request_token'
+YAHOO_OAUTH_ACCESS_TOKEN_URL = 'https://api.login.yahoo.com/oauth/v2/get_token'
+YAHOO_OAUTH_AUTHORIZE_URL = 'https://api.login.yahoo.com/oauth/v2/request_auth'
+YAHOO_FANTASY_API_BASE_URL = 'https://fantasysports.yahooapis.com/fantasy/v2'
+
+# Lisää session muuttujat Yahoo OAuthia varten
+if 'yahoo_oauth_token' not in st.session_state:
+    st.session_state['yahoo_oauth_token'] = None
+if 'yahoo_oauth_token_secret' not in st.session_state:
+    st.session_state['yahoo_oauth_token_secret'] = None
+if 'yahoo_oauth_verifier' not in st.session_state:
+    st.session_state['yahoo_oauth_verifier'] = None
+if 'yahoo_access_token' not in st.session_state:
+    st.session_state['yahoo_access_token'] = None
+if 'yahoo_access_token_secret' not in st.session_state:
+    st.session_state['yahoo_access_token_secret'] = None
+if 'yahoo_league_id' not in st.session_state:
+    st.session_state['yahoo_league_id'] = None
+if 'yahoo_team_id' not in st.session_state:
+    st.session_state['yahoo_team_id'] = None
 
 # Aseta sivun konfiguraatio
 st.set_page_config(
@@ -41,86 +61,216 @@ if 'free_agents' not in st.session_state:
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
-# --- YAHOO FANTASY FUNKTIO (Valmis ja korjattu) ---
+def get_yahoo_oauth():
+    """Hanki OAuth-tunnisteet Yahoo Fantasy API:lle"""
+    try:
+        consumer_key = st.secrets["yahoo"]["consumer_key"]
+        consumer_secret = st.secrets["yahoo"]["consumer_secret"]
+        callback_url = st.secrets["yahoo"]["callback_url"]
+        
+        # Luo OAuth1-asiakas
+        oauth = OAuth1(
+            consumer_key,
+            consumer_secret,
+            callback_uri=callback_url
+        )
+        
+        # Pyydä request token
+        response = requests.post(YAHOO_OAUTH_REQUEST_TOKEN_URL, auth=oauth)
+        if response.status_code != 200:
+            st.error(f"Virhe request tokenin haussa: {response.text}")
+            return None, None, None
+        
+        # Jäsennä vastaus
+        token_data = parse_qs(response.text)
+        oauth_token = token_data['oauth_token'][0]
+        oauth_token_secret = token_data['oauth_token_secret'][0]
+        
+        # Tallenna tokenit session tilaan
+        st.session_state['yahoo_oauth_token'] = oauth_token
+        st.session_state['yahoo_oauth_token_secret'] = oauth_token_secret
+        
+        # Luo valtuutusosoite
+        auth_url = f"{YAHOO_OAUTH_AUTHORIZE_URL}?oauth_token={oauth_token}"
+        
+        return auth_url, oauth_token, oauth_token_secret
+    except Exception as e:
+        st.error(f"Virhe OAuth-tunnisteiden haussa: {str(e)}")
+        return None, None, None
 
-@st.cache_data(show_spinner="Ladataan dataa Yahoo Fantasysta...")
-def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: str):
-    """Lataa rosterin tai vapaat agentit Yahoo Fantasysta käyttäen raakaa Refresh Tokenia."""
+def get_yahoo_access_token(oauth_token, oauth_token_secret, oauth_verifier):
+    """Hanki access token Yahoo Fantasy API:lle"""
+    try:
+        consumer_key = st.secrets["yahoo"]["consumer_key"]
+        consumer_secret = st.secrets["yahoo"]["consumer_secret"]
+        
+        # Luo OAuth1-asiakas
+        oauth = OAuth1(
+            consumer_key,
+            consumer_secret,
+            resource_owner_key=oauth_token,
+            resource_owner_secret=oauth_token_secret,
+            verifier=oauth_verifier
+        )
+        
+        # Pyydä access token
+        response = requests.post(YAHOO_OAUTH_ACCESS_TOKEN_URL, auth=oauth)
+        if response.status_code != 200:
+            st.error(f"Virhe access tokenin haussa: {response.text}")
+            return None, None
+        
+        # Jäsennä vastaus
+        token_data = parse_qs(response.text)
+        access_token = token_data['oauth_token'][0]
+        access_token_secret = token_data['oauth_token_secret'][0]
+        
+        # Tallenna tokenit session tilaan
+        st.session_state['yahoo_access_token'] = access_token
+        st.session_state['yahoo_access_token_secret'] = access_token_secret
+        
+        return access_token, access_token_secret
+    except Exception as e:
+        st.error(f"Virhe access tokenin haussa: {str(e)}")
+        return None, None
+
+def make_yahoo_api_request(url, params=None):
+    """Tee API-pyyntö Yahoo Fantasylle"""
+    try:
+        consumer_key = st.secrets["yahoo"]["consumer_key"]
+        consumer_secret = st.secrets["yahoo"]["consumer_secret"]
+        
+        # Tarkista, onko meillä access token
+        if not st.session_state['yahoo_access_token'] or not st.session_state['yahoo_access_token_secret']:
+            st.error("Sinun täytyy ensin kirjautua Yahoo Fantasyyn")
+            return None
+        
+        # Luo OAuth1-asiakas
+        oauth = OAuth1(
+            consumer_key,
+            consumer_secret,
+            resource_owner_key=st.session_state['yahoo_access_token'],
+            resource_owner_secret=st.session_state['yahoo_access_token_secret']
+        )
+        
+        # Tee API-pyyntö
+        response = requests.get(url, auth=oauth, params=params)
+        if response.status_code != 200:
+            st.error(f"Virhe API-pyynnössä: {response.text}")
+            return None
+        
+        return response.json()
+    except Exception as e:
+        st.error(f"Virhe API-pyynnössä: {str(e)}")
+        return None
+
+def get_yahoo_user_games():
+    """Hae käyttäjän pelit"""
+    url = f"{YAHOO_FANTASY_API_BASE_URL}/users;use_login=1/games"
+    response = make_yahoo_api_request(url)
+    return response
+
+def get_yahoo_leagues(game_key):
+    """Hae käyttäjän liigat pelin perusteella"""
+    url = f"{YAHOO_FANTASY_API_BASE_URL}/users;use_login=1/games;game_keys={game_key}/leagues"
+    response = make_yahoo_api_request(url)
+    return response
+
+def get_yahoo_teams(league_key):
+    """Hae joukkueet liigasta"""
+    url = f"{YAHOO_FANTASY_API_BASE_URL}/league/{league_key}/teams"
+    response = make_yahoo_api_request(url)
+    return response
+
+def get_yahoo_roster(team_key):
+    """Hae joukkueen rosteri"""
+    url = f"{YAHOO_FANTASY_API_BASE_URL}/team/{team_key}/roster"
+    response = make_yahoo_api_request(url)
+    return response
+
+def get_yahoo_players(league_key, position=None, status=None):
+    """Hae pelaajia liigasta"""
+    params = {}
+    if position:
+        params['position'] = position
+    if status:
+        params['status'] = status
     
-    # Tarkistetaan, onko kirjasto käytettävissä (perustuu tiedoston alussa olevaan tuontiin)
-    if not YAHOO_FANTASY_AVAILABLE:
-        st.error("Kirjasto 'yahoofantasy' puuttuu. Varmista, että se on requirements.txt-tiedostossa.")
+    url = f"{YAHOO_FANTASY_API_BASE_URL}/league/{league_key}/players"
+    response = make_yahoo_api_request(url, params=params)
+    return response
+
+def parse_yahoo_roster(roster_data):
+    """Jäsennä Yahoo-rosteri sovelluksen muotoon"""
+    if not roster_data or 'fantasy_content' not in roster_data:
+        return pd.DataFrame()
+    
+    try:
+        players = []
+        roster = roster_data['fantasy_content']['team'][1]['roster']['0']['players']
+        
+        for player_key in roster:
+            player_data = roster[player_key]['player'][0]
+            
+            name = player_data[2]['name']['full']
+            team = player_data[3]['editorial_team_abbr']
+            positions = '/'.join(player_data[4]['position_type'])
+            
+            # Hae fantasiapisteet
+            fantasy_points = 0.0
+            if 'player_stats' in player_data[1]:
+                stats = player_data[1]['player_stats']['stats']
+                for stat in stats:
+                    if stat['stat']['stat_id'] == '60':  # Fantasiapisteet
+                        fantasy_points = float(stat['stat']['value'])
+                        break
+            
+            players.append({
+                'name': name,
+                'team': team,
+                'positions': positions,
+                'fantasy_points_avg': fantasy_points
+            })
+        
+        return pd.DataFrame(players)
+    except Exception as e:
+        st.error(f"Virhe rosterin jäsentämisessä: {str(e)}")
         return pd.DataFrame()
 
+def parse_yahoo_players(players_data):
+    """Jäsennä Yahoo-pelaajat sovelluksen muotoon"""
+    if not players_data or 'fantasy_content' not in players_data:
+        return pd.DataFrame()
+    
     try:
-        # 1. Tarkistetaan salaisuudet
-        if ("yahoo" not in st.secrets or 
-            "client_id" not in st.secrets["yahoo"] or 
-            "client_secret" not in st.secrets["yahoo"] or 
-            "raw_refresh_token" not in st.secrets["yahoo"]): 
-            
-            st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'raw_refresh_token' puuttuvat secrets.toml-tiedostosta.")
-            return pd.DataFrame()
-
-        # 2. Alustetaan Yahoo Fantasy Context
-        st.info("Yritetään luoda Yahoo Context. Jos juuttuu tähän, tarkista secrets.toml ja Refresh Token.") 
-        sc = Context(
-            client_id=st.secrets["yahoo"]["client_id"],
-            client_secret=st.secrets["yahoo"]["client_secret"],
-            refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
-        )
-        st.info("Context luotu. Yritetään hakea liiga suoraan ID:llä...") 
+        players = []
+        players_list = players_data['fantasy_content']['league'][1]['players']
         
-        # 3. LIIGAN HAKU (Käytetään suoraa league() metodia)
-        lg = sc.league(league_id)
-        st.info(f"Liiga ID:llä {league_id} ladattu. Haetaan dataa...") 
+        for player_key in players_list:
+            player_data = players_list[player_key]['player'][0]
+            
+            name = player_data[2]['name']['full']
+            team = player_data[3]['editorial_team_abbr']
+            positions = '/'.join(player_data[4]['position_type'])
+            
+            # Hae fantasiapisteet
+            fantasy_points = 0.0
+            if 'player_stats' in player_data[1]:
+                stats = player_data[1]['player_stats']['stats']
+                for stat in stats:
+                    if stat['stat']['stat_id'] == '60':  # Fantasiapisteet
+                        fantasy_points = float(stat['stat']['value'])
+                        break
+            
+            players.append({
+                'name': name,
+                'team': team,
+                'positions': positions,
+                'fantasy_points_avg': fantasy_points
+            })
         
-        data = []
-        
-        # 4. DATAN KÄSITTELY
-        if roster_type == 'my_roster':
-            # Etsitään oma joukkue nimen perusteella
-            teams = lg.teams()
-            my_team = next((t for t in teams if t.name == team_name), None)
-            if not my_team:
-                st.error(f"Joukkue nimellä '{team_name}' ei löytynyt liigasta ID:llä {league_id}.")
-                return pd.DataFrame()
-
-            roster_data = my_team.roster() 
-            
-            for p in roster_data:
-                data.append({
-                    'name': p.name,
-                    'team': p.editorial_team_abbr, 
-                    'positions': "/".join(p.eligible_positions), 
-                    'fantasy_points_avg': 0.0 # PLACEHOLDER
-                })
-            
-            st.success(f"Rosteri ladattu joukkueelle '{team_name}'!")
-            return pd.DataFrame(data)
-
-        elif roster_type == 'free_agents':
-            # Haetaan vapaat agentit (top-200)
-            free_agents = lg.free_agents(limit=200) 
-            
-            for p in free_agents:
-                data.append({
-                    'name': p.name,
-                    'team': p.editorial_team_abbr, 
-                    'positions': "/".join(p.eligible_positions), 
-                    'fantasy_points_avg': 0.0 # PLACEHOLDER
-                })
-            
-            st.success("Vapaat agentit ladattu onnistuneesti!")
-            return pd.DataFrame(data)
-            
+        return pd.DataFrame(players)
     except Exception as e:
-        # Yleinen virheen käsittely
-        if "Authentication failed" in str(e) or "access token is missing" in str(e) or "Client ID, secret, and refresh token are required" in str(e):
-            st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
-        else:
-            st.error(f"Virhe Yahoo-datan latauksessa: {e}")
-            st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
+        st.error(f"Virhe pelaajien jäsentämisessä: {str(e)}")
         return pd.DataFrame()
 
 # --- GOOGLE SHEETS LATAUSFUNKTIOT (Muokkaamaton) ---
