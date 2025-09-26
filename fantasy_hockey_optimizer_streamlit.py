@@ -18,7 +18,7 @@ except ImportError:
 
 # Aseta sivun konfiguraatio
 st.set_page_config(
-    page_title="Fantasy Hockey Optimizer Pro",
+    page_title="Fantasy Hockey Optimizer Yahoo",
     page_icon="🏒",
     layout="wide",
     initial_sidebar_state="expanded"
