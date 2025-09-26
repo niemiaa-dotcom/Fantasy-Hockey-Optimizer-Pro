@@ -72,7 +72,7 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
         # 3. Yhdistetään LIIGA JA DATAN HAKU (Korjattu sijoittelu)
         
         # Haetaan liiga
-        lg = sc.get_league(league_id)
+       lg = sc.league(league_id)
         data = []
         
         if roster_type == 'my_roster':
