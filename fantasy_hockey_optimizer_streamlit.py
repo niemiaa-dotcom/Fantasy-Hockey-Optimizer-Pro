@@ -102,7 +102,7 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             return pd.DataFrame(data)
 
         elif roster_type == 'free_agents':
-        # Haetaan vapaat agentit (top-200)
+# Haetaan vapaat agentit (top-200)
              free_agents = lg.free_agents(limit=200) 
              
              for p in free_agents:
