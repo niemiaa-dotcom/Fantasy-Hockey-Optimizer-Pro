@@ -132,9 +132,14 @@ def get_yahoo_oauth():
         )
         
         # Pyydä request token
-        response = requests.post(YAHOO_OAUTH_REQUEST_TOKEN_URL, auth=oauth)
+        response = requests.post(
+            YAHOO_OAUTH_REQUEST_TOKEN_URL,
+            auth=oauth,
+            params={"oauth_callback": callback_url}
+        )
+        
         if response.status_code != 200:
-            st.error(f"Virhe request tokenin haussa: {response.text}")
+            st.error(f"Virhe request tokenin haussa: {response.status_code} - {response.text}")
             return None, None, None
         
         # Jäsennä vastaus
@@ -153,41 +158,6 @@ def get_yahoo_oauth():
     except Exception as e:
         st.error(f"Virhe OAuth-tunnisteiden haussa: {str(e)}")
         return None, None, None
-
-def get_yahoo_access_token(oauth_token, oauth_token_secret, oauth_verifier):
-    """Hanki access token Yahoo Fantasy API:lle"""
-    try:
-        consumer_key = st.secrets["yahoo"]["consumer_key"]
-        consumer_secret = st.secrets["yahoo"]["consumer_secret"]
-        
-        # Luo OAuth1-asiakas
-        oauth = OAuth1(
-            consumer_key,
-            consumer_secret,
-            resource_owner_key=oauth_token,
-            resource_owner_secret=oauth_token_secret,
-            verifier=oauth_verifier
-        )
-        
-        # Pyydä access token
-        response = requests.post(YAHOO_OAUTH_ACCESS_TOKEN_URL, auth=oauth)
-        if response.status_code != 200:
-            st.error(f"Virhe access tokenin haussa: {response.text}")
-            return None, None
-        
-        # Jäsennä vastaus
-        token_data = parse_qs(response.text)
-        access_token = token_data['oauth_token'][0]
-        access_token_secret = token_data['oauth_token_secret'][0]
-        
-        # Tallenna tokenit session tilaan
-        st.session_state['yahoo_access_token'] = access_token
-        st.session_state['yahoo_access_token_secret'] = access_token_secret
-        
-        return access_token, access_token_secret
-    except Exception as e:
-        st.error(f"Virhe access tokenin haussa: {str(e)}")
-        return None, None
 
 def make_yahoo_api_request(url, params=None):
     """Tee API-pyyntö Yahoo Fantasylle"""
