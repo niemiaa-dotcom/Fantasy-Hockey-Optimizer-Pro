@@ -48,7 +48,7 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
     """Lataa rosterin tai vapaat agentit Yahoo Fantasysta käyttäen raakaa Refresh Tokenia."""
     
     if not YAHOO_FANTASY_AVAILABLE:
-        st.error("Kirjasto 'yahoofantasy' ei ole asennettuna.")
+        st.error("Kirjasto 'yahoofantasy' ei ole asennettuna. Asenna: pip install yahoofantasy")
         return pd.DataFrame()
 
     try:
@@ -68,10 +68,18 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
         )
         
-        # 3. Yhdistetään LIIGA JA DATAN HAKU
+        # 3. LIIGAN HAKU (LOPULLINEN KORJAUS VIRHEESEEN 'Context' object has no attribute 'league')
+        lg = None
+        user = sc.get_user()
+        user_leagues = user.leagues()
         
-        # Haetaan liiga
-        lg = sc.league(league_id)
+        # Etsitään haluttu liiga ID:n perusteella
+        lg = next((l for l in user_leagues if l.league_id == league_id), None)
+        
+        if lg is None:
+            st.error(f"Liigaa ID:llä {league_id} ei löytynyt Yahoo Fantasysta tällä käyttäjällä. Tarkista ID.")
+            return pd.DataFrame()
+            
         data = []
         
         if roster_type == 'my_roster':
@@ -111,7 +119,7 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             return pd.DataFrame(data)
             
     except Exception as e:
-        # Jos virhe liittyy autentikointiin tai puuttuviin tunnuksiin
+        # Yleinen virheen käsittely
         if "Authentication failed" in str(e) or "access token is missing" in str(e) or "Client ID, secret, and refresh token are required" in str(e):
             st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
         else:
