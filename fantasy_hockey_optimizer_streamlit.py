@@ -41,28 +41,51 @@ if 'free_agents' not in st.session_state:
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
-# --- YAHOO FANTASY FUNKTIO ---
+# --- YAHOO FANTASY FUNKTIO (KORJATTU) ---
+import streamlit as st
+import pandas as pd
+from yahoofantasy import Context # Varmista, että tuot tämän
+
+# HUOM: Oletetaan, että YAHOO_FANTASY_AVAILABLE on määritelty muualla.
+
 @st.cache_data(show_spinner="Ladataan dataa Yahoo Fantasysta...")
 def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: str):
-    """Lataa rosterin tai vapaat agentit Yahoo Fantasysta."""
+    """Lataa rosterin tai vapaat agentit Yahoo Fantasysta käyttäen raakaa Refresh Tokenia."""
+    
+    # 1. Tarkistus kirjaston olemassaolosta
     if not YAHOO_FANTASY_AVAILABLE:
         st.error("Kirjasto 'yahoofantasy' ei ole asennettuna. Asenna se: pip install yahoofantasy")
         return pd.DataFrame()
 
     try:
-        # Tarkistetaan, että kaikki tarvittavat salaisuudet ovat olemassa
-        if "yahoo" not in st.secrets or "client_id" not in st.secrets["yahoo"] or "client_secret" not in st.secrets["yahoo"] or "scd_path" not in st.secrets["yahoo"]:
-             st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'scd_path' puuttuvat secrets.toml-tiedostosta.")
-             return pd.DataFrame()
+        # 2. Tarkistetaan, että kaikki tarvittavat salaisuudet ovat olemassa (KORJATTU)
+        # Etsitään nyt raw_refresh_token, ei enää scd_path-avainta.
+        if ("yahoo" not in st.secrets or 
+            "client_id" not in st.secrets["yahoo"] or 
+            "client_secret" not in st.secrets["yahoo"] or 
+            "raw_refresh_token" not in st.secrets["yahoo"]): # <-- KORJATTU TARKISTUS
+            
+            st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'raw_refresh_token' puuttuvat secrets.toml-tiedostosta.")
+            return pd.DataFrame()
 
-        scd_file = st.secrets["yahoo"]["scd_path"] 
+        # HUOM: Rivi scd_file = st.secrets["yahoo"]["scd_path"] on poistettu, koska sitä ei enää tarvita!
         
-        # Alustetaan Yahoo Fantasy Context
+        # 3. Alustetaan Yahoo Fantasy Context (OIKEA)
+        # Context-olio luodaan suoraan raa'alla refresh_tokenilla, mikä ohittaa tiedoston tarpeen.
         sc = Context(
-    client_id=st.secrets["yahoo"]["client_id"],
-    client_secret=st.secrets["yahoo"]["client_secret"],
-    refresh_token=st.secrets["yahoo"]["raw_refresh_token"] 
+            client_id=st.secrets["yahoo"]["client_id"],
+            client_secret=st.secrets["yahoo"]["client_secret"],
+            refresh_token=st.secrets["yahoo"]["raw_refresh_token"] # <-- TÄMÄ ON RATKAISU
         )
+        
+        # TÄSTÄ ALKAA NYT YAHOO-FANTASY DATAN HAKULOGIIKKASI
+        # Esimerkiksi: user = sc.get_user_leagues()
+        
+        return pd.DataFrame() # TÄMÄ TÄYTYY KORVATA OMALLA DATAN PALAUTUKSELLA!
+
+    except Exception as e:
+        st.error(f"Yahoo-datan lataus epäonnistui: {e}")
+        return pd.DataFrame()
 
         # Haetaan liiga
         # TÄRKEÄ HUOM: Yahoo-liigojen ID:t ovat muotoa 'nhl.l.XXXXXX'
