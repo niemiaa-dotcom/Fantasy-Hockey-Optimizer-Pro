@@ -59,9 +59,9 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
         
         # Alustetaan Yahoo Fantasy Context
         sc = Context(
-            st.secrets["yahoo"]["client_id"],
-            st.secrets["yahoo"]["client_secret"],
-            scd_file
+    client_id=st.secrets["yahoo"]["client_id"],
+    client_secret=st.secrets["yahoo"]["client_secret"],
+    refresh_token=st.secrets["yahoo"]["raw_refresh_token"] 
         )
 
         # Haetaan liiga
