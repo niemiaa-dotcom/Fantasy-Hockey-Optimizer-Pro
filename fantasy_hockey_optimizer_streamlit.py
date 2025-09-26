@@ -52,21 +52,27 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
         return pd.DataFrame()
 
     try:
-        # 1. Tarkistetaan salaisuudet (Oikea)
+      try:
+        # 1. Tarkistetaan salaisuudet
         if ("yahoo" not in st.secrets or 
             "client_id" not in st.secrets["yahoo"] or 
             "client_secret" not in st.secrets["yahoo"] or 
             "raw_refresh_token" not in st.secrets["yahoo"]): 
             
-            st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'raw_refresh_token' puuttuvat secrets.toml-tiedostosta.")
+            st.warning("Yahoo-datan lataus epäonnistui...")
             return pd.DataFrame()
 
-        # 2. Alustetaan Yahoo Fantasy Context (Oikea)
-         sc = Context(
+        # 2. Alustetaan Yahoo Fantasy Context (HUOM: Sisennys on nyt oikein!)
+        sc = Context( # <--- Tämän rivin tulee olla samassa sisennyksessä kuin 'if'-lohko ja 'st.warning'
             client_id=st.secrets["yahoo"]["client_id"],
             client_secret=st.secrets["yahoo"]["client_secret"],
             refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
         )
+        
+        # 3. Yhdistetään LIIGA JA DATAN HAKU
+        # Tämänkin pitää olla samassa sisennyksessä
+        lg = sc.league(league_id) 
+        # ... muu koodisi jatkuu tästä
         
         # 3. Yhdistetään LIIGA JA DATAN HAKU
         
