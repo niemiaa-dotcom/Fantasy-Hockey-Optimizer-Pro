@@ -63,16 +63,16 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             return pd.DataFrame()
 
         # 2. Alustetaan Yahoo Fantasy Context (Oikea)
-        sc = Context(
+         sc = Context(
             client_id=st.secrets["yahoo"]["client_id"],
             client_secret=st.secrets["yahoo"]["client_secret"],
             refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
         )
         
-        # 3. Yhdistetään LIIGA JA DATAN HAKU (Korjattu sijoittelu)
+        # 3. Yhdistetään LIIGA JA DATAN HAKU
         
-        # Haetaan liiga
-       lg = sc.league(league_id)
+        # Haetaan liiga (KORJATTU: käytetään sc.league() metodia)
+        lg = sc.league(league_id) # <--- MUUTETTU TÄHÄN!
         data = []
         
         if roster_type == 'my_roster':
