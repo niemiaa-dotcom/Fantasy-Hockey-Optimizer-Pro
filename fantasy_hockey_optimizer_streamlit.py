@@ -41,7 +41,7 @@ if 'free_agents' not in st.session_state:
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
-# --- YAHOO FANTASY FUNKTIO (KORJATTU) ---
+# --- YAHOO FANTASY FUNKTIO (Lopullinen ja korjattu) ---
 
 @st.cache_data(show_spinner="Ladataan dataa Yahoo Fantasysta...")
 def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: str):
@@ -52,32 +52,26 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
         return pd.DataFrame()
 
     try:
-      try:
         # 1. Tarkistetaan salaisuudet
         if ("yahoo" not in st.secrets or 
             "client_id" not in st.secrets["yahoo"] or 
             "client_secret" not in st.secrets["yahoo"] or 
             "raw_refresh_token" not in st.secrets["yahoo"]): 
             
-            st.warning("Yahoo-datan lataus epäonnistui...")
+            st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'raw_refresh_token' puuttuvat secrets.toml-tiedostosta.")
             return pd.DataFrame()
 
-        # 2. Alustetaan Yahoo Fantasy Context (HUOM: Sisennys on nyt oikein!)
-        sc = Context( # <--- Tämän rivin tulee olla samassa sisennyksessä kuin 'if'-lohko ja 'st.warning'
+        # 2. Alustetaan Yahoo Fantasy Context
+        sc = Context(
             client_id=st.secrets["yahoo"]["client_id"],
             client_secret=st.secrets["yahoo"]["client_secret"],
             refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
         )
         
         # 3. Yhdistetään LIIGA JA DATAN HAKU
-        # Tämänkin pitää olla samassa sisennyksessä
-        lg = sc.league(league_id) 
-        # ... muu koodisi jatkuu tästä
         
-        # 3. Yhdistetään LIIGA JA DATAN HAKU
-        
-        # Haetaan liiga (KORJATTU: käytetään sc.league() metodia)
-        lg = sc.league(league_id) # <--- MUUTETTU TÄHÄN!
+        # Haetaan liiga
+        lg = sc.league(league_id)
         data = []
         
         if roster_type == 'my_roster':
@@ -95,36 +89,35 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
                     'name': p.name,
                     'team': p.editorial_team_abbr, 
                     'positions': "/".join(p.eligible_positions), 
-                    'fantasy_points_avg': 0.0 # TÄMÄ ON TÄLLÄ HETKELLÄ PLACEHOLDER.
+                    'fantasy_points_avg': 0.0
                 })
             
             st.success(f"Rosteri ladattu joukkueelle '{team_name}'!")
             return pd.DataFrame(data)
 
         elif roster_type == 'free_agents':
-# Haetaan vapaat agentit (top-200)
-             free_agents = lg.free_agents(limit=200) 
-             
-             for p in free_agents:
-                 data.append({
-                     'name': p.name,
-                     'team': p.editorial_team_abbr, 
-                     'positions': "/".join(p.eligible_positions), 
-                     'fantasy_points_avg': 0.0 # TÄMÄ ON TÄLLÄ HETKELLÄ PLACEHOLDER.
-                 })
-             
-             st.success("Vapaat agentit ladattu onnistuneesti!")
-             return pd.DataFrame(data)
-             
-    except Exception as e: # <--- TÄMÄ RIVI ON KORJATTU. Poista ylimääräinen sisennys.
+            # Haetaan vapaat agentit (top-200)
+            free_agents = lg.free_agents(limit=200) 
+            
+            for p in free_agents:
+                data.append({
+                    'name': p.name,
+                    'team': p.editorial_team_abbr, 
+                    'positions': "/".join(p.eligible_positions), 
+                    'fantasy_points_avg': 0.0
+                })
+            
+            st.success("Vapaat agentit ladattu onnistuneesti!")
+            return pd.DataFrame(data)
+            
+    except Exception as e:
         # Jos virhe liittyy autentikointiin tai puuttuviin tunnuksiin
         if "Authentication failed" in str(e) or "access token is missing" in str(e) or "Client ID, secret, and refresh token are required" in str(e):
-             st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
+            st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
         else:
-             st.error(f"Virhe Yahoo-datan latauksessa: {e}")
-             st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
+            st.error(f"Virhe Yahoo-datan latauksessa: {e}")
+            st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
         return pd.DataFrame()
-
 
 # --- GOOGLE SHEETS LATAUSFUNKTIOT (Muokkaamaton) ---
 @st.cache_resource
