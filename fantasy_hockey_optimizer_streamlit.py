@@ -42,55 +42,37 @@ if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
 # --- YAHOO FANTASY FUNKTIO (KORJATTU) ---
-import streamlit as st
-import pandas as pd
-from yahoofantasy import Context # Varmista, että tuot tämän
-
-# HUOM: Oletetaan, että YAHOO_FANTASY_AVAILABLE on määritelty muualla.
+# --- YAHOO FANTASY FUNKTIO (Lopullinen korjattu rakenne) ---
 
 @st.cache_data(show_spinner="Ladataan dataa Yahoo Fantasysta...")
 def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: str):
     """Lataa rosterin tai vapaat agentit Yahoo Fantasysta käyttäen raakaa Refresh Tokenia."""
     
-    # 1. Tarkistus kirjaston olemassaolosta
     if not YAHOO_FANTASY_AVAILABLE:
-        st.error("Kirjasto 'yahoofantasy' ei ole asennettuna. Asenna se: pip install yahoofantasy")
+        st.error("Kirjasto 'yahoofantasy' ei ole asennettuna.")
         return pd.DataFrame()
 
     try:
-        # 2. Tarkistetaan, että kaikki tarvittavat salaisuudet ovat olemassa (KORJATTU)
-        # Etsitään nyt raw_refresh_token, ei enää scd_path-avainta.
+        # 1. Tarkistetaan salaisuudet (Oikea)
         if ("yahoo" not in st.secrets or 
             "client_id" not in st.secrets["yahoo"] or 
             "client_secret" not in st.secrets["yahoo"] or 
-            "raw_refresh_token" not in st.secrets["yahoo"]): # <-- KORJATTU TARKISTUS
+            "raw_refresh_token" not in st.secrets["yahoo"]): 
             
             st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'raw_refresh_token' puuttuvat secrets.toml-tiedostosta.")
             return pd.DataFrame()
 
-        # HUOM: Rivi scd_file = st.secrets["yahoo"]["scd_path"] on poistettu, koska sitä ei enää tarvita!
-        
-        # 3. Alustetaan Yahoo Fantasy Context (OIKEA)
-        # Context-olio luodaan suoraan raa'alla refresh_tokenilla, mikä ohittaa tiedoston tarpeen.
+        # 2. Alustetaan Yahoo Fantasy Context (Oikea)
         sc = Context(
             client_id=st.secrets["yahoo"]["client_id"],
             client_secret=st.secrets["yahoo"]["client_secret"],
-            refresh_token=st.secrets["yahoo"]["raw_refresh_token"] # <-- TÄMÄ ON RATKAISU
+            refresh_token=st.secrets["yahoo"]["raw_refresh_token"]
         )
         
-        # TÄSTÄ ALKAA NYT YAHOO-FANTASY DATAN HAKULOGIIKKASI
-        # Esimerkiksi: user = sc.get_user_leagues()
+        # 3. Yhdistetään LIIGA JA DATAN HAKU (Korjattu sijoittelu)
         
-        return pd.DataFrame() # TÄMÄ TÄYTYY KORVATA OMALLA DATAN PALAUTUKSELLA!
-
-    except Exception as e:
-        st.error(f"Yahoo-datan lataus epäonnistui: {e}")
-        return pd.DataFrame()
-
         # Haetaan liiga
-        # TÄRKEÄ HUOM: Yahoo-liigojen ID:t ovat muotoa 'nhl.l.XXXXXX'
         lg = sc.get_league(league_id)
-        
         data = []
         
         if roster_type == 'my_roster':
@@ -104,13 +86,6 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             roster_data = my_team.roster() 
             
             for p in roster_data:
-                # Huomaa: Tässä haetaan vain perustiedot. Fantasiapisteiden keskiarvo (FP/GP)
-                # täytyy hakea erikseen tilastorajapinnoista, mikä on monimutkaista.
-                # Tässä käytetään tällä hetkellä nollaa tai pyritään hakemaan Yahoo Fantasy -pisteet.
-                
-                # yahoofantasy API ei aina sisällä 'stats' attribuuttia suoraan rosterissa/FA:ssa.
-                # Käytetään nollaa turvallisesti.
-                
                 data.append({
                     'name': p.name,
                     'team': p.editorial_team_abbr, 
@@ -135,14 +110,14 @@ def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: st
             
             st.success("Vapaat agentit ladattu onnistuneesti!")
             return pd.DataFrame(data)
-        
+            
     except Exception as e:
         # Jos virhe liittyy autentikointiin tai puuttuviin tunnuksiin
-        if "Authentication failed" in str(e) or "access token is missing" in str(e):
-             st.error("Yahoo-autentikointi epäonnistui. Varmista, että olet suorittanut yahoofantasy-kirjaston aloitusautentikoinnin ja scd-tiedoston polku on oikein secrets.toml-tiedostossa.")
+        if "Authentication failed" in str(e) or "access token is missing" in str(e) or "Client ID, secret, and refresh token are required" in str(e):
+             st.error("Yahoo-autentikointi epäonnistui. Varmista, että 'raw_refresh_token' on oikein secrets.toml-tiedostossa.")
         else:
-            st.error(f"Virhe Yahoo-datan latauksessa: {e}")
-            st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
+             st.error(f"Virhe Yahoo-datan latauksessa: {e}")
+             st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
         return pd.DataFrame()
 
 
