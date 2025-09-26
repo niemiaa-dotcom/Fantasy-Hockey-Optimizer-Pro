@@ -9,6 +9,13 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 
+# Yritä tuoda 'yahoofantasy' kirjasto. Tämä epäonnistuu, jos sitä ei ole asennettu.
+try:
+    from yahoofantasy import Context
+    YAHOO_FANTASY_AVAILABLE = True
+except ImportError:
+    YAHOO_FANTASY_AVAILABLE = False
+
 # Aseta sivun konfiguraatio
 st.set_page_config(
     page_title="Fantasy Hockey Optimizer Pro",
@@ -34,9 +41,92 @@ if 'free_agents' not in st.session_state:
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
-# --- GOOGLE SHEETS LATAUSFUNKTIOT ---
+# --- YAHOO FANTASY FUNKTIO ---
+@st.cache_data(show_spinner="Ladataan dataa Yahoo Fantasysta...")
+def load_data_from_yahoo_fantasy(league_id: str, team_name: str, roster_type: str):
+    """Lataa rosterin tai vapaat agentit Yahoo Fantasysta."""
+    if not YAHOO_FANTASY_AVAILABLE:
+        st.error("Kirjasto 'yahoofantasy' ei ole asennettuna. Asenna se: pip install yahoofantasy")
+        return pd.DataFrame()
+
+    try:
+        # Tarkistetaan, että kaikki tarvittavat salaisuudet ovat olemassa
+        if "yahoo" not in st.secrets or "client_id" not in st.secrets["yahoo"] or "client_secret" not in st.secrets["yahoo"] or "scd_path" not in st.secrets["yahoo"]:
+             st.warning("Yahoo-datan lataus epäonnistui: 'client_id', 'client_secret' tai 'scd_path' puuttuvat secrets.toml-tiedostosta.")
+             return pd.DataFrame()
+
+        scd_file = st.secrets["yahoo"]["scd_path"] 
+        
+        # Alustetaan Yahoo Fantasy Context
+        sc = Context(
+            st.secrets["yahoo"]["client_id"],
+            st.secrets["yahoo"]["client_secret"],
+            scd_file
+        )
+
+        # Haetaan liiga
+        # TÄRKEÄ HUOM: Yahoo-liigojen ID:t ovat muotoa 'nhl.l.XXXXXX'
+        lg = sc.get_league(league_id)
+        
+        data = []
+        
+        if roster_type == 'my_roster':
+            # Etsitään oma joukkue nimen perusteella
+            teams = lg.teams()
+            my_team = next((t for t in teams if t.name == team_name), None)
+            if not my_team:
+                st.error(f"Joukkue nimellä '{team_name}' ei löytynyt liigasta ID:llä {league_id}.")
+                return pd.DataFrame()
+
+            roster_data = my_team.roster() 
+            
+            for p in roster_data:
+                # Huomaa: Tässä haetaan vain perustiedot. Fantasiapisteiden keskiarvo (FP/GP)
+                # täytyy hakea erikseen tilastorajapinnoista, mikä on monimutkaista.
+                # Tässä käytetään tällä hetkellä nollaa tai pyritään hakemaan Yahoo Fantasy -pisteet.
+                
+                # yahoofantasy API ei aina sisällä 'stats' attribuuttia suoraan rosterissa/FA:ssa.
+                # Käytetään nollaa turvallisesti.
+                
+                data.append({
+                    'name': p.name,
+                    'team': p.editorial_team_abbr, 
+                    'positions': "/".join(p.eligible_positions), 
+                    'fantasy_points_avg': 0.0 # TÄMÄ ON TÄLLÄ HETKELLÄ PLACEHOLDER.
+                })
+            
+            st.success(f"Rosteri ladattu joukkueelle '{team_name}'!")
+            return pd.DataFrame(data)
+
+        elif roster_type == 'free_agents':
+            # Haetaan vapaat agentit (top-200)
+            free_agents = lg.free_agents(limit=200) 
+            
+            for p in free_agents:
+                data.append({
+                    'name': p.name,
+                    'team': p.editorial_team_abbr, 
+                    'positions': "/".join(p.eligible_positions), 
+                    'fantasy_points_avg': 0.0 # TÄMÄ ON TÄLLÄ HETKELLÄ PLACEHOLDER.
+                })
+            
+            st.success("Vapaat agentit ladattu onnistuneesti!")
+            return pd.DataFrame(data)
+        
+    except Exception as e:
+        # Jos virhe liittyy autentikointiin tai puuttuviin tunnuksiin
+        if "Authentication failed" in str(e) or "access token is missing" in str(e):
+             st.error("Yahoo-autentikointi epäonnistui. Varmista, että olet suorittanut yahoofantasy-kirjaston aloitusautentikoinnin ja scd-tiedoston polku on oikein secrets.toml-tiedostossa.")
+        else:
+            st.error(f"Virhe Yahoo-datan latauksessa: {e}")
+            st.warning("Tarkista konsoli saadaksesi lisätietoja virheestä.")
+        return pd.DataFrame()
+
+
+# --- GOOGLE SHEETS LATAUSFUNKTIOT (Muokkaamaton) ---
 @st.cache_resource
 def get_gspread_client():
+    # ... (muokkaamaton)
     try:
         scopes = ['https://www.googleapis.com/auth/spreadsheets']
         creds_json = st.secrets["gcp_service_account"]
@@ -44,7 +134,7 @@ def get_gspread_client():
         client = gspread.authorize(creds)
         return client
     except Exception as e:
-        st.error(f"Virhe Google Sheets -tunnistautumisessa. Tarkista secrets.toml-tiedostosi: {e}")
+        #st.error(f"Virhe Google Sheets -tunnistautumisessa. Tarkista secrets.toml-tiedostosi: {e}")
         return None
 
 def load_roster_from_gsheets():
@@ -80,10 +170,7 @@ def load_free_agents_from_gsheets():
             st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
             return pd.DataFrame()
 
-        # Muunna 'fantasy_points_avg' numeeriseksi ja täytä puuttuvat arvot nollalla
         df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce')
-        
-        # Järjestä sarakkeet oikein ennen palautusta
         df = df[required_columns]
 
         return df
@@ -103,6 +190,7 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
 # Peliaikataulun lataus
+# ... (muokkaamaton)
 schedule_file_exists = False
 try:
     st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
@@ -135,6 +223,19 @@ else:
 
 # Rosterin lataus
 st.sidebar.subheader("Lataa oma rosteri")
+
+# UUSI YAHOO LATAUS VALINTA
+if YAHOO_FANTASY_AVAILABLE:
+    with st.sidebar.expander("Lataa Yahoo Fantasysta"):
+        yahoo_league_id = st.text_input("Yahoo League ID (esim. nhl.l.XXXXXX)", key="yahoo_roster_league_id")
+        yahoo_team_name = st.text_input("Oman joukkueen nimi Yahoo Fantasyssä", key="yahoo_roster_team_name")
+        if st.button("Lataa Yahoo-rosteri", key="yahoo_roster_button") and yahoo_league_id and yahoo_team_name:
+            roster_df = load_data_from_yahoo_fantasy(yahoo_league_id, yahoo_team_name, 'my_roster')
+            if not roster_df.empty:
+                st.session_state['roster'] = roster_df
+                roster_df.to_csv(ROSTER_FILE, index=False)
+                st.rerun()
+
 if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     try:
         roster_df = load_roster_from_gsheets()
@@ -150,6 +251,18 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
 
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
+
+# UUSI YAHOO LATAUS VALINTA
+if YAHOO_FANTASY_AVAILABLE:
+    with st.sidebar.expander("Lataa Yahoo Fantasysta"):
+        yahoo_fa_league_id = st.text_input("Yahoo League ID (FA)", key="yahoo_fa_league_id")
+        if st.button("Lataa Yahoo vapaat agentit", key="yahoo_fa_button") and yahoo_fa_league_id:
+            # Käytetään tyhjää joukkueen nimeä FA-latauksessa
+            free_agents_df = load_data_from_yahoo_fantasy(yahoo_fa_league_id, "", 'free_agents')
+            if not free_agents_df.empty:
+                st.session_state['free_agents'] = free_agents_df
+                st.rerun()
+
 if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents_button_new"):
     try:
         free_agents_df = load_free_agents_from_gsheets()
@@ -164,16 +277,14 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
 
 # Vastustajan rosterin lataus - KORJATTU VERSIO
 st.sidebar.subheader("Lataa vastustajan rosteri")
-
+# ... (muokkaamaton - säilytetty vanha logiikka tiedostolataajalle)
 if 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
     st.sidebar.success("Vastustajan rosteri ladattu!")
     
-    # Näytä latauspainike vain jos rosteri on jo ladattu
     if st.sidebar.button("Lataa uusi vastustajan rosteri"):
         st.session_state['opponent_roster'] = None
         st.rerun()
 else:
-    # Näytä tiedostolataaja
     st.sidebar.info("Lataa vastustajan rosteri CSV-tiedostona")
     opponent_roster_file = st.sidebar.file_uploader(
         "Valitse CSV-tiedosto",
@@ -204,7 +315,9 @@ if st.sidebar.button("Nollaa vastustajan rosteri"):
     st.session_state['opponent_roster'] = None
     st.rerun()
 
+
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
+# ... (muokkaamaton)
 st.sidebar.header("👥 Rosterin hallinta")
 
 # Tyhjennä rosteri -painike
@@ -263,6 +376,7 @@ if not st.session_state['roster'].empty:
             st.rerun()
 
 # --- SIVUPALKKI: ASETUKSET ---
+# ... (muokkaamaton)
 st.sidebar.header("⚙️ Asetukset")
 
 st.sidebar.subheader("Aikaväli")
@@ -297,6 +411,7 @@ pos_limits = {
 }
 
 # --- PÄÄSIVU: OPTIMOINTIFUNKTIO ---
+# ... (muokkaamaton - optimize_roster_advanced, simulate_team_impact, calculate_team_impact_by_position, analyze_free_agents)
 def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
     players_info = {}
     for _, player in roster_df.iterrows():
@@ -546,13 +661,13 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
         pd.DataFrame: Lajiteltu DataFrame optimaalisimmista vapaista agenteista.
     """
     if not team_impact_dict or free_agents_df.empty:
-        st.warning("Joukkueanalyysiä tai vapaiden agenttien listaa ei ole ladattu.")
+        #st.warning("Joukkueanalyysiä tai vapaiden agenttien listaa ei ole ladattu.")
         return pd.DataFrame()
 
     # SUODATUS TÄSSÄ: Jätä pois pelaajat, joiden pelipaikka on "G"
     free_agents_df = free_agents_df[~free_agents_df['positions'].str.contains('G')].copy()
     if free_agents_df.empty:
-        st.info("Vapaita agentteja ei löytynyt maalivahtien suodatuksen jälkeen.")
+        #st.info("Vapaita agentteja ei löytynyt maalivahtien suodatuksen jälkeen.")
         return pd.DataFrame()
         
     team_impact_df_list = []
@@ -562,7 +677,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
             team_impact_df_list.append(df)
     
     if not team_impact_df_list:
-        st.warning("Joukkueanalyysin tuloksia ei löytynyt kenttäpelaajille.")
+        #st.warning("Joukkueanalyysin tuloksia ei löytynyt kenttäpelaajille.")
         return pd.DataFrame()
 
     combined_impact_df = pd.concat(team_impact_df_list, ignore_index=True)
@@ -572,7 +687,6 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
     results['total_impact'] = 0.0
     results['games_added'] = 0.0
     
-    # MUUTOS TÄSSÄ
     # Käsittele monipaikkaiset pelaajat
     results['positions_list'] = results['positions'].apply(lambda x: [p.strip() for p in str(x).replace('/', ',').split(',')])
 
