@@ -963,7 +963,12 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
     return results
     
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
-tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "Rosterin optimointi",
+    "Joukkueiden vertailu",
+    "Matchup",
+    "Yahoo Fantasy API"
+])
 
 with tab1:
     st.header("📊 Nykyinen rosteri")
@@ -1459,7 +1464,7 @@ with tab2:
                 st.dataframe(opponent_games_df, use_container_width=True)
 
 with tab3:
-    st.header("📊 Joukkuevertailu")
+    st.header("📊 Matchup")
     
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
         st.warning("Lataa peliaikataulu ja oma rosteri aloittaaksesi analyysin")
@@ -1516,3 +1521,95 @@ with tab3:
                     st.warning("Vapaiden agenttien analyysi epäonnistui")
             else:
                 st.warning("Lataa vapaat agentit aloittaaksesi analyysin")
+
+
+with tab4:
+    st.header("📡 Yahoo Fantasy Sports -kirjautuminen")
+
+    import requests
+    from urllib.parse import urlencode
+
+    AUTH_URL = "https://api.login.yahoo.com/oauth2/request_auth"
+    TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
+    API_BASE = "https://fantasysports.yahooapis.com/fantasy/v2"
+
+    def get_login_link():
+        params = {
+            "client_id": st.secrets["yahoo_oauth2"]["client_id"],
+            "redirect_uri": st.secrets["yahoo_oauth2"]["redirect_uri"],
+            "response_type": "code",
+            "language": "en-us",
+            "scope": "fspt-r"  # tai fspt-w jos tarvitset kirjoitusoikeuksia
+        }
+        return f"{AUTH_URL}?{urlencode(params)}"
+
+    def exchange_code_for_token(auth_code: str):
+        data = {
+            "grant_type": "authorization_code",
+            "redirect_uri": st.secrets["yahoo_oauth2"]["redirect_uri"],
+            "code": auth_code
+        }
+        auth = (
+            st.secrets["yahoo_oauth2"]["client_id"],
+            st.secrets["yahoo_oauth2"]["client_secret"]
+        )
+        resp = requests.post(TOKEN_URL, data=data, auth=auth)
+        if resp.status_code == 200:
+            token_info = resp.json()
+            st.session_state["yahoo_access_token"] = token_info["access_token"]
+            st.session_state["yahoo_refresh_token"] = token_info.get("refresh_token")
+            st.success("✅ Yahoo Fantasy -kirjautuminen onnistui!")
+        else:
+            st.error(f"Virhe tokenin haussa: {resp.status_code} - {resp.text}")
+
+    def refresh_token():
+        if "yahoo_refresh_token" not in st.session_state:
+            st.error("Ei refresh tokenia.")
+            return
+        data = {
+            "grant_type": "refresh_token",
+            "redirect_uri": st.secrets["yahoo_oauth2"]["redirect_uri"],
+            "refresh_token": st.session_state["yahoo_refresh_token"]
+        }
+        auth = (
+            st.secrets["yahoo_oauth2"]["client_id"],
+            st.secrets["yahoo_oauth2"]["client_secret"]
+        )
+        resp = requests.post(TOKEN_URL, data=data, auth=auth)
+        if resp.status_code == 200:
+            token_info = resp.json()
+            st.session_state["yahoo_access_token"] = token_info["access_token"]
+            st.success("🔄 Access token uusittu.")
+        else:
+            st.error(f"Virhe tokenin uusinnassa: {resp.status_code} - {resp.text}")
+
+    def yahoo_api_get(endpoint):
+        if "yahoo_access_token" not in st.session_state:
+            st.error("Kirjaudu ensin sisään.")
+            return None
+        headers = {"Authorization": f"Bearer {st.session_state['yahoo_access_token']}"}
+        resp = requests.get(f"{API_BASE}/{endpoint}", headers=headers)
+        if resp.status_code != 200:
+            st.error(f"Virhe API-pyynnössä: {resp.status_code} - {resp.text}")
+            return None
+        return resp.text
+
+    # --- UI ---
+    query_params = st.experimental_get_query_params()
+    if "code" in query_params and "yahoo_access_token" not in st.session_state:
+        code = query_params["code"][0]
+        exchange_code_for_token(code)
+
+    if "yahoo_access_token" not in st.session_state:
+        st.markdown(f"[Kirjaudu Yahoo Fantasyyn]({get_login_link()})")
+    else:
+        st.success("Olet kirjautunut sisään Yahoo Fantasyyn ✅")
+        if st.button("🔄 Uusi token"):
+            refresh_token()
+
+        st.subheader("Testaa API-yhteys")
+        if st.button("📊 Hae pelit (esim. NHL)"):
+            data = yahoo_api_get("game/nhl")
+            if data:
+                st.code(data)
+
