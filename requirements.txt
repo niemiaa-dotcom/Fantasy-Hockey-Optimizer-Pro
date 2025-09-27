@@ -4,6 +4,4 @@ numpy==1.26.4
 requests==2.32.3
 gspread==6.1.2
 google-auth==2.33.0
-google-auth-oauthlib==1.2.1
-oauthlib==3.2.2
-oauth2client
+oauth2client==4.1.3
