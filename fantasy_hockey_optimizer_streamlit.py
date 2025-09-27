@@ -10,13 +10,11 @@ from google.oauth2.service_account import Credentials
 import requests
 import json
 import time
-from urllib.parse import urlencode
+from urllib.parse import urlencode, parse_qs
 
-
-# Yahoo Fantasy API -asetukset
-YAHOO_OAUTH_REQUEST_TOKEN_URL = 'https://api.login.yahoo.com/oauth/v2/get_request_token'
-YAHOO_OAUTH_ACCESS_TOKEN_URL = 'https://api.login.yahoo.com/oauth/v2/get_token'
-YAHOO_OAUTH_AUTHORIZE_URL = 'https://api.login.yahoo.com/oauth/v2/request_auth'
+# Yahoo OAuth 2.0 -asetukset
+YAHOO_OAUTH2_AUTH_URL = 'https://api.login.yahoo.com/oauth2/request_auth'
+YAHOO_OAUTH2_TOKEN_URL = 'https://api.login.yahoo.com/oauth2/get_token'
 YAHOO_FANTASY_API_BASE_URL = 'https://fantasysports.yahooapis.com/fantasy/v2'
 
 # Aseta sivun konfiguraatio
@@ -41,16 +39,12 @@ if 'opponent_roster' not in st.session_state:
     st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
-if 'yahoo_oauth_token' not in st.session_state:
-    st.session_state['yahoo_oauth_token'] = None
-if 'yahoo_oauth_token_secret' not in st.session_state:
-    st.session_state['yahoo_oauth_token_secret'] = None
-if 'yahoo_oauth_verifier' not in st.session_state:
-    st.session_state['yahoo_oauth_verifier'] = None
 if 'yahoo_access_token' not in st.session_state:
     st.session_state['yahoo_access_token'] = None
-if 'yahoo_access_token_secret' not in st.session_state:
-    st.session_state['yahoo_access_token_secret'] = None
+if 'yahoo_refresh_token' not in st.session_state:
+    st.session_state['yahoo_refresh_token'] = None
+if 'yahoo_token_expires_at' not in st.session_state:
+    st.session_state['yahoo_token_expires_at'] = None
 if 'yahoo_league_id' not in st.session_state:
     st.session_state['yahoo_league_id'] = None
 if 'yahoo_team_id' not in st.session_state:
@@ -115,72 +109,132 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
-# --- YAHOO FANTASY API FUNKTIOT ---
-def get_yahoo_oauth():
-    """Hanki OAuth-tunnisteet Yahoo Fantasy API:lle"""
+# --- YAHOO OAUTH 2.0 FUNKTIOT ---
+def get_yahoo_oauth2_url():
+    """Luo OAuth 2.0 -kirjautumislinkin"""
     try:
-        consumer_key = st.secrets["yahoo"]["consumer_key"]
-        consumer_secret = st.secrets["yahoo"]["consumer_secret"]
-        callback_url = st.secrets["yahoo"]["callback_url"]
+        client_id = st.secrets["yahoo_oauth2"]["client_id"]
+        redirect_uri = st.secrets["yahoo_oauth2"]["redirect_uri"]
         
-        # Luo OAuth1-asiakas
-        oauth = OAuth1(
-            consumer_key,
-            consumer_secret,
-            callback_uri=callback_url
-        )
+        params = {
+            "client_id": client_id,
+            "redirect_uri": redirect_uri,
+            "response_type": "code",
+            "language": "en-us",
+            "scope": "fspt-r"  # Vain lukuoikeudet
+        }
         
-        # Pyydä request token
-        response = requests.post(
-            YAHOO_OAUTH_REQUEST_TOKEN_URL,
-            auth=oauth,
-            params={"oauth_callback": callback_url}
-        )
+        auth_url = f"{YAHOO_OAUTH2_AUTH_URL}?{urlencode(params)}"
+        return auth_url
+    except Exception as e:
+        st.error(f"Virhe OAuth 2.0 -linkin luomisessa: {str(e)}")
+        return None
+
+def exchange_code_for_token(auth_code):
+    """Vaihda authorization code access tokeniin"""
+    try:
+        client_id = st.secrets["yahoo_oauth2"]["client_id"]
+        client_secret = st.secrets["yahoo_oauth2"]["client_secret"]
+        redirect_uri = st.secrets["yahoo_oauth2"]["redirect_uri"]
+        
+        data = {
+            "grant_type": "authorization_code",
+            "redirect_uri": redirect_uri,
+            "code": auth_code
+        }
+        
+        auth = (client_id, client_secret)
+        response = requests.post(YAHOO_OAUTH2_TOKEN_URL, data=data, auth=auth)
         
         if response.status_code != 200:
-            st.error(f"Virhe request tokenin haussa: {response.status_code} - {response.text}")
-            return None, None, None
-        
-        # Jäsennä vastaus
-        token_data = parse_qs(response.text)
-        oauth_token = token_data['oauth_token'][0]
-        oauth_token_secret = token_data['oauth_token_secret'][0]
-        
-        # Tallenna tokenit session tilaan
-        st.session_state['yahoo_oauth_token'] = oauth_token
-        st.session_state['yahoo_oauth_token_secret'] = oauth_token_secret
-        
-        # Luo valtuutusosoite
-        auth_url = f"{YAHOO_OAUTH_AUTHORIZE_URL}?oauth_token={oauth_token}"
-        
-        return auth_url, oauth_token, oauth_token_secret
-    except Exception as e:
-        st.error(f"Virhe OAuth-tunnisteiden haussa: {str(e)}")
-        return None, None, None
-
-def make_yahoo_api_request(url, params=None):
-    """Tee API-pyyntö Yahoo Fantasylle"""
-    try:
-        consumer_key = st.secrets["yahoo"]["consumer_key"]
-        consumer_secret = st.secrets["yahoo"]["consumer_secret"]
-        
-        # Tarkista, onko meillä access token
-        if not st.session_state['yahoo_access_token'] or not st.session_state['yahoo_access_token_secret']:
-            st.error("Sinun täytyy ensin kirjautua Yahoo Fantasyyn")
+            st.error(f"Virhe tokenin vaihdossa: {response.status_code} - {response.text}")
             return None
         
-        # Luo OAuth1-asiakas
-        oauth = OAuth1(
-            consumer_key,
-            consumer_secret,
-            resource_owner_key=st.session_state['yahoo_access_token'],
-            resource_owner_secret=st.session_state['yahoo_access_token_secret']
-        )
+        token_info = response.json()
+        
+        # Tallenna tokenit session tilaan
+        st.session_state['yahoo_access_token'] = token_info['access_token']
+        st.session_state['yahoo_refresh_token'] = token_info.get('refresh_token')
+        st.session_state['yahoo_token_expires_at'] = time.time() + token_info['expires_in']
+        
+        return token_info
+    except Exception as e:
+        st.error(f"Virhe tokenin vaihdossa: {str(e)}")
+        return None
+
+def refresh_yahoo_token():
+    """Uusi vanhentunut access token"""
+    try:
+        if 'yahoo_refresh_token' not in st.session_state:
+            st.error("Ei refresh tokenia")
+            return False
+        
+        client_id = st.secrets["yahoo_oauth2"]["client_id"]
+        client_secret = st.secrets["yahoo_oauth2"]["client_secret"]
+        redirect_uri = st.secrets["yahoo_oauth2"]["redirect_uri"]
+        refresh_token = st.session_state['yahoo_refresh_token']
+        
+        data = {
+            "grant_type": "refresh_token",
+            "redirect_uri": redirect_uri,
+            "refresh_token": refresh_token
+        }
+        
+        auth = (client_id, client_secret)
+        response = requests.post(YAHOO_OAUTH2_TOKEN_URL, data=data, auth=auth)
+        
+        if response.status_code != 200:
+            st.error(f"Virhe tokenin uusinnassa: {response.status_code} - {response.text}")
+            return False
+        
+        token_info = response.json()
+        
+        # Päivitä tokenit session tilaan
+        st.session_state['yahoo_access_token'] = token_info['access_token']
+        st.session_state['yahoo_token_expires_at'] = time.time() + token_info['expires_in']
+        
+        if 'refresh_token' in token_info:
+            st.session_state['yahoo_refresh_token'] = token_info['refresh_token']
+        
+        st.success("Access token uusittu onnistuneesti")
+        return True
+    except Exception as e:
+        st.error(f"Virhe tokenin uusinnassa: {str(e)}")
+        return False
+
+def make_yahoo_api_request(endpoint, params=None):
+    """Tee API-pyyntö Yahoo Sports API:lle käyttäen OAuth 2.0"""
+    try:
+        # Tarkista, onko access token olemassa ja voimassa
+        if 'yahoo_access_token' not in st.session_state:
+            st.error("Sinun täytyy ensin kirjautua Yahoo Sportsiin")
+            return None
+        
+        # Tarkista, onko token vanhentunut
+        if time.time() >= st.session_state.get('yahoo_token_expires_at', 0):
+            st.info("Access token on vanhentunut, yritetään uusia...")
+            if not refresh_yahoo_token():
+                st.error("Tokenin uusinta epäonnistui")
+                return None
         
         # Tee API-pyyntö
-        response = requests.get(url, auth=oauth, params=params)
+        headers = {
+            "Authorization": f"Bearer {st.session_state['yahoo_access_token']}",
+            "Content-Type": "application/json"
+        }
+        
+        url = f"{YAHOO_FANTASY_API_BASE_URL}/{endpoint}"
+        response = requests.get(url, headers=headers, params=params)
+        
+        if response.status_code == 401:
+            st.info("Token ei ole voimassa, yritetään uusia...")
+            if refresh_yahoo_token():
+                # Yritä uudelleen uudella tokenilla
+                headers["Authorization"] = f"Bearer {st.session_state['yahoo_access_token']}"
+                response = requests.get(url, headers=headers, params=params)
+        
         if response.status_code != 200:
-            st.error(f"Virhe API-pyynnössä: {response.text}")
+            st.error(f"Virhe API-pyynnössä: {response.status_code} - {response.text}")
             return None
         
         return response.json()
@@ -190,27 +244,19 @@ def make_yahoo_api_request(url, params=None):
 
 def get_yahoo_user_games():
     """Hae käyttäjän pelit"""
-    url = f"{YAHOO_FANTASY_API_BASE_URL}/users;use_login=1/games"
-    response = make_yahoo_api_request(url)
-    return response
+    return make_yahoo_api_request("users;use_login=1/games")
 
 def get_yahoo_leagues(game_key):
     """Hae käyttäjän liigat pelin perusteella"""
-    url = f"{YAHOO_FANTASY_API_BASE_URL}/users;use_login=1/games;game_keys={game_key}/leagues"
-    response = make_yahoo_api_request(url)
-    return response
+    return make_yahoo_api_request(f"users;use_login=1/games;game_keys={game_key}/leagues")
 
 def get_yahoo_teams(league_key):
     """Hae joukkueet liigasta"""
-    url = f"{YAHOO_FANTASY_API_BASE_URL}/league/{league_key}/teams"
-    response = make_yahoo_api_request(url)
-    return response
+    return make_yahoo_api_request(f"league/{league_key}/teams")
 
 def get_yahoo_roster(team_key):
     """Hae joukkueen rosteri"""
-    url = f"{YAHOO_FANTASY_API_BASE_URL}/team/{team_key}/roster"
-    response = make_yahoo_api_request(url)
-    return response
+    return make_yahoo_api_request(f"team/{team_key}/roster")
 
 def get_yahoo_players(league_key, position=None, status=None):
     """Hae pelaajia liigasta"""
@@ -220,9 +266,7 @@ def get_yahoo_players(league_key, position=None, status=None):
     if status:
         params['status'] = status
     
-    url = f"{YAHOO_FANTASY_API_BASE_URL}/league/{league_key}/players"
-    response = make_yahoo_api_request(url, params=params)
-    return response
+    return make_yahoo_api_request(f"league/{league_key}/players", params=params)
 
 def parse_yahoo_roster(roster_data):
     """Jäsennä Yahoo-rosteri sovelluksen muotoon"""
@@ -341,25 +385,26 @@ else:
         except Exception as e:
             st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
-# --- SIVUPALKKI: YAHOO FANTASY INTEGRAATIO ---
-st.sidebar.header("🏒 Yahoo Fantasy")
+# --- SIVUPALKKI: YAHOO SPORTS INTEGRAATIO ---
+st.sidebar.header("🏒 Yahoo Sports")
 
 # Tarkista, onko käyttäjä jo kirjautunut
-if st.session_state['yahoo_access_token'] and st.session_state['yahoo_access_token_secret']:
-    st.sidebar.success("Olet kirjautunut Yahoo Fantasyyn!")
+if 'yahoo_access_token' in st.session_state and st.session_state['yahoo_access_token']:
+    st.sidebar.success("Olet kirjautunut Yahoo Sportsiin!")
     
     # Näytä kirjautumisen ulos -painike
-    if st.sidebar.button("Kirjaudu ulos Yahoo Fantasysta"):
-        st.session_state['yahoo_access_token'] = None
-        st.session_state['yahoo_access_token_secret'] = None
-        st.session_state['yahoo_league_id'] = None
-        st.session_state['yahoo_team_id'] = None
+    if st.sidebar.button("Kirjaudu ulos Yahoo Sportsista"):
+        st.session_state.pop('yahoo_access_token', None)
+        st.session_state.pop('yahoo_refresh_token', None)
+        st.session_state.pop('yahoo_token_expires_at', None)
+        st.session_state.pop('yahoo_league_id', None)
+        st.session_state.pop('yahoo_team_id', None)
         st.sidebar.success("Kirjauduttu ulos!")
         st.rerun()
     
     # Hae käyttäjän pelit
-    if st.sidebar.button("Hae Yahoo Fantasy -tiedot"):
-        with st.spinner("Haetaan Yahoo Fantasy -tietoja..."):
+    if st.sidebar.button("Hae Yahoo Sports -tiedot"):
+        with st.spinner("Haetaan Yahoo Sports -tietoja..."):
             # Hae käyttäjän pelit
             games_data = get_yahoo_user_games()
             
@@ -421,7 +466,7 @@ if st.session_state['yahoo_access_token'] and st.session_state['yahoo_access_tok
                                         if not roster_df.empty:
                                             st.session_state['roster'] = roster_df
                                             roster_df.to_csv(ROSTER_FILE, index=False)
-                                            st.sidebar.success("Rosteri ladattu Yahoo Fantasysta!")
+                                            st.sidebar.success("Rosteri ladattu Yahoo Sportsista!")
                                             
                                             # Hae vapaat agentit
                                             free_agents_data = get_yahoo_players(league_key, status='A')
@@ -431,7 +476,7 @@ if st.session_state['yahoo_access_token'] and st.session_state['yahoo_access_tok
                                                 
                                                 if not free_agents_df.empty:
                                                     st.session_state['free_agents'] = free_agents_df
-                                                    st.sidebar.success("Vapaat agentit ladattu Yahoo Fantasysta!")
+                                                    st.sidebar.success("Vapaat agentit ladattu Yahoo Sportsista!")
                                                 else:
                                                     st.sidebar.warning("Vapaita agentteja ei löytynyt")
                                             else:
@@ -456,34 +501,21 @@ if st.session_state['yahoo_access_token'] and st.session_state['yahoo_access_tok
         st.rerun()
 else:
     # Näytä kirjautumispainike
-    if st.sidebar.button("Kirjaudu Yahoo Fantasyyn"):
-        auth_url, oauth_token, oauth_token_secret = get_yahoo_oauth()
+    if st.sidebar.button("Kirjaudu Yahoo Sportsiin"):
+        auth_url = get_yahoo_oauth2_url()
         
         if auth_url:
             st.sidebar.markdown(f"""
-            ### Kirjaudu Yahoo Fantasyyn
+            ### Kirjaudu Yahoo Sportsiin
             
             1. Klikkaa [tästä]({auth_url}) avataksesi Yahoo-sivun
             2. Anna lupa sovellukselle
-            3. Kopioi palautusosoitteesta (callback URL) `oauth_verifier`-arvo
-            4. Liitä se alla olevaan kenttään
+            3. Sinut ohjataan takaisin sovellukseen
             """)
             
-            oauth_verifier = st.sidebar.text_input("Liitä oauth_verifier tähän")
-            
-            if st.sidebar.button("Vahvista kirjautuminen"):
-                if oauth_verifier:
-                    access_token, access_token_secret = get_yahoo_access_token(
-                        oauth_token, oauth_token_secret, oauth_verifier
-                    )
-                    
-                    if access_token and access_token_secret:
-                        st.sidebar.success("Kirjautuminen onnistui!")
-                        st.rerun()
-                    else:
-                        st.sidebar.error("Kirjautuminen epäonnistui")
-                else:
-                    st.sidebar.error("Syötä oauth_verifier")
+            st.sidebar.info("Kun olet antanut luvan, sinut ohjataan automaattisesti takaisin tähän sovellukseen.")
+        else:
+            st.sidebar.error("Kirjautumislinkin luonti epäonnistui")
 
 # Rosterin lataus
 st.sidebar.subheader("Lataa oma rosteri")
@@ -514,7 +546,7 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
         st.sidebar.error(f"Virhe vapaiden agenttien lataamisessa: {e}")
     st.rerun()
 
-# Vastustajan rosterin lataus - KORJATTU VERSIO
+# Vastustajan rosterin lataus
 st.sidebar.subheader("Lataa vastustajan rosteri")
 
 if 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
@@ -966,7 +998,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
     "Rosterin optimointi",
     "Joukkueiden vertailu",
     "Matchup",
-    "Yahoo Fantasy API"
+    "Yahoo Sports API"
 ])
 
 with tab1:
@@ -1521,96 +1553,59 @@ with tab3:
             else:
                 st.warning("Lataa vapaat agentit aloittaaksesi analyysin")
 
-
 with tab4:
-    st.header("📡 Yahoo Fantasy Sports -kirjautuminen")
-
-    AUTH_URL = "https://api.login.yahoo.com/oauth2/request_auth"
-    TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
-    API_BASE = "https://fantasysports.yahooapis.com/fantasy/v2"
-
-    def get_login_link():
-        params = {
-            "client_id": st.secrets["yahoo_oauth2"]["client_id"],
-            "redirect_uri": st.secrets["yahoo_oauth2"]["redirect_uri"],
-            "response_type": "code",
-            "language": "en-us",
-            "scope": "fspt-r"  # tai fspt-w jos tarvitset kirjoitusoikeuksia
-        }
-        return f"{AUTH_URL}?{urlencode(params)}"
-
-    def exchange_code_for_token(auth_code: str):
-        data = {
-            "grant_type": "authorization_code",
-            "redirect_uri": st.secrets["yahoo_oauth2"]["redirect_uri"],
-            "code": auth_code
-        }
-        auth = (
-            st.secrets["yahoo_oauth2"]["client_id"],
-            st.secrets["yahoo_oauth2"]["client_secret"]
-        )
-        resp = requests.post(TOKEN_URL, data=data, auth=auth)
-        if resp.status_code == 200:
-            token_info = resp.json()
-            st.session_state["yahoo_access_token"] = token_info["access_token"]
-            st.session_state["yahoo_refresh_token"] = token_info.get("refresh_token")
-            st.success("✅ Yahoo Fantasy -kirjautuminen onnistui!")
-            st.write("Token info:", token_info)
-        else:
-            st.error(f"Virhe tokenin haussa: {resp.status_code} - {resp.text}")
-
-    def refresh_token():
-        if "yahoo_refresh_token" not in st.session_state:
-            st.error("Ei refresh tokenia.")
-            return
-        data = {
-            "grant_type": "refresh_token",
-            "redirect_uri": st.secrets["yahoo_oauth2"]["redirect_uri"],
-            "refresh_token": st.session_state["yahoo_refresh_token"]
-        }
-        auth = (
-            st.secrets["yahoo_oauth2"]["client_id"],
-            st.secrets["yahoo_oauth2"]["client_secret"]
-        )
-        resp = requests.post(TOKEN_URL, data=data, auth=auth)
-        if resp.status_code == 200:
-            token_info = resp.json()
-            st.session_state["yahoo_access_token"] = token_info["access_token"]
-            st.success("🔄 Access token uusittu.")
-        else:
-            st.error(f"Virhe tokenin uusinnassa: {resp.status_code} - {resp.text}")
-
-    def yahoo_api_get(endpoint):
-        if not st.session_state.get("yahoo_access_token"):
-            st.error("Kirjaudu ensin sisään.")
-            return None
-        headers = {"Authorization": f"Bearer {st.session_state['yahoo_access_token']}"}
-        resp = requests.get(f"{API_BASE}/{endpoint}", headers=headers)
-        if resp.status_code != 200:
-            st.error(f"Virhe API-pyynnössä: {resp.status_code} - {resp.text}")
-            return None
-        return resp.text
-
-    # --- UI ---
+    st.header("📡 Yahoo Sports API -tilanne")
+    
+    # Tarkista, onko URL:ssa authorization code
     query_params = st.query_params
     if "code" in query_params and not st.session_state.get("yahoo_access_token"):
-        code = query_params["code"][0]
-        exchange_code_for_token(code)
-
-    if not st.session_state.get("yahoo_access_token"):
-        st.markdown(f"[Kirjaudu Yahoo Fantasyyn]({get_login_link()})")
-    else:
-        st.success("Olet kirjautunut sisään Yahoo Fantasyyn ✅")
-        if st.button("🔄 Uusi token"):
-            refresh_token()
-
+        auth_code = query_params["code"][0]
+        
+        with st.spinner("Vaihdetaan authorization code access tokeniin..."):
+            token_info = exchange_code_for_token(auth_code)
+            
+            if token_info:
+                st.success("✅ Kirjautuminen onnistui!")
+                st.rerun()
+            else:
+                st.error("❌ Kirjautuminen epäonnistui")
+    
+    if 'yahoo_access_token' in st.session_state:
+        st.success("✅ Olet kirjautunut Yahoo Sportsiin")
+        
+        # Näytä tokenin tiedot
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Access Token:**")
+            st.code(st.session_state['yahoo_access_token'][:50] + "...")
+        
+        with col2:
+            st.write("**Token vanhenee:**")
+            expires_in = int(st.session_state.get('yahoo_token_expires_at', 0) - time.time())
+            st.code(f"{expires_in // 60} minuuttia")
+        
+        # Testaa API-yhteyttä
+        if st.button("📊 Testaa API-yhteys"):
+            with st.spinner("Testataan API-yhteyttä..."):
+                test_data = get_yahoo_user_games()
+                if test_data:
+                    st.success("✅ API-yhteys toimii!")
+                    st.write("Vastaus (ensimmäiset 500 merkkiä):")
+                    st.code(str(test_data)[:500])
+                else:
+                    st.error("❌ API-yhteys epäonnistui")
+        
+        # Kirjaudu ulos
         if st.button("🚪 Kirjaudu ulos"):
-            st.session_state.pop("yahoo_access_token", None)
-            st.session_state.pop("yahoo_refresh_token", None)
-            st.experimental_rerun()
-
-        st.subheader("Testaa API-yhteys")
-        if st.button("📊 Testaa token ja hae omat pelit"):
-            data = yahoo_api_get("users;use_login=1/games")
-            if data:
-                st.code(data)
+            st.session_state.pop('yahoo_access_token', None)
+            st.session_state.pop('yahoo_refresh_token', None)
+            st.session_state.pop('yahoo_token_expires_at', None)
+            st.rerun()
+    else:
+        st.info("Et ole kirjautunut Yahoo Sportsiin")
+        
+        auth_url = get_yahoo_oauth2_url()
+        if auth_url:
+            st.markdown(f"[Kirjaudu Yahoo Sportsiin]({auth_url})")
+        else:
+            st.error("Kirjautumislinkin luonti epäonnistui")
