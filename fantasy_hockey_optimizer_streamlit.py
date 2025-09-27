@@ -1608,8 +1608,8 @@ with tab4:
             refresh_token()
 
         st.subheader("Testaa API-yhteys")
-        if st.button("📊 Hae pelit (esim. NHL)"):
-            data = yahoo_api_get("game/nhl")
+        if st.button("📊 Testaa token ja hae omat pelit"):
+            data = yahoo_api_get("users;use_login=1/games")
             if data:
                 st.code(data)
 
