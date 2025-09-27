@@ -1,5 +1,4 @@
 import streamlit as st
-import datetime
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
@@ -9,10 +8,10 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 import requests
-from requests_oauthlib import OAuth1
 import json
 import time
-from urllib.parse import parse_qs
+from urllib.parse import urlencode
+
 
 # Yahoo Fantasy API -asetukset
 YAHOO_OAUTH_REQUEST_TOKEN_URL = 'https://api.login.yahoo.com/oauth/v2/get_request_token'
