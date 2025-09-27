@@ -1525,9 +1525,6 @@ with tab3:
 with tab4:
     st.header("📡 Yahoo Fantasy Sports -kirjautuminen")
 
-    import requests
-    from urllib.parse import urlencode
-
     AUTH_URL = "https://api.login.yahoo.com/oauth2/request_auth"
     TOKEN_URL = "https://api.login.yahoo.com/oauth2/get_token"
     API_BASE = "https://fantasysports.yahooapis.com/fantasy/v2"
@@ -1558,6 +1555,7 @@ with tab4:
             st.session_state["yahoo_access_token"] = token_info["access_token"]
             st.session_state["yahoo_refresh_token"] = token_info.get("refresh_token")
             st.success("✅ Yahoo Fantasy -kirjautuminen onnistui!")
+            st.write("Token info:", token_info)
         else:
             st.error(f"Virhe tokenin haussa: {resp.status_code} - {resp.text}")
 
@@ -1583,7 +1581,7 @@ with tab4:
             st.error(f"Virhe tokenin uusinnassa: {resp.status_code} - {resp.text}")
 
     def yahoo_api_get(endpoint):
-        if "yahoo_access_token" not in st.session_state:
+        if not st.session_state.get("yahoo_access_token"):
             st.error("Kirjaudu ensin sisään.")
             return None
         headers = {"Authorization": f"Bearer {st.session_state['yahoo_access_token']}"}
@@ -1595,20 +1593,24 @@ with tab4:
 
     # --- UI ---
     query_params = st.query_params
-    if "code" in query_params and "yahoo_access_token" not in st.session_state:
+    if "code" in query_params and not st.session_state.get("yahoo_access_token"):
         code = query_params["code"][0]
         exchange_code_for_token(code)
 
-    if "yahoo_access_token" not in st.session_state:
+    if not st.session_state.get("yahoo_access_token"):
         st.markdown(f"[Kirjaudu Yahoo Fantasyyn]({get_login_link()})")
     else:
         st.success("Olet kirjautunut sisään Yahoo Fantasyyn ✅")
         if st.button("🔄 Uusi token"):
             refresh_token()
 
+        if st.button("🚪 Kirjaudu ulos"):
+            st.session_state.pop("yahoo_access_token", None)
+            st.session_state.pop("yahoo_refresh_token", None)
+            st.experimental_rerun()
+
         st.subheader("Testaa API-yhteys")
         if st.button("📊 Testaa token ja hae omat pelit"):
             data = yahoo_api_get("users;use_login=1/games")
             if data:
                 st.code(data)
-
