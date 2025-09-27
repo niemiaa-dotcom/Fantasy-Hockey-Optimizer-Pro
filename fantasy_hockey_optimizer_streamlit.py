@@ -1595,7 +1595,7 @@ with tab4:
         return resp.text
 
     # --- UI ---
-    query_params = st.experimental_get_query_params()
+    query_params = st.query_params
     if "code" in query_params and "yahoo_access_token" not in st.session_state:
         code = query_params["code"][0]
         exchange_code_for_token(code)
