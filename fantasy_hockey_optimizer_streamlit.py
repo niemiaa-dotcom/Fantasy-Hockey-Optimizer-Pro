@@ -98,7 +98,7 @@ def load_opponent_roster_from_gsheets(selected_team):
         # Käytetään samaa sheets URL:ia kuin omaan rosteriin
         sheet_url = "https://docs.google.com/spreadsheets/d/12UFq7zUuVy_WVCZa2I1JOd_PGPWex1VRfxOB-VEcWIA"
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("vs. roster")  # haetaan oikea välilehti
+        worksheet = sheet.worksheet("Lindgren rosters")  # haetaan oikea välilehti
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
@@ -106,7 +106,7 @@ def load_opponent_roster_from_gsheets(selected_team):
         required_columns = ["Fantasy Team", "Player Name", "Position(s)", "NHL Team", "FP"]
         missing = [c for c in required_columns if c not in df.columns]
         if missing:
-            st.error(f"Puuttuvat sarakkeet vs. roster -välilehdeltä: {', '.join(missing)}")
+            st.error(f"Puuttuvat sarakkeet Lindgren rosters -välilehdeltä: {', '.join(missing)}")
             return pd.DataFrame()
 
         # Suodatetaan valitun joukkueen pelaajat
@@ -213,7 +213,7 @@ if client:
     try:
         sheet_url = "https://docs.google.com/spreadsheets/d/12UFq7zUuVy_WVCZa2I1JOd_PGPWex1VRfxOB-VEcWIA"
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("vs. roster")
+        worksheet = sheet.worksheet("Lindgren rosters")
         data = worksheet.get_all_records()
         df_vs = pd.DataFrame(data)
         if "Fantasy Team" in df_vs.columns:
@@ -840,7 +840,7 @@ with tab1:
         # Lisätään valintalaatikko vertailutyypille
         comparison_type = st.radio(
             "Valitse vertailutyyppi:",
-            ["Vertaa kahta uutta pelaajaa", "Vertaa uutta pelaajaa vs. rosterissa olevan pudottamista"],
+            ["Vertaa kahta uutta pelaajaa", "Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista"],
             key="comparison_type"
         )
         
@@ -882,7 +882,7 @@ with tab1:
                     removed_fpa_default = 0.0
                 removed_fpa = st.number_input("Syötä poistettavan pelaajan FP/GP", min_value=0.0, step=0.1, format="%.2f", value=removed_fpa_default, key="removed_fpa")
 
-        else:  # Vertaa uutta pelaajaa vs. rosterissa olevan pudottamista
+        else:  # Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista
             st.markdown("#### Uusi pelaaja")
             colA1, colA2, colA3, colA4 = st.columns(4)
             with colA1:
@@ -1018,7 +1018,7 @@ with tab1:
                 else:
                     st.warning("Syötä molempien pelaajien tiedot suorittaaksesi vertailun.")
             
-            else:  # Vertaa uutta pelaajaa vs. rosterissa olevan pudottamista
+            else:  # Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista
                 if new_player_name and new_player_team and new_player_positions and drop_player_name:
                     
                     # Luo uusi pelaaja
