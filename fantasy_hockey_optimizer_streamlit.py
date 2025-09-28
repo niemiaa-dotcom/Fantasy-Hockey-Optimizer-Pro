@@ -90,6 +90,45 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+def load_opponent_roster_from_gsheets(selected_team):
+    client = get_gspread_client()
+    if client is None:
+        return pd.DataFrame()
+    try:
+        # Käytetään samaa sheets URL:ia kuin omaan rosteriin
+        sheet_url = "https://docs.google.com/spreadsheets/d/12UFq7zUuVy_WVCZa2I1JOd_PGPWex1VRfxOB-VEcWIA"
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("vs. roster")  # haetaan oikea välilehti
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+
+        # Tarkistetaan että sarakkeet löytyvät
+        required_columns = ["Fantasy Team", "Player Name", "Position(s)", "NHL Team", "FP"]
+        missing = [c for c in required_columns if c not in df.columns]
+        if missing:
+            st.error(f"Puuttuvat sarakkeet vs. roster -välilehdeltä: {', '.join(missing)}")
+            return pd.DataFrame()
+
+        # Suodatetaan valitun joukkueen pelaajat
+        team_df = df[df["Fantasy Team"] == selected_team].copy()
+
+        # Muutetaan sarakenimet yhteneviksi muun sovelluksen kanssa
+        team_df.rename(columns={
+            "Player Name": "name",
+            "NHL Team": "team",
+            "Position(s)": "positions",
+            "FP": "fantasy_points_avg"
+        }, inplace=True)
+
+        # Muunnetaan FP numeroksi
+        team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0.0)
+
+        return team_df[["name", "team", "positions", "fantasy_points_avg"]]
+    except Exception as e:
+        st.error(f"Virhe vastustajan rosterin lukemisessa Google Sheetistä: {e}")
+        return pd.DataFrame()
+
+
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
@@ -164,39 +203,39 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
 # Vastustajan rosterin lataus - KORJATTU VERSIO
 st.sidebar.subheader("Lataa vastustajan rosteri")
 
-if 'opponent_roster' in st.session_state and st.session_state['opponent_roster'] is not None and not st.session_state['opponent_roster'].empty:
-    st.sidebar.success("Vastustajan rosteri ladattu!")
-    
-    # Näytä latauspainike vain jos rosteri on jo ladattu
-    if st.sidebar.button("Lataa uusi vastustajan rosteri"):
-        st.session_state['opponent_roster'] = None
-        st.rerun()
-else:
-    # Näytä tiedostolataaja
-    st.sidebar.info("Lataa vastustajan rosteri CSV-tiedostona")
-    opponent_roster_file = st.sidebar.file_uploader(
-        "Valitse CSV-tiedosto",
-        type=["csv"],
-        key="opponent_roster_uploader",
-        help="CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)"
-    )
-    
-    if opponent_roster_file is not None:
-        try:
-            opponent_roster = pd.read_csv(opponent_roster_file)
-            if not opponent_roster.empty and all(col in opponent_roster.columns for col in ['name', 'team', 'positions']):
-                if 'fantasy_points_avg' not in opponent_roster.columns:
-                    opponent_roster['fantasy_points_avg'] = 0.0
-                    st.sidebar.info("Lisätty puuttuva 'fantasy_points_avg'-sarake oletusarvolla 0.0")
-                opponent_roster['fantasy_points_avg'] = pd.to_numeric(opponent_roster['fantasy_points_avg'], errors='coerce').fillna(0)
-                st.session_state['opponent_roster'] = opponent_roster
-                opponent_roster.to_csv(OPPONENT_ROSTER_FILE, index=False)
-                st.sidebar.success("Vastustajan rosteri ladattu ja tallennettu!")
+# --- Vastustajan rosterin lataus Google Sheetistä ---
+st.sidebar.subheader("Lataa vastustajan rosteri Google Sheetistä")
+
+# Hae joukkueiden nimet Google Sheetistä
+client = get_gspread_client()
+available_teams = []
+if client:
+    try:
+        sheet_url = "https://docs.google.com/spreadsheets/d/12UFq7zUuVy_WVCZa2I1JOd_PGPWex1VRfxOB-VEcWIA"
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("vs. roster")
+        data = worksheet.get_all_records()
+        df_vs = pd.DataFrame(data)
+        if "Fantasy Team" in df_vs.columns:
+            available_teams = sorted(df_vs["Fantasy Team"].dropna().unique().tolist())
+    except Exception as e:
+        st.sidebar.error(f"Virhe joukkueiden lataamisessa: {e}")
+
+# Valitse joukkue
+if available_teams:
+    selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
+    if selected_opponent_team:
+        if st.sidebar.button("Lataa valitun joukkueen rosteri"):
+            opponent_df = load_opponent_roster_from_gsheets(selected_opponent_team)
+            if not opponent_df.empty:
+                st.session_state["opponent_roster"] = opponent_df
+                opponent_df.to_csv(OPPONENT_ROSTER_FILE, index=False)
+                st.sidebar.success(f"{selected_opponent_team} rosteri ladattu onnistuneesti!")
                 st.rerun()
             else:
-                st.sidebar.error("Vastustajan rosterin CSV-tiedoston tulee sisältää sarakkeet: name, team, positions, (fantasy_points_avg)")
-        except Exception as e:
-            st.sidebar.error(f"Virhe vastustajan rosterin lukemisessa: {str(e)}")
+                st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tyhjä tulos.")
+else:
+    st.sidebar.warning("Ei saatavilla olevia joukkueita ladattavissa.")
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
