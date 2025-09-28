@@ -794,208 +794,259 @@ with tab1:
                 use_container_width=True
             )
 
-# --- 🔮 SIMULOI UUDEN PELAAJAN VAIKUTUS ---
-
-st.header("🔮 Simuloi uuden pelaajan vaikutus")
-
-def analyze_roster_scenario(roster, schedule_filtered, pos_limits):
-    """
-    Laskee annetulle rosterille aktiivisten pelien määrän ja kokonais-FP:n optimoinnin perusteella.
-    """
-    _, total_games_dict, total_fp, _ = optimize_roster_advanced(schedule_filtered, roster, pos_limits)
-    active_games = sum(total_games_dict.values())
-    return active_games, total_fp
-
-# Tarkistetaan, että data on ladattu
-if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
-
-    comparison_type = st.radio(
-        "Valitse vertailutyyppi:",
-        ["Vertaa kahta uutta pelaajaa", "Vertaa uutta pelaajaa vs. rosterissa olevan pudottamista"],
-        key="comparison_type"
-    )
-
-    # --- VERTAA KAHTA UUTTA PELAAJAA ---
-    if comparison_type == "Vertaa kahta uutta pelaajaa":
-
-        st.markdown("#### Pelaaja A")
-        colA1, colA2, colA3, colA4 = st.columns(4)
-        with colA1:
-            sim_name_A = st.text_input("Pelaajan nimi", key="sim_name_A")
-        with colA2:
-            sim_team_A = st.text_input("Joukkue", key="sim_team_A")
-        with colA3:
-            sim_positions_A = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_A")
-        with colA4:
-            sim_fpa_A = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_A")
-
-        st.markdown("#### Pelaaja B")
-        colB1, colB2, colB3, colB4 = st.columns(4)
-        with colB1:
-            sim_name_B = st.text_input("Pelaajan nimi", key="sim_name_B")
-        with colB2:
-            sim_team_B = st.text_input("Joukkue", key="sim_team_B")
-        with colB3:
-            sim_positions_B = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_B")
-        with colB4:
-            sim_fpa_B = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B")
-
-        remove_sim_player = st.selectbox(
-            "Pelaaja poistettavaksi rosterista (valinnainen)",
-            [""] + list(st.session_state['roster']['name']),
-            key="remove_sim_player"
+    st.header("🔮 Simuloi uuden pelaajan vaikutus")
+    if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
+        st.subheader("Valitse vertailutyyppi")
+        
+        # Lisätään valintalaatikko vertailutyypille
+        comparison_type = st.radio(
+            "Valitse vertailutyyppi:",
+            ["Vertaa kahta uutta pelaajaa", "Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista"],
+            key="comparison_type"
         )
+        
+        if comparison_type == "Vertaa kahta uutta pelaajaa":
+            st.markdown("#### Pelaaja A")
+            colA1, colA2, colA3, colA4 = st.columns(4)
+            with colA1:
+                sim_name_A = st.text_input("Pelaajan nimi", key="sim_name_A")
+            with colA2:
+                sim_team_A = st.text_input("Joukkue", key="sim_team_A")
+            with colA3:
+                sim_positions_A = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_A")
+            with colA4:
+                sim_fpa_A = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_A")
 
-        # --- Suorita vertailu ---
-        if st.button("Suorita vertailu"):
-
-            schedule_filtered = st.session_state['schedule'][
-                (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-                (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-            ]
-
-            active_games_original, total_fp_original = analyze_roster_scenario(
-                st.session_state['roster'], schedule_filtered, pos_limits
+            st.markdown("#### Pelaaja B")
+            colB1, colB2, colB3, colB4 = st.columns(4)
+            with colB1:
+                sim_name_B = st.text_input("Pelaajan nimi", key="sim_name_B")
+            with colB2:
+                sim_team_B = st.text_input("Joukkue", key="sim_team_B")
+            with colB3:
+                sim_positions_B = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_B")
+            with colB4:
+                sim_fpa_B = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B")
+            
+            # Valinta poistettavalle pelaajalle (valinnainen)
+            remove_sim_player = st.selectbox(
+                "Pelaaja poistettavaksi rosterista (valinnainen)",
+                [""] + list(st.session_state['roster']['name'])
             )
 
-            base_roster = st.session_state['roster'].copy()
-            if remove_sim_player:
-                base_roster = base_roster[base_roster['name'] != remove_sim_player].copy()
-
-            results = []
-
-            # Pelaaja A
-            if sim_name_A and sim_team_A and sim_positions_A:
-                roster_A = pd.concat([
-                    base_roster,
-                    pd.DataFrame([{
-                        'name': sim_name_A,
-                        'team': sim_team_A,
-                        'positions': sim_positions_A,
-                        'fantasy_points_avg': sim_fpa_A
-                    }])
-                ], ignore_index=True)
-                active_A, fp_A = analyze_roster_scenario(roster_A, schedule_filtered, pos_limits)
-                results.append({
-                    "name": sim_name_A,
-                    "active": active_A,
-                    "fp": fp_A,
-                    "delta_games": active_A - active_games_original,
-                    "delta_fp": fp_A - total_fp_original
-                })
-
-            # Pelaaja B
-            if sim_name_B and sim_team_B and sim_positions_B:
-                roster_B = pd.concat([
-                    base_roster,
-                    pd.DataFrame([{
-                        'name': sim_name_B,
-                        'team': sim_team_B,
-                        'positions': sim_positions_B,
-                        'fantasy_points_avg': sim_fpa_B
-                    }])
-                ], ignore_index=True)
-                active_B, fp_B = analyze_roster_scenario(roster_B, schedule_filtered, pos_limits)
-                results.append({
-                    "name": sim_name_B,
-                    "active": active_B,
-                    "fp": fp_B,
-                    "delta_games": active_B - active_games_original,
-                    "delta_fp": fp_B - total_fp_original
-                })
-
-            st.subheader("Vertailun tulokset")
-
-            col1, col2 = st.columns(2)
-            with col1:
-                st.markdown("**Alkuperäinen rosteri**")
-                st.metric("Aktiiviset pelit", active_games_original)
-                st.metric("Kokonais-FP", f"{total_fp_original:.2f}")
-            with col2:
-                if remove_sim_player:
-                    st.markdown(f"*Poistettu pelaaja: {remove_sim_player}*")
-
-            for r in results:
-                st.markdown(f"---\n### {r['name']}")
-                st.metric("Aktiiviset pelit", r["active"], f"{r['delta_games']:+}")
-                st.metric("Kokonais-FP", f"{r['fp']:.2f}", f"{r['delta_fp']:+.2f}")
-
-            if len(results) == 2:
-                diff_games = results[0]['active'] - results[1]['active']
-                diff_fp = results[0]['fp'] - results[1]['fp']
-                st.markdown("---")
-                st.subheader("A vs B -vertailu")
-                if diff_fp > 0:
-                    st.success(f"✅ {results[0]['name']} tuo {diff_games:+} peliä ja {diff_fp:+.2f} FP enemmän kuin {results[1]['name']}.")
-                elif diff_fp < 0:
-                    st.success(f"✅ {results[1]['name']} tuo {abs(diff_games)} peliä ja {abs(diff_fp):.2f} FP enemmän kuin {results[0]['name']}.")
+            removed_fpa = 0.0
+            if remove_sim_player and not st.session_state['roster'].empty:
+                removed_player_info = st.session_state['roster'][st.session_state['roster']['name'] == remove_sim_player]
+                if 'fantasy_points_avg' in removed_player_info.columns and not pd.isna(removed_player_info['fantasy_points_avg'].iloc[0]):
+                    removed_fpa_default = float(removed_player_info['fantasy_points_avg'].iloc[0])
                 else:
-                    st.info("Molemmat vaihtoehdot tuottavat yhtä paljon FP.")
+                    removed_fpa_default = 0.0
+                removed_fpa = st.number_input("Syötä poistettavan pelaajan FP/GP", min_value=0.0, step=0.1, format="%.2f", value=removed_fpa_default, key="removed_fpa")
 
-    # --- VERTAA UUTTA PELAAJAA VS. PUDOTETTAVA ---
-    else:
-        st.markdown("#### Uusi pelaaja")
-        colA1, colA2, colA3, colA4 = st.columns(4)
-        with colA1:
-            new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
-        with colA2:
-            new_player_team = st.text_input("Joukkue", key="new_player_team")
-        with colA3:
-            new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
-        with colA4:
-            new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
-
-        drop_player_name = st.selectbox("Valitse pudotettava pelaaja", list(st.session_state['roster']['name']), key="drop_player_name")
+        else:  # Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista
+            st.markdown("#### Uusi pelaaja")
+            colA1, colA2, colA3, colA4 = st.columns(4)
+            with colA1:
+                new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
+            with colA2:
+                new_player_team = st.text_input("Joukkue", key="new_player_team")
+            with colA3:
+                new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
+            with colA4:
+                new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
+            
+            st.markdown("#### Pudotettava pelaaja")
+            colB1, colB2, colB3, colB4 = st.columns(4)
+            with colB1:
+                # Valitse pudotettava pelaaja rosterista
+                drop_player_name = st.selectbox(
+                    "Valitse pudotettava pelaaja",
+                    list(st.session_state['roster']['name']),
+                    key="drop_player_name"
+                )
+            with colB2:
+                # Näytä valitun pelaajan joukkue
+                if drop_player_name:
+                    drop_player_team = st.session_state['roster'][st.session_state['roster']['name'] == drop_player_name]['team'].iloc[0]
+                    st.text_input("Joukkue", value=drop_player_team, disabled=True, key="drop_player_team_display")
+                else:
+                    st.text_input("Joukkue", value="", disabled=True, key="drop_player_team_empty")
+            with colB3:
+                # Näytä valitun pelaajan pelipaikat
+                if drop_player_name:
+                    drop_player_positions = st.session_state['roster'][st.session_state['roster']['name'] == drop_player_name]['positions'].iloc[0]
+                    st.text_input("Pelipaikat", value=drop_player_positions, disabled=True, key="drop_player_positions_display")
+                else:
+                    st.text_input("Pelipaikat", value="", disabled=True, key="drop_player_positions_empty")
+            with colB4:
+                # Näytä valitun pelaajan FP/GP ja salli muokkaus
+                if drop_player_name:
+                    drop_player_fpa_default = st.session_state['roster'][st.session_state['roster']['name'] == drop_player_name]['fantasy_points_avg'].iloc[0]
+                    if pd.isna(drop_player_fpa_default):
+                        drop_player_fpa_default = 0.0
+                    drop_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", value=float(drop_player_fpa_default), key="drop_player_fpa")
+                else:
+                    drop_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", value=0.0, key="drop_player_fpa_empty")
 
         if st.button("Suorita vertailu"):
-            if new_player_name and new_player_team and new_player_positions and drop_player_name:
+            if comparison_type == "Vertaa kahta uutta pelaajaa":
+                if sim_name_A and sim_team_A and sim_positions_A and sim_name_B and sim_team_B and sim_positions_B:
+                    
+                    original_roster_copy = st.session_state['roster'].copy()
+                    if 'fantasy_points_avg' not in original_roster_copy.columns:
+                        original_roster_copy['fantasy_points_avg'] = 0.0
+                    
+                    temp_roster = original_roster_copy.copy()
+                    if remove_sim_player:
+                        temp_roster = temp_roster[temp_roster['name'] != remove_sim_player].copy()
+                    
+                    # Pelaaja A:n simulointi
+                    new_player_A = {'name': sim_name_A, 'team': sim_team_A, 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A}
+                    sim_roster_A = pd.concat([temp_roster, pd.DataFrame([new_player_A])], ignore_index=True)
 
-                schedule_filtered = st.session_state['schedule'][
-                    (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-                    (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-                ]
+                    # Pelaaja B:n simulointi
+                    new_player_B = {'name': sim_name_B, 'team': sim_team_B, 'positions': sim_positions_B, 'fantasy_points_avg': sim_fpa_B}
+                    sim_roster_B = pd.concat([temp_roster, pd.DataFrame([new_player_B])], ignore_index=True)
+                    
+                    schedule_filtered = st.session_state['schedule'][
+                        (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+                        (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+                    ]
+                    
+                    team_game_days = {}
+                    for _, row in schedule_filtered.iterrows():
+                        date = row['Date']
+                        for team in [row['Visitor'], row['Home']]:
+                            if team not in team_game_days:
+                                team_game_days[team] = set()
+                            team_game_days[team].add(date)
 
-                # Uusi rosteri: vanha - pudotettava + uusi
-                new_player = {
-                    'name': new_player_name,
-                    'team': new_player_team,
-                    'positions': new_player_positions,
-                    'fantasy_points_avg': new_player_fpa
-                }
-                modified_roster = st.session_state['roster'][st.session_state['roster']['name'] != drop_player_name].copy()
-                modified_roster = pd.concat([modified_roster, pd.DataFrame([new_player])], ignore_index=True)
+                    with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää ja pisteitä..."):
+                        _, original_total_games_dict, original_fp, _ = optimize_roster_advanced(
+                            schedule_filtered,
+                            st.session_state['roster'],
+                            pos_limits
+                        )
+                        original_total_games = sum(original_total_games_dict.values())
+                    
+                    with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
+                        _, total_games_A_dict, new_fp_A, _ = optimize_roster_advanced(
+                            schedule_filtered,
+                            sim_roster_A,
+                            pos_limits
+                        )
+                        new_total_games_A = sum(total_games_A_dict.values())
+                        player_A_impact_days = total_games_A_dict.get(sim_name_A, 0)
+                    
+                    with st.spinner(f"Lasketaan {sim_name_B}:n vaikutusta..."):
+                        _, total_games_B_dict, new_fp_B, _ = optimize_roster_advanced(
+                            schedule_filtered,
+                            sim_roster_B,
+                            pos_limits
+                        )
+                        new_total_games_B = sum(total_games_B_dict.values())
+                        player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
 
-                # Laske molemmat skenaariot
-                active_orig, fp_orig = analyze_roster_scenario(st.session_state['roster'], schedule_filtered, pos_limits)
-                active_mod, fp_mod = analyze_roster_scenario(modified_roster, schedule_filtered, pos_limits)
+                    st.subheader("Vertailun tulokset")
+                    
+                    col_vertailu_1, col_vertailu_2 = st.columns(2)
+                    
+                    with col_vertailu_1:
+                        st.markdown(f"**Pelaaja A: {sim_name_A}**")
+                        st.metric("Pelien muutos", f"{new_total_games_A - original_total_games}", help="Pelaajan lisäämisen vaikutus kokonaispelimäärään")
+                        st.metric("Omat pelit", player_A_impact_days)
+                        st.metric("Fantasiapiste-ero", f"{new_fp_A - original_fp:.2f}", help="Pelaajan lisäämisen vaikutus fantasiapisteisiin")
+                        
+                    with col_vertailu_2:
+                        st.markdown(f"**Pelaaja B: {sim_name_B}**")
+                        st.metric("Pelien muutos", f"{new_total_games_B - original_total_games}", help="Pelaajan lisäämisen vaikutus kokonaispelimäärään")
+                        st.metric("Omat pelit", player_B_impact_days)
+                        st.metric("Fantasiapiste-ero", f"{new_fp_B - original_fp:.2f}", help="Pelaajan lisäämisen vaikutus fantasiapisteisiin")
+                        
+                    st.markdown("---")
+                    
+                    st.subheader("Yhteenveto")
+                    games_A_vs_B = (new_total_games_A - original_total_games) - (new_total_games_B - original_total_games)
+                    fp_A_vs_B = (new_fp_A - original_fp) - (new_fp_B - original_fp)
 
-                delta_games = active_mod - active_orig
-                delta_fp = fp_mod - fp_orig
+                    if fp_A_vs_B > 0:
+                        st.success(f"{sim_name_A} on parempi vaihtoehto! Rosterisi kokonais-FP olisi arviolta **{fp_A_vs_B:.2f}** pistettä suurempi kuin {sim_name_B}:llä.")
+                    elif fp_A_vs_B < 0:
+                        st.error(f"{sim_name_B} on parempi vaihtoehto! Rosterisi kokonais-FP olisi arviolta **{abs(fp_A_vs_B):.2f}** pistettä suurempi kuin {sim_name_A}:lla.")
+                    else:
+                        st.info("Fantasiapisteissä ei ole eroa näiden pelaajien välillä.")
 
-                st.subheader("Vertailun tulokset")
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("**Alkuperäinen rosteri**")
-                    st.metric("Aktiiviset pelit", active_orig)
-                    st.metric("Kokonais-FP", f"{fp_orig:.2f}")
-                with col2:
-                    st.markdown(f"**Muutettu rosteri ({new_player_name} sisään, {drop_player_name} ulos)**")
-                    st.metric("Aktiiviset pelit", active_mod, f"{delta_games:+}")
-                    st.metric("Kokonais-FP", f"{fp_mod:.2f}", f"{delta_fp:+.2f}")
-
-                st.markdown("---")
-                st.subheader("📊 Yhteenveto")
-                if delta_fp > 0:
-                    st.success(f"✅ Muutos on kannattava: saat {delta_games:+} aktiivista peliä ja {delta_fp:+.2f} FP enemmän.")
-                elif delta_fp < 0:
-                    st.error(f"❌ Muutos ei ole kannattava: menetät {abs(delta_games)} aktiivista peliä ja {abs(delta_fp):.2f} FP.")
                 else:
-                    st.info("Muutos ei vaikuta kokonais-FP:hen.")
-            else:
-                st.warning("Syötä uuden pelaajan tiedot ja valitse pudotettava pelaaja suorittaaksesi vertailun.")
-else:
-    st.info("📋 Lataa rosteri ja peliaikataulu, jotta voit suorittaa simulaation.")
+                    st.warning("Syötä molempien pelaajien tiedot suorittaaksesi vertailun.")
+            
+            else:  # Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista
+                if new_player_name and new_player_team and new_player_positions and drop_player_name:
+                    
+                    # Luo uusi pelaaja
+                    new_player = {'name': new_player_name, 'team': new_player_team, 'positions': new_player_positions, 'fantasy_points_avg': new_player_fpa}
+                    
+                    # Luo pudotettava pelaaja
+                    drop_player = {'name': drop_player_name, 'team': drop_player_team, 'positions': drop_player_positions, 'fantasy_points_avg': drop_player_fpa}
+                    
+                    schedule_filtered = st.session_state['schedule'][
+                        (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+                        (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+                    ]
+                    
+                    # Lasketaan alkuperäinen rosteri
+                    with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää ja pisteitä..."):
+                        _, original_total_games_dict, original_fp, _ = optimize_roster_advanced(
+                            schedule_filtered,
+                            st.session_state['roster'],
+                            pos_limits
+                        )
+                        original_total_games = sum(original_total_games_dict.values())
+                    
+                    # Luodaan muokattu rosteri: poistetaan pudotettava pelaaja ja lisätään uusi pelaaja
+                    modified_roster = st.session_state['roster'][st.session_state['roster']['name'] != drop_player_name].copy()
+                    modified_roster = pd.concat([modified_roster, pd.DataFrame([new_player])], ignore_index=True)
+                    
+                    # Lasketaan muokatun rosterin tulokset
+                    with st.spinner(f"Lasketaan muutoksen vaikutusta..."):
+                        _, modified_total_games_dict, modified_fp, _ = optimize_roster_advanced(
+                            schedule_filtered,
+                            modified_roster,
+                            pos_limits
+                        )
+                        modified_total_games = sum(modified_total_games_dict.values())
+                        new_player_impact_days = modified_total_games_dict.get(new_player_name, 0)
+                    
+                    st.subheader("Vertailun tulokset")
+                    
+                    col_vertailu_1, col_vertailu_2 = st.columns(2)
+                    
+                    with col_vertailu_1:
+                        st.markdown(f"**Uusi pelaaja: {new_player_name}**")
+                        st.metric("Pelien muutos", f"{modified_total_games - original_total_games}", help="Muutoksen vaikutus kokonaispelimäärään")
+                        st.metric("Omat pelit", new_player_impact_days)
+                        st.metric("Fantasiapiste-ero", f"{modified_fp - original_fp:.2f}", help="Muutoksen vaikutus fantasiapisteisiin")
+                        
+                    with col_vertailu_2:
+                        st.markdown(f"**Pudotettava pelaaja: {drop_player_name}**")
+                        st.metric("Menetetyt pelit", f"{original_total_games_dict.get(drop_player_name, 0)}", help="Pudotettavan pelaajan pelien määrä")
+                        st.metric("Menetetyt FP", f"{original_total_games_dict.get(drop_player_name, 0) * drop_player_fpa:.2f}", help="Pudotettavan pelaajan menettämät pisteet")
+                        
+                    st.markdown("---")
+                    
+                    st.subheader("Yhteenveto")
+                    
+                    if modified_fp > original_fp:
+                        st.success(f"Muutos on kannattava! Rosterisi kokonais-FP olisi arviolta **{modified_fp - original_fp:.2f}** pistettä suurempi.")
+                    elif modified_fp < original_fp:
+                        st.error(f"Muutos ei ole kannattava. Rosterisi kokonais-FP olisi arviolta **{original_fp - modified_fp:.2f}** pistettä pienempi.")
+                    else:
+                        st.info("Fantasiapisteissä ei ole eroa.")
+
+                else:
+                    st.warning("Syötä uuden pelaajan tiedot ja valitse pudotettava pelaaja suorittaaksesi vertailun.")
+    else:
+        st.info("Lataa rosteri ja peliaikataulu, jotta voit vertailla pelaajia.")
+
 
 
     # Alkuperäinen joukkueanalyysi osio
