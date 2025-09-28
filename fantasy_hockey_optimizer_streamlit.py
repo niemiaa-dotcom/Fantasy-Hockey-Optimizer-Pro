@@ -972,8 +972,6 @@ if st.button("Suorita vertailu"):
         else:
             st.warning("Syötä vähintään yhden uuden pelaajan tiedot suorittaaksesi vertailun.")
 
-
-            
             else:  # Vertaa uutta pelaajaa vs. rosterissa olevan pudottamista
                 if new_player_name and new_player_team and new_player_positions and drop_player_name:
                     
