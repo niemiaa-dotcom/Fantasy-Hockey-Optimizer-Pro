@@ -66,41 +66,120 @@ def load_roster_from_gsheets():
 def load_free_agents_from_gsheets():
     client = get_gspread_client()
     if client is None:
+        st.error("Google Sheets -asiakasta ei saatu. Tarkista tunnistautuminen (gcp_service_account).")
         return pd.DataFrame()
+
+    # 1) Hae URL secretsistä
     try:
-        # 🔹 Ladataan tiedoston URL secretsistä
         sheet_url = st.secrets["free_agents_sheet"]["url"]
-        sheet = client.open_by_url(sheet_url)
-        
-        # 🔹 Avataan nimenomaan "FA" välilehti, ei oletus sheet1
-        worksheet = sheet.worksheet("FA")
+    except Exception as e:
+        st.error("st.secrets ei sisällä keytä 'free_agents_sheet' tai se on virheellinen.")
+        st.error(str(e))
+        return pd.DataFrame()
+
+    # 2) Avaa työkirja
+    try:
+        book = client.open_by_url(sheet_url)
+    except Exception as e:
+        st.error(f"Virhe avatessa Google Sheet -tiedostoa: {e}")
+        return pd.DataFrame()
+
+    # 3) Yritä löytää FA-välilehti useilla tavoilla
+    worksheet = None
+    possible_names = ["FA", "Fa", "fa", "FA ", "FA-list", "Free Agents", "FA - list", "Sheet1"]
+    for name in possible_names:
+        try:
+            worksheet = book.worksheet(name)
+            st.info(f"Löytyi välilehti nimellä: '{name}'")
+            break
+        except Exception:
+            continue
+
+    # heuristinen fallback: etsi välilehti, jonka ensimmäisen rivin otsikot sisältävät 'name' tai 'player'
+    if worksheet is None:
+        for ws in book.worksheets():
+            try:
+                header = [h.strip().lower() for h in ws.row_values(1)]
+                if any(k in header for k in ("name", "player", "player name")):
+                    worksheet = ws
+                    st.info(f"Löytyi heuristiikalla välilehti: '{ws.title}'")
+                    break
+            except Exception:
+                continue
+
+    if worksheet is None:
+        st.error("FA-välilehteä ei löytynyt. Tarkista välilehden nimi tai jaa tiedosto palvelutilille (service account).")
+        return pd.DataFrame()
+
+    # 4) Hae tiedot ja tee joustava sarakekäsittely
+    try:
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
-
-        # 🔹 Varmistetaan että vaaditut sarakkeet löytyvät
-        required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
-        missing_columns = [col for col in required_columns if col not in df.columns]
-        if missing_columns:
-            st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
+        if df.empty:
+            st.warning("FA-välilehti löytyi mutta se on tyhjä.")
             return pd.DataFrame()
 
-        # 🔹 Muutetaan fantasy_points_avg numeroksi ja poistetaan virheelliset rivit
-        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce')
+        # debug: näytä alkuperäiset sarakeotsikot
+        st.write("DEBUG: alkuperäiset sarakkeet:", df.columns.tolist())
 
-        # 🔹 Poistetaan rivit, joilta puuttuu pelipaikka (tyhjä tai NaN)
-        df = df[df['positions'].notna() & (df['positions'].str.strip() != '')]
+        # normalisoi sarakenimet (poista whitespace, lowercase)
+        df.columns = df.columns.str.strip().str.lower()
 
-        # 🔹 Järjestetään sarakkeet oikeaan järjestykseen
-        df = df[required_columns]
+        # yleisiä alias-kartoituksia
+        rename_map = {}
+        alias_map = {
+            'player name': 'name',
+            'player': 'name',
+            'full name': 'name',
+            'fp': 'fantasy_points_avg',
+            'fp/gp': 'fantasy_points_avg',
+            'fppg': 'fantasy_points_avg',
+            'fantasy points': 'fantasy_points_avg',
+            'fantasypoints': 'fantasy_points_avg'
+        }
+        for k, v in alias_map.items():
+            if k in df.columns and v not in df.columns:
+                rename_map[k] = v
 
-        # 🔹 Tyhjät FP:t nollaksi (jos haluat pitää mukana)
-        df['fantasy_points_avg'] = df['fantasy_points_avg'].fillna(0)
+        # joissain sheetissä 'nhl team' tai 'club' käytössä
+        if 'nhl team' in df.columns and 'team' not in df.columns:
+            rename_map['nhl team'] = 'team'
+        if 'club' in df.columns and 'team' not in df.columns:
+            rename_map['club'] = 'team'
 
+        # position vs. positions
+        if 'position' in df.columns and 'positions' not in df.columns:
+            rename_map['position'] = 'positions'
+
+        if rename_map:
+            df = df.rename(columns=rename_map)
+
+        # pakolliset sarakkeet
+        required = ['name', 'team', 'positions', 'fantasy_points_avg']
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            st.error(f"Pakollisia sarakkeita puuttuu FA-välilehdeltä: {missing}")
+            st.write("Löydetyt sarakkeet:", df.columns.tolist())
+            st.dataframe(df.head())
+            return pd.DataFrame()
+
+        # muunna FP numeeriseksi ja täytä NaN->0
+        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+
+        # käyttäjä kertoi poistaessaan pelipaikattomat rivit, joten ei suodateta positions-saraketta tässä
+        # jos haluat varmistaa ettei tyhjiä ole, voi käyttää:
+        # df = df[df['positions'].notna() & (df['positions'].str.strip() != '')]
+
+        # järjestä sarakkeet ja poista duplikaatit
+        df = df[required].drop_duplicates(subset=['name', 'team'])
+
+        st.success(f"Ladattiin {len(df)} vapaa(agenttia) FA-välilehdeltä '{worksheet.title}'")
         return df
 
     except Exception as e:
-        st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
+        st.error(f"Virhe tietojen käsittelyssä FA-välilehdeltä: {e}")
         return pd.DataFrame()
+
 
 
 def load_opponent_roster_from_gsheets(selected_team):
