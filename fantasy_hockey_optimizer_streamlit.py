@@ -149,6 +149,42 @@ def load_free_agents_from_gsheets():
     except Exception as e:
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
+# --- Vastustajan rosterin lataus Google Sheetistä ---
+st.sidebar.subheader("📋 Lataa vastustajan rosteri")
+
+client = get_gspread_client()
+available_teams = []
+if client:
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        data = worksheet.get_all_records()
+        df_vs = pd.DataFrame(data)
+        if not df_vs.empty:
+            df_vs.columns = df_vs.columns.str.strip().str.lower()
+            if "fantasy team" in df_vs.columns:
+                available_teams = sorted(df_vs["fantasy team"].dropna().unique().tolist())
+    except Exception as e:
+        st.sidebar.error(f"Virhe joukkueiden lataamisessa: {e}")
+
+if available_teams:
+    selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
+    if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
+        opponent_df = load_opponent_roster_from_gsheets(selected_opponent_team)
+        if not opponent_df.empty:
+            st.session_state["opponent_roster"] = opponent_df
+            st.sidebar.success(f"{selected_opponent_team} rosteri ladattu onnistuneesti! ({len(opponent_df)} pelaajaa)")
+            st.dataframe(opponent_df)
+        else:
+            st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
+else:
+    st.sidebar.warning("Ei joukkueita ladattavissa. Tarkista välilehti 'T2 Lindgren Roster'.")
+
+# Nollauspainike
+if st.sidebar.button("Nollaa vastustajan rosteri"):
+    st.session_state["opponent_roster"] = None
+    st.sidebar.info("Vastustajan rosteri nollattu.")
 
 
 
@@ -227,43 +263,42 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
 st.sidebar.subheader("Lataa vastustajan rosteri")
 
 # --- Vastustajan rosterin lataus Google Sheetistä ---
-st.sidebar.subheader("Lataa vastustajan rosteri Google Sheetistä")
+st.sidebar.subheader("📋 Lataa vastustajan rosteri")
 
-# Hae joukkueiden nimet Google Sheetistä
 client = get_gspread_client()
 available_teams = []
 if client:
     try:
-        sheet_url = "https://docs.google.com/spreadsheets/d/1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo"
+        sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
         worksheet = sheet.worksheet("T2 Lindgren Roster")
         data = worksheet.get_all_records()
         df_vs = pd.DataFrame(data)
-        if "Fantasy Team" in df_vs.columns:
-            available_teams = sorted(df_vs["Fantasy Team"].dropna().unique().tolist())
+        if not df_vs.empty:
+            df_vs.columns = df_vs.columns.str.strip().str.lower()
+            if "fantasy team" in df_vs.columns:
+                available_teams = sorted(df_vs["fantasy team"].dropna().unique().tolist())
     except Exception as e:
         st.sidebar.error(f"Virhe joukkueiden lataamisessa: {e}")
 
-# Valitse joukkue
 if available_teams:
     selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
-    if selected_opponent_team:
-        if st.sidebar.button("Lataa valitun joukkueen rosteri"):
-            opponent_df = load_opponent_roster_from_gsheets(selected_opponent_team)
-            if not opponent_df.empty:
-                st.session_state["opponent_roster"] = opponent_df
-                opponent_df.to_csv(OPPONENT_ROSTER_FILE, index=False)
-                st.sidebar.success(f"{selected_opponent_team} rosteri ladattu onnistuneesti!")
-                st.rerun()
-            else:
-                st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tyhjä tulos.")
+    if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
+        opponent_df = load_opponent_roster_from_gsheets(selected_opponent_team)
+        if not opponent_df.empty:
+            st.session_state["opponent_roster"] = opponent_df
+            st.sidebar.success(f"{selected_opponent_team} rosteri ladattu onnistuneesti! ({len(opponent_df)} pelaajaa)")
+            st.dataframe(opponent_df)
+        else:
+            st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
 else:
-    st.sidebar.warning("Ei saatavilla olevia joukkueita ladattavissa.")
+    st.sidebar.warning("Ei joukkueita ladattavissa. Tarkista välilehti 'T2 Lindgren Roster'.")
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state['opponent_roster'] = None
-    st.rerun()
+    st.session_state["opponent_roster"] = None
+    st.sidebar.info("Vastustajan rosteri nollattu.")
+
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
 st.sidebar.header("👥 Rosterin hallinta")
