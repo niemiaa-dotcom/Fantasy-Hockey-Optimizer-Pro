@@ -609,7 +609,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
     return results
     
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
-tab1, tab2, tab3 = st.tabs(["Rosterin optimointi", "Joukkueiden vertailu", "Joukkuevertailu"])
+tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
 with tab1:
     st.header("📊 Nykyinen rosteri")
@@ -1117,90 +1117,6 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             }), use_container_width=True)
         else:
             st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
-with tab2:
-    st.header("Joukkueiden vertailu")
-    st.markdown("Tämä työkalu auttaa sinua vertailemaan joukkueiden pelimääriä halutulla aikavälillä.")
-    
-    if st.session_state['schedule'].empty:
-        st.warning("Lataa peliaikataulu aloittaaksesi joukkueiden vertailun.")
-    else:
-        all_teams = sorted(list(set(st.session_state['schedule']['Home'].tolist() + st.session_state['schedule']['Visitor'].tolist())))
-        
-        st.subheader("Valitse joukkueet")
-        colA, colB = st.columns(2)
-        
-        with colA:
-            team_A = st.selectbox("Joukkue A", options=[""] + all_teams, key='team_A_vertailu')
-        
-        with colB:
-            team_B = st.selectbox("Joukkue B", options=[""] + all_teams, key='team_B_vertailu')
-
-        if team_A and team_B:
-            schedule_filtered = st.session_state['schedule'][
-                (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-                (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-            ]
-            
-            games_A = schedule_filtered[
-                (schedule_filtered['Home'] == team_A) | (schedule_filtered['Visitor'] == team_A)
-            ]
-            games_B = schedule_filtered[
-                (schedule_filtered['Home'] == team_B) | (schedule_filtered['Visitor'] == team_B)
-            ]
-            
-            games_A_count = len(games_A)
-            games_B_count = len(games_B)
-            
-            st.subheader("Vertailun tulokset")
-            st.markdown(f"**Pelimäärät välillä {start_date} - {end_date}**")
-            
-            col_res_A, col_res_B = st.columns(2)
-            
-            with col_res_A:
-                st.metric(f"**{team_A}**", f"{games_A_count} peliä")
-            
-            with col_res_B:
-                st.metric(f"**{team_B}**", f"{games_B_count} peliä")
-                
-            st.markdown("---")
-            
-            st.subheader("Päivittäinen pelimäärä-analyysi")
-            st.markdown("Alla olevasta taulukosta näet kumpi joukkue pelaa minäkin päivänä.")
-            
-            date_range = pd.date_range(start=start_date, end=end_date, freq='D')
-            daily_analysis_data = []
-            
-            for date in date_range:
-                date_str = date.strftime('%Y-%m-%d')
-                
-                plays_A = date in games_A['Date'].values
-                plays_B = date in games_B['Date'].values
-                
-                status_A = "✅" if plays_A else "❌"
-                status_B = "✅" if plays_B else "❌"
-
-                daily_analysis_data.append({
-                    "Päivä": date_str,
-                    f"Joukkue A: {team_A}": status_A,
-                    f"Joukkue B: {team_B}": status_B
-                })
-            
-            analysis_df = pd.DataFrame(daily_analysis_data)
-            
-            def highlight_winner(row):
-                if row[f'Joukkue A: {team_A}'] == '✅' and row[f'Joukkue B: {team_B}'] == '❌':
-                    return [f'background-color: lightgreen'] * len(row)
-                elif row[f'Joukkue A: {team_A}'] == '❌' and row[f'Joukkue B: {team_B}'] == '✅':
-                    return [f'background-color: lightblue'] * len(row)
-                elif row[f'Joukkue A: {team_A}'] == '✅' and row[f'Joukkue B: {team_B}'] == '✅':
-                    return [f'background-color: lightyellow'] * len(row)
-                else:
-                    return [''] * len(row)
-
-            st.dataframe(analysis_df.style.apply(highlight_winner, axis=1), use_container_width=True)
-
-        else:
-            st.info("Valitse kaksi joukkuetta vertaillaksesi niitä.")
 
 with tab3:
     st.header("🆚 Joukkuevertailu")
