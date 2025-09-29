@@ -49,19 +49,43 @@ def get_gspread_client():
 def load_roster_from_gsheets():
     client = get_gspread_client()
     if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
         return pd.DataFrame()
     try:
-        sheet_url = st.secrets["roster_sheet"]["url"]
-        sheet = client.open_by_url(sheet_url).sheet1
-        data = sheet.get_all_records()
+        # 🔹 Käytetään samaa taulukkoa kuin free agents -data
+        sheet_url = st.secrets["free_agents_sheet"]["url"]
+        sheet = client.open_by_url(sheet_url)
+
+        # 🔹 Avataan nimenomaan välilehti "ZeroxG"
+        worksheet = sheet.worksheet("ZeroxG")
+
+        # 🔹 Luetaan tiedot
+        data = worksheet.get_all_records()
         df = pd.DataFrame(data)
-        if 'fantasy_points_avg' not in df.columns:
-            df['fantasy_points_avg'] = 0.0
+
+        if df.empty:
+            st.warning("⚠️ 'ZeroxG' välilehti on tyhjä tai sitä ei löytynyt.")
+            return pd.DataFrame()
+
+        # 🔹 Normalisoidaan sarakenimet
+        df.columns = df.columns.str.strip().str.lower()
+
+        # 🔹 Varmistetaan vaaditut sarakkeet
+        required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            st.error(f"Seuraavat sarakkeet puuttuvat rosterivälilehdeltä 'ZeroxG': {', '.join(missing_columns)}")
+            st.write("Löydetyt sarakkeet:", df.columns.tolist())
+            return pd.DataFrame()
+
+        # 🔹 Muunnetaan FP numeeriseksi ja täytetään puuttuvat nollalla
         df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
-        return df
-    except Exception as e:
-        st.error(f"Virhe Google Sheets -tiedoston lukemisessa: {e}")
-        return pd.DataFrame()
+
+        # 🔹 Palautetaan vain tarvittavat sarakkeet
+        df = df[required_columns]
+
+        st.success(f"Rosterivälilehti 'ZeroxG' ladat
+
 
 def load_free_agents_from_gsheets():
     client = get_gspread_client()
