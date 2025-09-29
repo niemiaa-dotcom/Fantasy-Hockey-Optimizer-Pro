@@ -651,7 +651,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
 tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
 with tab1:
-    st.header("📊 Nykyinen rosteri")
+    st.header("📊 Nykyinen rosteri (APL)")
     if st.session_state['roster'].empty:
         st.warning("Lataa rosteri nähdäksesi pelaajat")
     else:
