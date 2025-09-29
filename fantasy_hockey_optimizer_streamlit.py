@@ -1118,7 +1118,7 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
         else:
             st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
 
-with tab3:
+with tab2:
     st.header("🆚 Joukkuevertailu")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
     
