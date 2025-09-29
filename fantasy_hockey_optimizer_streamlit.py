@@ -90,6 +90,65 @@ def load_roster_from_gsheets():
     except Exception as e:
         st.error(f"Virhe rosterin Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
+def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
+    """
+    Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'
+    samasta tiedostosta kuin oma rosteri.
+    """
+    client = get_gspread_client()
+    if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+        return pd.DataFrame()
+    try:
+        # Käytetään samaa tiedostoa kuin oma rosteri
+        sheet_url = st.secrets["free_agents_sheet"]["url"]
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("T2 Lindgren Roster")
+
+        # Lataa data
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        if df.empty:
+            st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
+            return pd.DataFrame()
+
+        # Normalisoidaan sarakenimet
+        df.columns = df.columns.str.strip().str.lower()
+
+        # Varmistetaan että tarvittavat sarakkeet löytyvät
+        required = ["fantasy team", "player name", "position(s)", "nhl team", "fp"]
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            st.error(f"Puuttuvia sarakkeita 'T2 Lindgren Roster' -välilehdeltä: {missing}")
+            st.write("Löydetyt sarakkeet:", df.columns.tolist())
+            return pd.DataFrame()
+
+        # Suodatetaan valitun joukkueen mukaan
+        team_df = df[df["fantasy team"] == selected_team_name].copy()
+        if team_df.empty:
+            st.warning(f"Joukkueella '{selected_team_name}' ei löytynyt pelaajia.")
+            return pd.DataFrame()
+
+        # Muutetaan sarakenimet sovelluksen logiikkaan sopiviksi
+        team_df = team_df.rename(columns={
+            "player name": "name",
+            "nhl team": "team",
+            "position(s)": "positions",
+            "fp": "fantasy_points_avg"
+        })
+
+        # Muutetaan FP numeroksi
+        team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
+
+        # Säilytetään vain oleelliset sarakkeet
+        team_df = team_df[["name", "team", "positions", "fantasy_points_avg"]]
+
+        return team_df
+
+    except Exception as e:
+        st.error(f"Virhe vastustajan rosterin lataamisessa: {e}")
+        return pd.DataFrame()
+
 
 
 def load_free_agents_from_gsheets():
