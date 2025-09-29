@@ -84,7 +84,12 @@ def load_roster_from_gsheets():
         # 🔹 Palautetaan vain tarvittavat sarakkeet
         df = df[required_columns]
 
-        st.success(f"Rosterivälilehti 'ZeroxG' ladat
+        st.success(f"Rosterivälilehti 'ZeroxG' ladattu: {len(df)} riviä.")
+        return df
+
+    except Exception as e:
+        st.error(f"Virhe rosterin Google Sheets -tiedoston lukemisessa: {e}")
+        return pd.DataFrame()
 
 
 def load_free_agents_from_gsheets():
