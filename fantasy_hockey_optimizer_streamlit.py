@@ -69,64 +69,58 @@ def load_free_agents_from_gsheets():
         return pd.DataFrame()
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
-        sheet = client.open_by_url(sheet_url).sheet1
-        data = sheet.get_all_records()
+        sheet = client.open_by_url(sheet_url)
+
+        # Avataan nimenomaan "FA" välilehti
+        worksheet = sheet.worksheet("FA")
+        data = worksheet.get_all_records()
         df = pd.DataFrame(data)
+
+        if df.empty:
+            st.warning("⚠️ FA-välilehti on tyhjä tai sitä ei löytynyt.")
+            return pd.DataFrame()
+
+        # ✅ Normalisoidaan sarakenimet pieniksi kirjaimiksi
+        df.columns = df.columns.str.strip().str.lower()
+
+        # ✅ Sallitaan vaihtoehtoiset sarakenimet
+        rename_map = {}
+        if 'fp' in df.columns:
+            rename_map['fp'] = 'fantasy_points_avg'
+        elif 'fp/gp' in df.columns:
+            rename_map['fp/gp'] = 'fantasy_points_avg'
+
+        if 'player name' in df.columns:
+            rename_map['player name'] = 'name'
+
+        if rename_map:
+            df = df.rename(columns=rename_map)
 
         required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"Seuraavat sarakkeet puuttuvat vapaiden agenttien tiedostosta: {', '.join(missing_columns)}")
+            st.dataframe(df.head())  # näyttää mitä sarakkeita oikeasti löytyi
             return pd.DataFrame()
 
-        # Muunna 'fantasy_points_avg' numeeriseksi ja täytä puuttuvat arvot nollalla
+        # Muutetaan FP numeroksi
         df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce')
-        
-        # Järjestä sarakkeet oikein ennen palautusta
+
+        # Poistetaan rivit, joilta puuttuu pelipaikka
+        df = df[df['positions'].notna() & (df['positions'].str.strip() != '')]
+
+        # Täytetään puuttuvat FP:t nollalla
+        df['fantasy_points_avg'] = df['fantasy_points_avg'].fillna(0)
+
+        # Järjestetään sarakkeet
         df = df[required_columns]
 
         return df
+
     except Exception as e:
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
-def load_opponent_roster_from_gsheets(selected_team):
-    client = get_gspread_client()
-    if client is None:
-        return pd.DataFrame()
-    try:
-        # Käytetään samaa sheets URL:ia kuin omaan rosteriin
-        sheet_url = "https://docs.google.com/spreadsheets/d/12UFq7zUuVy_WVCZa2I1JOd_PGPWex1VRfxOB-VEcWIA"
-        sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("Lindgren rosters")  # haetaan oikea välilehti
-        data = worksheet.get_all_records()
-        df = pd.DataFrame(data)
-
-        # Tarkistetaan että sarakkeet löytyvät
-        required_columns = ["Fantasy Team", "Player Name", "Position(s)", "NHL Team", "FP"]
-        missing = [c for c in required_columns if c not in df.columns]
-        if missing:
-            st.error(f"Puuttuvat sarakkeet Lindgren rosters -välilehdeltä: {', '.join(missing)}")
-            return pd.DataFrame()
-
-        # Suodatetaan valitun joukkueen pelaajat
-        team_df = df[df["Fantasy Team"] == selected_team].copy()
-
-        # Muutetaan sarakenimet yhteneviksi muun sovelluksen kanssa
-        team_df.rename(columns={
-            "Player Name": "name",
-            "NHL Team": "team",
-            "Position(s)": "positions",
-            "FP": "fantasy_points_avg"
-        }, inplace=True)
-
-        # Muunnetaan FP numeroksi
-        team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0.0)
-
-        return team_df[["name", "team", "positions", "fantasy_points_avg"]]
-    except Exception as e:
-        st.error(f"Virhe vastustajan rosterin lukemisessa Google Sheetistä: {e}")
-        return pd.DataFrame()
 
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
