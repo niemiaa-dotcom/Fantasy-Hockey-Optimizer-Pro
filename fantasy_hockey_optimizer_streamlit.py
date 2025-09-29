@@ -234,9 +234,9 @@ client = get_gspread_client()
 available_teams = []
 if client:
     try:
-        sheet_url = "https://docs.google.com/spreadsheets/d/12UFq7zUuVy_WVCZa2I1JOd_PGPWex1VRfxOB-VEcWIA"
+        sheet_url = "https://docs.google.com/spreadsheets/d/1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo"
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("Lindgren rosters")
+        worksheet = sheet.worksheet("T2 Lindgren Roster")
         data = worksheet.get_all_records()
         df_vs = pd.DataFrame(data)
         if "Fantasy Team" in df_vs.columns:
