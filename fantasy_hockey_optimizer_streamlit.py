@@ -90,6 +90,7 @@ def load_roster_from_gsheets():
     except Exception as e:
         st.error(f"Virhe rosterin Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
+
 def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
     """
     Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'
@@ -208,12 +209,6 @@ def load_free_agents_from_gsheets():
     except Exception as e:
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
-
-# Nollauspainike
-if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state["opponent_roster"] = None
-    st.sidebar.info("Vastustajan rosteri nollattu.")
-
 
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
