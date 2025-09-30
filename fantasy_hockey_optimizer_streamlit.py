@@ -1246,15 +1246,19 @@ with tab2:
         else:
             if st.button("Suorita joukkuevertailu", key="roster_compare_button"):
                 with st.spinner("Vertailu käynnissä..."):
-                    
-                    # Lasketaan oma rosteri
-                    _, my_games_dict, my_fp, my_total_games = optimize_roster_advanced(
-                        schedule_filtered, st.session_state['roster'], pos_limits
+
+                    # Oma rosteri
+                    _, my_games_dict, my_fp, my_total_games, my_bench_games = optimize_roster_advanced(
+                        schedule_filtered, 
+                        st.session_state['roster'], 
+                        pos_limits
                     )
-                    
-                    # Lasketaan vastustajan rosteri
-                    _, opponent_games_dict, opponent_fp, opponent_total_games = optimize_roster_advanced(
-                        schedule_filtered, st.session_state['opponent_roster'], pos_limits
+
+                    # Vastustajan rosteri
+                    _, opponent_games_dict, opponent_fp, opponent_total_games, opponent_bench_games = optimize_roster_advanced(
+                        schedule_filtered, 
+                        st.session_state['opponent_roster'], 
+                        pos_limits
                     )
 
                     # Kootaan omien pelaajien tiedot DataFrameen
