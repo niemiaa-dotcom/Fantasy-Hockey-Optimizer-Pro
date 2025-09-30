@@ -423,7 +423,7 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
         if pd.isna(positions_str):
             positions_list = []
         elif isinstance(positions_str, str):
-            # Korjattu rivi, joka käsittelee sekä '/' että ',' erottimia
+            # Käsitellään sekä '/' että ',' erottimet
             positions_list = [p.strip() for p in positions_str.replace(',', '/').split('/')]
         else:
             positions_list = positions_str
@@ -435,8 +435,9 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
         }
     
     daily_results = []
-    player_games = {name: 0 for name in players_info.keys()}
-    
+    player_games = {name: 0 for name in players_info.keys()}          # aktiiviset pelit
+    player_bench_games = {name: 0 for name in players_info.keys()}    # penkillä olleet pelit
+
     all_dates = sorted(schedule_df['Date'].unique())
     
     for date in all_dates:
@@ -467,16 +468,15 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
                 player_name = player_info['name']
                 positions_list = player_info['positions']
                 
-                # Sijoita ensin ensisijaisille paikoille
+                # Sijoita ensisijaisille pelipaikoille
                 for pos in positions_list:
                     if pos in limits and len(active[pos]) < limits[pos]:
                         active[pos].append(player_name)
                         placed = True
                         break
                 
-                # Jos ei sijoitettu, yritä UTIL-paikkaa
+                # Jos ei sijoitettu, yritä UTIL
                 if not placed and 'UTIL' in limits and len(active['UTIL']) < limits['UTIL']:
-                    # Tarkista, että pelaaja voi pelata UTIL-paikalla (ei G)
                     if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
                         active['UTIL'].append(player_name)
                         placed = True
@@ -484,11 +484,10 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
                 if not placed:
                     bench.append(player_name)
             
-            # Optimointi: vaihda penkillä olevia parempia pelaajia heikompien tilalle
+            # Parannetaan aktiivista kokoonpanoa penkin paremmilla pelaajilla
             improved = True
             while improved:
                 improved = False
-                
                 bench_copy = sorted(bench, key=lambda name: players_info[name]['fpa'], reverse=True)
                 
                 for bench_player_name in bench_copy:
@@ -497,17 +496,10 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
                     
                     swapped = False
                     for active_pos, active_players in active.items():
-                        # Järjestä aktiiviset pelaajat FP/GP:n mukaan
                         active_sorted = sorted([(name, i) for i, name in enumerate(active_players)], key=lambda x: players_info[x[0]]['fpa'])
-                        
                         for active_player_name, active_idx in active_sorted:
                             active_player_fpa = players_info[active_player_name]['fpa']
-
-                            # Tarkista, voidaanko tehdä parantava vaihto
-                            if (
-                                bench_player_fpa > active_player_fpa and 
-                                active_pos in bench_player_positions
-                            ):
+                            if bench_player_fpa > active_player_fpa and active_pos in bench_player_positions:
                                 active_players[active_idx] = bench_player_name
                                 bench.remove(bench_player_name)
                                 bench.append(active_player_name)
@@ -519,34 +511,20 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
                     if swapped:
                         break
 
-            # Laske nykyisen kokoonpanon pisteet
-            current_fp = sum(
-                players_info[player_name]['fpa']
-                for players in active.values()
-                for player_name in players
-            )
+            # Lasketaan FP
+            current_fp = sum(players_info[player_name]['fpa'] for players in active.values() for player_name in players)
             
             if current_fp > best_assignment_fp:
                 best_assignment_fp = current_fp
-                best_assignment = {
-                    'active': {pos: players[:] for pos, players in active.items()},
-                    'bench': bench[:]
-                }
-            
+                best_assignment = {'active': {pos: players[:] for pos, players in active.items()}, 'bench': bench[:]}
             elif current_fp == best_assignment_fp and best_assignment:
                 current_active_count = sum(len(players) for players in active.values())
                 best_active_count = sum(len(players) for players in best_assignment['active'].values())
                 if current_active_count > best_active_count:
-                    best_assignment = {
-                        'active': {pos: players[:] for pos, players in active.items()},
-                        'bench': bench[:]
-                    }
+                    best_assignment = {'active': {pos: players[:] for pos, players in active.items()}, 'bench': bench[:]}
 
         if best_assignment is None:
-            best_assignment = {
-                'active': {pos: [] for pos in limits.keys()},
-                'bench': [p['name'] for p in available_players]
-            }
+            best_assignment = {'active': {pos: [] for pos in limits.keys()}, 'bench': [p['name'] for p in available_players]}
             
         daily_results.append({
             'Date': date.date(),
@@ -554,17 +532,20 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
             'Bench': best_assignment['bench']
         })
         
+        # Päivitetään laskurit
         for pos, players in best_assignment['active'].items():
             for player_name in players:
                 player_games[player_name] += 1
+
+        for player_name in best_assignment['bench']:
+            player_bench_games[player_name] += 1
     
-    total_fantasy_points = sum(
-        player_games[name] * players_info[name]['fpa'] for name in players_info
-    )
-    
+    total_fantasy_points = sum(player_games[name] * players_info[name]['fpa'] for name in players_info)
     total_active_games = sum(player_games.values())
 
-    return daily_results, player_games, total_fantasy_points, total_active_games
+    # Palautetaan myös bench-pelit
+    return daily_results, player_games, total_fantasy_points, total_active_games, player_bench_games
+
 
 def simulate_team_impact(schedule_df, my_roster_df, opponent_roster_df, pos_limits):
     """
