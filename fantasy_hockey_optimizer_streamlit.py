@@ -763,6 +763,9 @@ with tab1:
                     'Aktiiviset pelaajat': ", ".join(active_list),
                     'Penkki': ", ".join(bench_list) if bench_list else "Ei pelaajia penkille"
                 })
+
+            daily_df = pd.DataFrame(daily_data)
+            st.dataframe(daily_df, use_container_width=True)
             
             st.subheader("Pelaajien kokonaispelimäärät (aktiiviset ja penkillä)")
             games_df = pd.DataFrame({
