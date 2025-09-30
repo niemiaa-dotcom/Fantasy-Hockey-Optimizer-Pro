@@ -739,11 +739,12 @@ with tab1:
             st.warning("Ei pelejä valitulla aikavälillä")
         else:
             with st.spinner("Optimoidaan rosteria älykkäällä algoritmilla..."):
-                daily_results, total_games, total_fp, total_active_games = optimize_roster_advanced(
-                    schedule_filtered, 
-                    st.session_state['roster'], 
+                daily_results, total_games, total_fp, total_active_games, player_bench_games = optimize_roster_advanced(
+                    schedule_filtered,
+                    st.session_state['roster'],
                     pos_limits
                 )
+
             
             st.subheader("Päivittäiset aktiiviset rosterit")
             daily_data = []
