@@ -764,16 +764,22 @@ with tab1:
                     'Penkki': ", ".join(bench_list) if bench_list else "Ei pelaajia penkille"
                 })
             
-            daily_df = pd.DataFrame(daily_data)
-            st.dataframe(daily_df, use_container_width=True)
-            
-            st.subheader("Pelaajien kokonaispelimäärät")
+            st.subheader("Pelaajien kokonaispelimäärät (aktiiviset ja penkillä)")
             games_df = pd.DataFrame({
                 'Pelaaja': list(total_games.keys()),
-                'Pelit': list(total_games.values())
-            }).sort_values('Pelit', ascending=False)
+                'Aktiiviset pelit': list(total_games.values()),
+                'Pelit penkillä': [player_bench_games.get(p, 0) for p in total_games.keys()],
+            })
+
+            # Lasketaan myös yhteenlaskettu pelimäärä (aktiiviset + penkki)
+            games_df['Yhteensä pelit'] = games_df['Aktiiviset pelit'] + games_df['Pelit penkillä']
+
+            # Järjestetään näkyvyys järkevästi
+            games_df = games_df.sort_values('Aktiiviset pelit', ascending=False)
+
             st.dataframe(games_df, use_container_width=True)
-            
+
+            # 📥 CSV-lataus
             csv = games_df.to_csv(index=False).encode('utf-8')
             st.download_button(
                 "Lataa pelimäärät CSV-muodossa",
