@@ -618,9 +618,9 @@ def calculate_team_impact_by_position(schedule_df, roster_df, pos_limits):
             sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
             
             # Suoritetaan optimointi
-               _, player_games, *_ = optimize_roster_advanced(
-                    schedule_df, sim_roster, pos_limits, num_attempts=50
-                )
+            _, player_games, *_ = optimize_roster_advanced(
+                schedule_df, sim_roster, pos_limits, num_attempts=50
+            )
 
             
             # Lasketaan kuinka monta peliä simuloitu pelaaja sai
