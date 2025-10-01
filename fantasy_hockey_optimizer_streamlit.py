@@ -56,8 +56,8 @@ def load_roster_from_gsheets():
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
 
-        # 🔹 Avataan nimenomaan välilehti "ZeroxG"
-        worksheet = sheet.worksheet("ZeroxG")
+        # 🔹 Avataan nimenomaan välilehti "Moose"
+        worksheet = sheet.worksheet("Moose")
 
         # 🔹 Luetaan tiedot
         data = worksheet.get_all_records()
@@ -93,7 +93,7 @@ def load_roster_from_gsheets():
 
 def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
     """
-    Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'
+    Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'Draft Results'
     samasta tiedostosta kuin oma rosteri.
     """
     client = get_gspread_client()
@@ -104,13 +104,13 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
         # Käytetään samaa tiedostoa kuin oma rosteri
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        worksheet = sheet.worksheet("Draft Results")
 
         # Lataa data
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
         if df.empty:
-            st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
+            st.warning("Välilehti 'Draft Results' on tyhjä.")
             return pd.DataFrame()
 
         # Normalisoidaan sarakenimet
@@ -120,7 +120,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
         required = ["fantasy team", "player name", "position(s)", "nhl team", "fp"]
         missing = [c for c in required if c not in df.columns]
         if missing:
-            st.error(f"Puuttuvia sarakkeita 'T2 Lindgren Roster' -välilehdeltä: {missing}")
+            st.error(f"Puuttuvia sarakkeita 'Draft Results' -välilehdeltä: {missing}")
             st.write("Löydetyt sarakkeet:", df.columns.tolist())
             return pd.DataFrame()
 
@@ -161,7 +161,7 @@ def load_free_agents_from_gsheets():
         sheet = client.open_by_url(sheet_url)
 
         # Avataan nimenomaan "FA" välilehti
-        worksheet = sheet.worksheet("FA")
+        worksheet = sheet.worksheet("Valioliika FA")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
@@ -294,7 +294,7 @@ if client:
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        worksheet = sheet.worksheet("Draft Results")
         data = worksheet.get_all_records()
         df_vs = pd.DataFrame(data)
         if not df_vs.empty:
@@ -315,7 +315,7 @@ if available_teams:
         else:
             st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
 else:
-    st.sidebar.warning("Ei joukkueita ladattavissa. Tarkista välilehti 'T2 Lindgren Roster'.")
+    st.sidebar.warning("Ei joukkueita ladattavissa. Tarkista välilehti 'Draft Results'.")
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
