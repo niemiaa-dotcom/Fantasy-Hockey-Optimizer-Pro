@@ -216,7 +216,10 @@ if st.sidebar.button("Tyhjennä koko oma rosteri", key="clear_roster_button"):
 
 if not st.session_state['roster'].empty:
     st.sidebar.subheader("Nykyinen oma rosteri")
-    st.sidebar.dataframe(st.session_state['roster'], use_container_width=True)
+    roster_df = st.session_state['roster'].copy()
+    roster_df.index = roster_df.index + 1
+    st.sidebar.dataframe(roster_df, use_container_width=True)
+
 
     # Poista pelaaja -valikko ja -painike
     remove_player = st.sidebar.selectbox(
