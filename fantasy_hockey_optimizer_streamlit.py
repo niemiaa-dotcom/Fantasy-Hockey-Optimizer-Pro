@@ -718,7 +718,12 @@ with tab1:
     if st.session_state['roster'].empty:
         st.warning("Lataa rosteri nähdäksesi pelaajat")
     else:
-        st.dataframe(st.session_state['roster'], use_container_width=True)
+        roster_df = st.session_state['roster'].copy()
+        roster_df.index = roster_df.index + 1
+        roster_df = roster_df.reset_index()
+        roster_df.rename(columns={"index": "Rivi"}, inplace=True)
+        st.dataframe(roster_df, use_container_width=True, hide_index=True)
+
         
         st.subheader("Joukkueiden jakauma")
         team_counts = st.session_state['roster']['team'].value_counts()
