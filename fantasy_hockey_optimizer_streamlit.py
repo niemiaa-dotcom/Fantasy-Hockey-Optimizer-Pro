@@ -623,7 +623,8 @@ with tab1:
         roster_df.index = roster_df.index + 1
         roster_df = roster_df.reset_index()
         roster_df.rename(columns={"index": "Rivi"}, inplace=True)
-        st.dataframe(roster_df, use_container_width=True)
+        st.dataframe(roster_df, use_container_width=True, hide_index=True)
+
 
         st.subheader("Joukkueiden jakauma")
         team_counts = st.session_state['roster']['team'].value_counts()
