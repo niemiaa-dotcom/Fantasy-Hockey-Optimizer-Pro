@@ -785,11 +785,13 @@ with tab1:
         else:
             with st.spinner("Optimoidaan rosteria älykkäällä algoritmilla..."):
                 daily_results, total_games, total_fp, total_active_games, player_bench_games = optimize_roster_advanced(
-                    schedule_filtered, roster_to_use, pos_limits,
-                    st.session_state['roster'],
-                    pos_limits
+                    schedule_filtered,
+                    roster_to_use,
+                    pos_limits,
+                    num_attempts=200   # esim. 200 yritystä
                 )
 
+               
             st.subheader("Päivittäiset aktiiviset rosterit")
             daily_data = []
             for result in daily_results:
