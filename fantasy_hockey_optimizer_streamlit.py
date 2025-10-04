@@ -52,14 +52,14 @@ def load_roster_from_gsheets():
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
         return pd.DataFrame(), pd.DataFrame()
     try:
-        # 🔹 Käytetään samaa taulukkoa kuin free agents -data
+        # Käytetään samaa taulukkoa kuin free agents -data
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
 
-        # 🔹 Avataan nimenomaan välilehti "ZeroxG"
+        # Avataan nimenomaan välilehti "ZeroxG"
         worksheet = sheet.worksheet("ZeroxG")
 
-        # 🔹 Luetaan tiedot
+        # Luetaan tiedot
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
@@ -67,26 +67,24 @@ def load_roster_from_gsheets():
             st.warning("⚠️ 'ZeroxG' välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame(), pd.DataFrame()
 
-        # 🔹 Normalisoidaan sarakenimet
+        # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
 
-        # 🔹 Varmistetaan vaaditut sarakkeet
-        required_columns = ['fantasy team', 'player name', 'position(s)', 'injury status']
+        # Varmistetaan vaaditut sarakkeet
+        required_columns = ['name', 'positions', 'team', 'fantasy_points_avg', 'injury status']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"Seuraavat sarakkeet puuttuvat rosterivälilehdeltä 'ZeroxG': {', '.join(missing_columns)}")
             st.write("Löydetyt sarakkeet:", df.columns.tolist())
             return pd.DataFrame(), pd.DataFrame()
 
-        # 🔹 Uudelleennimetään sarakkeet sovelluksen logiikkaan sopiviksi
-        df = df.rename(columns={
-            "player name": "name",
-            "fantasy team": "team",
-            "position(s)": "positions",
-            "injury status": "injury_status"
-        })
+        # Uudelleennimetään injury status
+        df = df.rename(columns={"injury status": "injury_status"})
 
-        # 🔹 Erotellaan loukkaantuneet ja terveet
+        # Muutetaan FP numeroksi
+        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+
+        # Erotellaan loukkaantuneet ja terveet
         injured = df[df['injury_status'].notna() & (df['injury_status'].str.lower() != "healthy")]
         healthy = df[~df.index.isin(injured.index)]
 
