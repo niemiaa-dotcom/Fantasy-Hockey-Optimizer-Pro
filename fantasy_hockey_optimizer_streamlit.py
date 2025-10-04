@@ -88,10 +88,12 @@ def load_roster_from_gsheets():
 
 
 def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """Lataa vastustajan rosterin Google Sheetsistä ja jakaa sen terveisiin ja loukkaantuneisiin Yahoo-statusten mukaan."""
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
         return pd.DataFrame(), pd.DataFrame()
+
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
@@ -103,6 +105,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
             st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
             return pd.DataFrame(), pd.DataFrame()
 
+        # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
         required = ["fantasy team", "player name", "position(s)", "nhl team", "fp", "injury status"]
         missing = [c for c in required if c not in df.columns]
@@ -110,11 +113,13 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
             st.error(f"Puuttuvia sarakkeita: {missing}")
             return pd.DataFrame(), pd.DataFrame()
 
+        # Suodatetaan valitun joukkueen mukaan
         team_df = df[df["fantasy team"] == selected_team_name].copy()
         if team_df.empty:
             st.warning(f"Joukkueella '{selected_team_name}' ei löytynyt pelaajia.")
             return pd.DataFrame(), pd.DataFrame()
 
+        # Uudelleennimetään sarakkeet
         team_df = team_df.rename(columns={
             "player name": "name",
             "nhl team": "team",
@@ -123,12 +128,28 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
             "injury status": "injury_status"
         })
 
+        # Muutetaan FP numeroksi
         team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
-        team_df["injury_status"] = team_df["injury_status"].fillna("").astype(str).str.strip().str.upper()
 
-        # Yahoo-statukset
+        # Normalisoidaan injury_status
+        team_df["injury_status"] = (
+            team_df["injury_status"]
+            .fillna("")
+            .astype(str)
+            .str.strip()
+            .str.upper()
+        )
+
+        # 🔍 Debug: näytä mitä arvoja oikeasti tulee
+        st.write("DEBUG: Vastustajan injury_status-arvot:", team_df["injury_status"].unique().tolist())
+
+        # Yahoo-statukset, jotka tulkitaan loukkaantuneiksi
         yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ"}
+
+        # Loukkaantuneet = vain nämä
         injured = team_df[team_df["injury_status"].isin(yahoo_injury_statuses)]
+
+        # Kaikki muu (myös "", "NA", "HEALTHY") = terveet
         healthy = team_df[~team_df.index.isin(injured.index)]
 
         return healthy, injured
