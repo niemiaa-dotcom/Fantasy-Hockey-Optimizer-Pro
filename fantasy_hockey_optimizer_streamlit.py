@@ -1279,7 +1279,7 @@ with tab2:
     st.header("🆚 Joukkuevertailu")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
 
-    if st.session_state['roster'].empty or st.session_state['opponent_roster'].empty:
+    if st.session_state['roster'].empty or not st.session_state.get('opponent_roster'):
         st.warning("Lataa molemmat rosterit vertailua varten.")
     elif st.session_state['schedule'].empty:
         st.warning("Lataa peliaikataulu vertailua varten.")
