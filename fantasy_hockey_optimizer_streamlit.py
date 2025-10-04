@@ -317,8 +317,9 @@ if client:
 
 if available_teams:
     selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
+    
     if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
-    opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
+        opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
 
     if not opponent_healthy.empty or not opponent_injured.empty:
         st.session_state['opponent_roster'] = (opponent_healthy, opponent_injured)
