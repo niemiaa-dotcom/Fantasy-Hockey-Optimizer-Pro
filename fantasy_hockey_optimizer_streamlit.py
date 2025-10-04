@@ -734,36 +734,51 @@ tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 with tab1:
     st.header("📊 Nykyinen rosteri (APL)")
 
+    # Puretaan rosterit turvallisesti
     my_roster = st.session_state.get("roster", pd.DataFrame())
-    opponent_healthy, opponent_injured = st.session_state.get("opponent_roster", (pd.DataFrame(), pd.DataFrame()))
+    opponent_healthy, opponent_injured = st.session_state.get(
+        "opponent_roster", (pd.DataFrame(), pd.DataFrame())
+    )
 
+    # Alustetaan aina, jotta NameError ei voi tulla
+    healthy = st.session_state.get("roster_healthy", pd.DataFrame())
+    injured = st.session_state.get("roster_injured", pd.DataFrame())
+    roster_to_use = pd.DataFrame()
+
+    # Tarkistus: molemmat rosterit oltava ladattuna
     if my_roster.empty or (opponent_healthy.empty and opponent_injured.empty):
         st.warning("Lataa molemmat rosterit vertailua varten.")
     else:
-        # käytä omaa rosteria
-       healthy = st.session_state.get("roster_healthy", pd.DataFrame())
-injured = st.session_state.get("roster_injured", pd.DataFrame())
-roster_to_use = pd.DataFrame()
+        # Toggle: näytetäänkö kaikki vai vain terveet
+        show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)",
+                             value=False, key="show_all_roster")
 
-# Toggle: näytetäänkö kaikki vai vain terveet
-show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)", value=False, key="show_all_roster")
+        if show_all:
+            if not healthy.empty or not injured.empty:
+                roster_to_use = pd.concat([healthy, injured])
+        else:
+            roster_to_use = healthy
 
-if show_all:
-    roster_to_use = pd.concat([healthy, injured]) if not healthy.empty or not injured.empty else pd.DataFrame()
-else:
-    roster_to_use = healthy
+        # Näytetään analyysissä käytettävä rosteri
+        if not roster_to_use.empty:
+            roster_to_use = roster_to_use.reset_index(drop=True)
+            roster_to_use.index = roster_to_use.index + 1
+            roster_to_use = roster_to_use.reset_index().rename(columns={"index": "Rivi"})
 
-if not roster_to_use.empty:
-    roster_to_use = roster_to_use.reset_index(drop=True)
-    roster_to_use.index = roster_to_use.index + 1
-    roster_to_use = roster_to_use.reset_index().rename(columns={"index": "Rivi"})
+            st.subheader("✅ Analyysissä käytettävä rosteri")
+            st.dataframe(roster_to_use, use_container_width=True, hide_index=True)
 
-    st.subheader("✅ Analyysissä käytettävä rosteri")
-    st.dataframe(roster_to_use, use_container_width=True, hide_index=True)
+        # Näytetään loukkaantuneet erikseen
+        if not injured.empty:
+            st.subheader("🚑 Loukkaantuneet pelaajat")
+            st.dataframe(injured.reset_index(drop=True),
+                         use_container_width=True, hide_index=True)
 
-    if not injured.empty:
-        st.subheader("🚑 Loukkaantuneet pelaajat")
-        st.dataframe(injured.reset_index(drop=True), use_container_width=True, hide_index=True)
+    st.subheader("Joukkueiden jakauma")
+    if not my_roster.empty:
+        team_counts = my_roster['team'].value_counts()
+        st.bar_chart(team_counts)
+
 
     
     st.header("🚀 Rosterin optimointi")
