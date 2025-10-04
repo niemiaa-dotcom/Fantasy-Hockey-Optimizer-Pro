@@ -50,7 +50,7 @@ def load_roster_from_gsheets():
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
     try:
         # 🔹 Käytetään samaa taulukkoa kuin free agents -data
         sheet_url = st.secrets["free_agents_sheet"]["url"]
@@ -65,41 +65,50 @@ def load_roster_from_gsheets():
 
         if df.empty:
             st.warning("⚠️ 'ZeroxG' välilehti on tyhjä tai sitä ei löytynyt.")
-            return pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame()
 
         # 🔹 Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
 
         # 🔹 Varmistetaan vaaditut sarakkeet
-        required_columns = ['name', 'team', 'positions', 'fantasy_points_avg']
+        required_columns = ['fantasy team', 'player name', 'position(s)', 'injury status']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
             st.error(f"Seuraavat sarakkeet puuttuvat rosterivälilehdeltä 'ZeroxG': {', '.join(missing_columns)}")
             st.write("Löydetyt sarakkeet:", df.columns.tolist())
-            return pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame()
 
-        # 🔹 Muunnetaan FP numeeriseksi ja täytetään puuttuvat nollalla
-        df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
+        # 🔹 Uudelleennimetään sarakkeet sovelluksen logiikkaan sopiviksi
+        df = df.rename(columns={
+            "player name": "name",
+            "fantasy team": "team",
+            "position(s)": "positions",
+            "injury status": "injury_status"
+        })
 
-        # 🔹 Palautetaan vain tarvittavat sarakkeet
-        df = df[required_columns]
+        # 🔹 Erotellaan loukkaantuneet ja terveet
+        injured = df[df['injury_status'].notna() & (df['injury_status'].str.lower() != "healthy")]
+        healthy = df[~df.index.isin(injured.index)]
 
         st.success(f"Rosterivälilehti 'ZeroxG' ladattu: {len(df)} riviä.")
-        return df
+        return healthy, injured
 
     except Exception as e:
         st.error(f"Virhe rosterin Google Sheets -tiedoston lukemisessa: {e}")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
 
-def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
+
+def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
     """
     Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'
     samasta tiedostosta kuin oma rosteri.
+    Palauttaa kaksi DataFramea: (healthy_roster, injured_roster).
     """
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
-        return pd.DataFrame()
+        return pd.DataFrame(), pd.DataFrame()
+
     try:
         # Käytetään samaa tiedostoa kuin oma rosteri
         sheet_url = st.secrets["free_agents_sheet"]["url"]
@@ -111,46 +120,49 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
         df = pd.DataFrame(data)
         if df.empty:
             st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
-            return pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame()
 
         # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
 
         # Varmistetaan että tarvittavat sarakkeet löytyvät
-        required = ["fantasy team", "player name", "position(s)", "nhl team", "fp"]
+        required = ["fantasy team", "player name", "position(s)", "nhl team", "fp", "injury status"]
         missing = [c for c in required if c not in df.columns]
         if missing:
             st.error(f"Puuttuvia sarakkeita 'T2 Lindgren Roster' -välilehdeltä: {missing}")
             st.write("Löydetyt sarakkeet:", df.columns.tolist())
-            return pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame()
 
         # Suodatetaan valitun joukkueen mukaan
         team_df = df[df["fantasy team"] == selected_team_name].copy()
         if team_df.empty:
             st.warning(f"Joukkueella '{selected_team_name}' ei löytynyt pelaajia.")
-            return pd.DataFrame()
+            return pd.DataFrame(), pd.DataFrame()
 
         # Muutetaan sarakenimet sovelluksen logiikkaan sopiviksi
         team_df = team_df.rename(columns={
             "player name": "name",
             "nhl team": "team",
             "position(s)": "positions",
-            "fp": "fantasy_points_avg"
+            "fp": "fantasy_points_avg",
+            "injury status": "injury_status"
         })
 
         # Muutetaan FP numeroksi
         team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
 
         # Säilytetään vain oleelliset sarakkeet
-        team_df = team_df[["name", "team", "positions", "fantasy_points_avg"]]
+        team_df = team_df[["name", "team", "positions", "fantasy_points_avg", "injury_status"]]
 
-        return team_df
+        # Erotellaan loukkaantuneet ja terveet
+        injured = team_df[team_df['injury_status'].notna() & (team_df['injury_status'].str.lower() != "healthy")]
+        healthy = team_df[~team_df.index.isin(injured.index)]
+
+        return healthy, injured
 
     except Exception as e:
         st.error(f"Virhe vastustajan rosterin lataamisessa: {e}")
-        return pd.DataFrame()
-
-
+        return pd.DataFrame(), pd.DataFrame()
 
 def load_free_agents_from_gsheets():
     client = get_gspread_client()
@@ -715,19 +727,41 @@ tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
 with tab1:
     st.header("📊 Nykyinen rosteri (APL)")
+
     if st.session_state['roster'].empty:
         st.warning("Lataa rosteri nähdäksesi pelaajat")
     else:
         roster_df = st.session_state['roster'].copy()
-        roster_df.index = roster_df.index + 1
-        roster_df = roster_df.reset_index()
-        roster_df.rename(columns={"index": "Rivi"}, inplace=True)
-        st.dataframe(roster_df, use_container_width=True, hide_index=True)
 
-        
-        st.subheader("Joukkueiden jakauma")
-        team_counts = st.session_state['roster']['team'].value_counts()
-        st.bar_chart(team_counts)
+        # Erotellaan loukkaantuneet ja terveet
+        injured = roster_df[roster_df['injury_status'].notna() & (roster_df['injury_status'].str.lower() != "healthy")]
+        healthy = roster_df[~roster_df.index.isin(injured.index)]
+
+        # Toggle: näytetäänkö kaikki vai vain terveet
+        show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)", value=False, key="show_all_roster")
+
+        if show_all:
+            roster_to_use = pd.concat([healthy, injured])
+        else:
+            roster_to_use = healthy
+
+        # Näytetään analyysissä käytettävä rosteri
+        roster_to_use = roster_to_use.reset_index(drop=True)
+        roster_to_use.index = roster_to_use.index + 1
+        roster_to_use = roster_to_use.reset_index().rename(columns={"index": "Rivi"})
+
+        st.subheader("✅ Analyysissä käytettävä rosteri")
+        st.dataframe(roster_to_use, use_container_width=True, hide_index=True)
+
+        # Näytetään loukkaantuneet erikseen
+        if not injured.empty:
+            st.subheader("🚑 Loukkaantuneet pelaajat")
+            st.dataframe(injured.reset_index(drop=True), use_container_width=True, hide_index=True)
+
+    st.subheader("Joukkueiden jakauma")
+    team_counts = st.session_state['roster']['team'].value_counts()
+    st.bar_chart(team_counts)
+
     
     st.header("🚀 Rosterin optimointi")
     
@@ -746,12 +780,11 @@ with tab1:
         else:
             with st.spinner("Optimoidaan rosteria älykkäällä algoritmilla..."):
                 daily_results, total_games, total_fp, total_active_games, player_bench_games = optimize_roster_advanced(
-                    schedule_filtered,
+                    schedule_filtered, roster_to_use, pos_limits
                     st.session_state['roster'],
                     pos_limits
                 )
 
-            
             st.subheader("Päivittäiset aktiiviset rosterit")
             daily_data = []
             for result in daily_results:
@@ -1236,7 +1269,7 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
 with tab2:
     st.header("🆚 Joukkuevertailu")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
-    
+
     if st.session_state['roster'].empty or st.session_state['opponent_roster'].empty:
         st.warning("Lataa molemmat rosterit vertailua varten.")
     elif st.session_state['schedule'].empty:
@@ -1253,24 +1286,33 @@ with tab2:
             if st.button("Suorita joukkuevertailu", key="roster_compare_button"):
                 with st.spinner("Vertailu käynnissä..."):
 
-                    # Oma rosteri
+                    # Erotellaan oma rosteri terveisiin ja loukkaantuneisiin
+                    my_injured = st.session_state['roster'][
+                        st.session_state['roster']['injury_status'].notna() &
+                        (st.session_state['roster']['injury_status'].str.lower() != "healthy")
+                    ]
+                    my_healthy = st.session_state['roster'][~st.session_state['roster'].index.isin(my_injured.index)]
+
+                    # Oma rosteri optimointi vain terveillä
                     _, my_games_dict, my_fp, my_total_games, my_bench_games = optimize_roster_advanced(
-                        schedule_filtered, 
-                        st.session_state['roster'], 
+                        schedule_filtered,
+                        my_healthy,
                         pos_limits
                     )
 
-                    # Vastustajan rosteri
+                    # Vastustajan rosteri (olettaen että load_opponent_roster_from_gsheets palauttaa healthy, injured)
+                    opponent_healthy, opponent_injured = st.session_state['opponent_roster']
+
                     _, opponent_games_dict, opponent_fp, opponent_total_games, opponent_bench_games = optimize_roster_advanced(
-                        schedule_filtered, 
-                        st.session_state['opponent_roster'], 
+                        schedule_filtered,
+                        opponent_healthy,
                         pos_limits
                     )
 
                     # Kootaan omien pelaajien tiedot DataFrameen
                     my_players_data = []
                     for name, games in my_games_dict.items():
-                        fpa = st.session_state['roster'][st.session_state['roster']['name'] == name]['fantasy_points_avg'].iloc[0] if not st.session_state['roster'][st.session_state['roster']['name'] == name].empty else 0
+                        fpa = my_healthy[my_healthy['name'] == name]['fantasy_points_avg'].iloc[0] if not my_healthy[my_healthy['name'] == name].empty else 0
                         total_fp_player = games * fpa
                         my_players_data.append({
                             'Pelaaja': name,
@@ -1282,7 +1324,7 @@ with tab2:
                     # Kootaan vastustajan pelaajien tiedot DataFrameen
                     opponent_players_data = []
                     for name, games in opponent_games_dict.items():
-                        fpa = st.session_state['opponent_roster'][st.session_state['opponent_roster']['name'] == name]['fantasy_points_avg'].iloc[0] if not st.session_state['opponent_roster'][st.session_state['opponent_roster']['name'] == name].empty else 0
+                        fpa = opponent_healthy[opponent_healthy['name'] == name]['fantasy_points_avg'].iloc[0] if not opponent_healthy[opponent_healthy['name'] == name].empty else 0
                         total_fp_player = games * fpa
                         opponent_players_data.append({
                             'Pelaaja': name,
@@ -1290,16 +1332,24 @@ with tab2:
                             'Ennakoidut FP': round(total_fp_player, 2)
                         })
                     opponent_df = pd.DataFrame(opponent_players_data).sort_values(by='Ennakoidut FP', ascending=False)
-                    
+
+                    # Näytetään tulokset
                     st.subheader("Yksityiskohtainen vertailu")
                     col1_detail, col2_detail = st.columns(2)
                     with col1_detail:
-                        st.markdown("**Oma joukkueesi**")
-                        st.dataframe(my_df, use_container_width=True)
+                        st.markdown("**Oma joukkueesi (terveet)**")
+                        st.dataframe(my_df, use_container_width=True, hide_index=True)
+                        if not my_injured.empty:
+                            st.markdown("🚑 **Loukkaantuneet**")
+                            st.dataframe(my_injured.reset_index(drop=True), use_container_width=True, hide_index=True)
                     with col2_detail:
-                        st.markdown("**Vastustajan joukkue**")
-                        st.dataframe(opponent_df, use_container_width=True)
-                        
+                        st.markdown("**Vastustajan joukkue (terveet)**")
+                        st.dataframe(opponent_df, use_container_width=True, hide_index=True)
+                        if not opponent_injured.empty:
+                            st.markdown("🚑 **Loukkaantuneet**")
+                            st.dataframe(opponent_injured.reset_index(drop=True), use_container_width=True, hide_index=True)
+
+                    # Yhteenveto
                     st.subheader("Yhteenveto")
                     vertailu_col1, vertailu_col2 = st.columns(2)
                     with vertailu_col1:
@@ -1308,14 +1358,14 @@ with tab2:
                         st.metric("Vastustajan aktiiviset pelit", opponent_total_games)
 
                     st.markdown("---")
-                    
+
                     vertailu_fp_col1, vertailu_fp_col2 = st.columns(2)
                     with vertailu_fp_col1:
                         st.metric("Oman joukkueen FP", f"{my_fp:.2f}")
                     with vertailu_fp_col2:
                         st.metric("Vastustajan FP", f"{opponent_fp:.2f}")
 
-
+                    # Viestit
                     if my_total_games > opponent_total_games:
                         st.success(f"Oma joukkueesi saa arviolta **{my_total_games - opponent_total_games}** enemmän aktiivisia pelejä kuin vastustaja.")
                     elif my_total_games < opponent_total_games:
