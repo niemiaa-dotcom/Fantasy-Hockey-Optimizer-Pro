@@ -266,19 +266,22 @@ else:
             st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
 # Rosterin lataus
-st.sidebar.subheader("Lataa oma rosteri")
 if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     try:
-        roster_df = load_roster_from_gsheets()
-        if not roster_df.empty:
-            st.session_state['roster'] = roster_df
+        healthy, injured = load_roster_from_gsheets()
+        if not healthy.empty or not injured.empty:
+            st.session_state['roster_healthy'] = healthy
+            st.session_state['roster_injured'] = injured
+            # Jos haluat myös yhdistetyn rosterin:
+            st.session_state['roster'] = pd.concat([healthy, injured])
+
             st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
-            roster_df.to_csv(ROSTER_FILE, index=False)
+            st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
         else:
             st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
-    st.rerun()
+        st.rerun()
 
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
@@ -731,11 +734,8 @@ with tab1:
     if st.session_state['roster'].empty:
         st.warning("Lataa rosteri nähdäksesi pelaajat")
     else:
-        roster_df = st.session_state['roster'].copy()
-
-        # Erotellaan loukkaantuneet ja terveet
-        injured = roster_df[roster_df['injury_status'].notna() & (roster_df['injury_status'].str.lower() != "healthy")]
-        healthy = roster_df[~roster_df.index.isin(injured.index)]
+        healthy = st.session_state.get('roster_healthy', pd.DataFrame())
+        injured = st.session_state.get('roster_injured', pd.DataFrame())
 
         # Toggle: näytetäänkö kaikki vai vain terveet
         show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)", value=False, key="show_all_roster")
@@ -1286,17 +1286,21 @@ with tab2:
             if st.button("Suorita joukkuevertailu", key="roster_compare_button"):
                 with st.spinner("Vertailu käynnissä..."):
 
-                    # Erotellaan oma rosteri terveisiin ja loukkaantuneisiin
-                    my_injured = st.session_state['roster'][
-                        st.session_state['roster']['injury_status'].notna() &
-                        (st.session_state['roster']['injury_status'].str.lower() != "healthy")
-                    ]
-                    my_healthy = st.session_state['roster'][~st.session_state['roster'].index.isin(my_injured.index)]
+                    # Toggle: halutaanko analyysiin kaikki vai vain terveet
+                    healthy = st.session_state.get('roster_healthy', pd.DataFrame())
+                    injured = st.session_state.get('roster_injured', pd.DataFrame())
 
-                    # Oma rosteri optimointi vain terveillä
+                    show_all_my = st.toggle("Oman joukkueen analyysissä mukana myös loukkaantuneet", value=False, key="show_all_my_roster")
+
+                    if show_all_my:
+                        my_roster_to_use = pd.concat([healthy, injured])
+                    else:
+                        my_roster_to_use = healthy
+
+                    # Oma rosteri optimointi
                     _, my_games_dict, my_fp, my_total_games, my_bench_games = optimize_roster_advanced(
                         schedule_filtered,
-                        my_healthy,
+                        my_roster_to_use,
                         pos_limits
                     )
 
