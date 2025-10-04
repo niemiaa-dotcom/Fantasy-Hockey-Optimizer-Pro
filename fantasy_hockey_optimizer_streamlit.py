@@ -29,7 +29,7 @@ if 'schedule' not in st.session_state:
 if 'roster' not in st.session_state:
     st.session_state['roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
 if 'opponent_roster' not in st.session_state:
-    st.session_state['opponent_roster'] = pd.DataFrame(columns=['name', 'team', 'positions', 'fantasy_points_avg'])
+    st.session_state['opponent_roster'] = (pd.DataFrame(), pd.DataFrame())
 if 'team_impact_results' not in st.session_state:
     st.session_state['team_impact_results'] = None
 
@@ -320,11 +320,14 @@ if available_teams:
     if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
         opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
 
-    if st.session_state.get("opponent_roster"):
-        opponent_healthy, opponent_injured = st.session_state["opponent_roster"]
-   
-    else:
-        st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
+if not opponent_healthy.empty or not opponent_injured.empty:
+    st.session_state['opponent_roster'] = (opponent_healthy, opponent_injured)
+    st.sidebar.success(
+        f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
+        f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
+    )
+else:
+    st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
@@ -725,11 +728,10 @@ tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 with tab1:
     st.header("📊 Nykyinen rosteri (APL)")
 
-    if st.session_state['roster'].empty:
-        st.warning("Lataa rosteri nähdäksesi pelaajat")
+    if st.session_state['roster'].empty or st.session_state['opponent_roster'] == (pd.DataFrame(), pd.DataFrame()):
+        st.warning("Lataa molemmat rosterit vertailua varten.")
     else:
-        healthy = st.session_state.get('roster_healthy', pd.DataFrame())
-        injured = st.session_state.get('roster_injured', pd.DataFrame())
+        opponent_healthy, opponent_injured = st.session_state['opponent_roster']
 
         # Toggle: näytetäänkö kaikki vai vain terveet
         show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)", value=False, key="show_all_roster")
