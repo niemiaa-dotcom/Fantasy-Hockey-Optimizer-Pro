@@ -47,7 +47,6 @@ def get_gspread_client():
         return None
 
 def load_roster_from_gsheets():
-def load_roster_from_gsheets():
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
