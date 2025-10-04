@@ -1299,37 +1299,46 @@ with tab2:
             if st.button("Suorita joukkuevertailu", key="roster_compare_button"):
                 with st.spinner("Vertailu käynnissä..."):
 
-                    # Toggle: halutaanko analyysiin kaikki vai vain terveet
-                    healthy = st.session_state.get('roster_healthy', pd.DataFrame())
-                    injured = st.session_state.get('roster_injured', pd.DataFrame())
+                    # --- Oma rosteri ---
+                    my_healthy = st.session_state.get('roster_healthy', pd.DataFrame())
+                    my_injured = st.session_state.get('roster_injured', pd.DataFrame())
 
-                    show_all_my = st.toggle("Oman joukkueen analyysissä mukana myös loukkaantuneet", value=False, key="show_all_my_roster")
+                    show_all_my = st.toggle("Oman joukkueen analyysissä mukana myös loukkaantuneet",
+                                            value=False, key="show_all_my_roster")
 
                     if show_all_my:
-                        my_roster_to_use = pd.concat([healthy, injured])
+                        my_roster_to_use = pd.concat([my_healthy, my_injured])
                     else:
-                        my_roster_to_use = healthy
+                        my_roster_to_use = my_healthy
 
-                    # Oma rosteri optimointi
                     _, my_games_dict, my_fp, my_total_games, my_bench_games = optimize_roster_advanced(
                         schedule_filtered,
                         my_roster_to_use,
                         pos_limits
                     )
 
-                    # Vastustajan rosteri (olettaen että load_opponent_roster_from_gsheets palauttaa healthy, injured)
+                    # --- Vastustajan rosteri ---
                     opponent_healthy, opponent_injured = st.session_state['opponent_roster']
+
+                    show_all_opponent = st.toggle("Vastustajan analyysissä mukana myös loukkaantuneet",
+                                                  value=False, key="show_all_opponent_roster")
+
+                    if show_all_opponent:
+                        opponent_roster_to_use = pd.concat([opponent_healthy, opponent_injured])
+                    else:
+                        opponent_roster_to_use = opponent_healthy
 
                     _, opponent_games_dict, opponent_fp, opponent_total_games, opponent_bench_games = optimize_roster_advanced(
                         schedule_filtered,
-                        opponent_healthy,
+                        opponent_roster_to_use,
                         pos_limits
                     )
 
-                    # Kootaan omien pelaajien tiedot DataFrameen
+                    # --- Oma joukkue DataFrame ---
                     my_players_data = []
                     for name, games in my_games_dict.items():
-                        fpa = my_healthy[my_healthy['name'] == name]['fantasy_points_avg'].iloc[0] if not my_healthy[my_healthy['name'] == name].empty else 0
+                        fpa = my_roster_to_use[my_roster_to_use['name'] == name]['fantasy_points_avg'].iloc[0] \
+                              if not my_roster_to_use[my_roster_to_use['name'] == name].empty else 0
                         total_fp_player = games * fpa
                         my_players_data.append({
                             'Pelaaja': name,
@@ -1338,10 +1347,11 @@ with tab2:
                         })
                     my_df = pd.DataFrame(my_players_data).sort_values(by='Ennakoidut FP', ascending=False)
 
-                    # Kootaan vastustajan pelaajien tiedot DataFrameen
+                    # --- Vastustajan joukkue DataFrame ---
                     opponent_players_data = []
                     for name, games in opponent_games_dict.items():
-                        fpa = opponent_healthy[opponent_healthy['name'] == name]['fantasy_points_avg'].iloc[0] if not opponent_healthy[opponent_healthy['name'] == name].empty else 0
+                        fpa = opponent_roster_to_use[opponent_roster_to_use['name'] == name]['fantasy_points_avg'].iloc[0] \
+                              if not opponent_roster_to_use[opponent_roster_to_use['name'] == name].empty else 0
                         total_fp_player = games * fpa
                         opponent_players_data.append({
                             'Pelaaja': name,
@@ -1350,23 +1360,23 @@ with tab2:
                         })
                     opponent_df = pd.DataFrame(opponent_players_data).sort_values(by='Ennakoidut FP', ascending=False)
 
-                    # Näytetään tulokset
+                    # --- Näytetään tulokset ---
                     st.subheader("Yksityiskohtainen vertailu")
                     col1_detail, col2_detail = st.columns(2)
                     with col1_detail:
-                        st.markdown("**Oma joukkueesi (terveet)**")
+                        st.markdown("**Oma joukkueesi**")
                         st.dataframe(my_df, use_container_width=True, hide_index=True)
                         if not my_injured.empty:
                             st.markdown("🚑 **Loukkaantuneet**")
                             st.dataframe(my_injured.reset_index(drop=True), use_container_width=True, hide_index=True)
                     with col2_detail:
-                        st.markdown("**Vastustajan joukkue (terveet)**")
+                        st.markdown("**Vastustajan joukkue**")
                         st.dataframe(opponent_df, use_container_width=True, hide_index=True)
                         if not opponent_injured.empty:
                             st.markdown("🚑 **Loukkaantuneet**")
                             st.dataframe(opponent_injured.reset_index(drop=True), use_container_width=True, hide_index=True)
 
-                    # Yhteenveto
+                    # --- Yhteenveto ---
                     st.subheader("Yhteenveto")
                     vertailu_col1, vertailu_col2 = st.columns(2)
                     with vertailu_col1:
@@ -1382,7 +1392,7 @@ with tab2:
                     with vertailu_fp_col2:
                         st.metric("Vastustajan FP", f"{opponent_fp:.2f}")
 
-                    # Viestit
+                    # --- Viestit ---
                     if my_total_games > opponent_total_games:
                         st.success(f"Oma joukkueesi saa arviolta **{my_total_games - opponent_total_games}** enemmän aktiivisia pelejä kuin vastustaja.")
                     elif my_total_games < opponent_total_games:
