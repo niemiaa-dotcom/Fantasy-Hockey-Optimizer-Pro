@@ -1345,7 +1345,9 @@ with tab2:
                             'Aktiiviset pelit': games,
                             'Ennakoidut FP': round(total_fp_player, 2)
                         })
-                    my_df = pd.DataFrame(my_players_data).sort_values(by='Ennakoidut FP', ascending=False)
+                    my_df = pd.DataFrame(my_players_data)
+                    if not my_df.empty and 'Ennakoidut FP' in my_df.columns:
+                        my_df = my_df.sort_values(by='Ennakoidut FP', ascending=False)
 
                     # --- Vastustajan joukkue DataFrame ---
                     opponent_players_data = []
@@ -1358,7 +1360,9 @@ with tab2:
                             'Aktiiviset pelit': games,
                             'Ennakoidut FP': round(total_fp_player, 2)
                         })
-                    opponent_df = pd.DataFrame(opponent_players_data).sort_values(by='Ennakoidut FP', ascending=False)
+                    opponent_df = pd.DataFrame(opponent_players_data)
+                    if not opponent_df.empty and 'Ennakoidut FP' in opponent_df.columns:
+                        opponent_df = opponent_df.sort_values(by='Ennakoidut FP', ascending=False)
 
                     # --- Näytetään tulokset ---
                     st.subheader("Yksityiskohtainen vertailu")
