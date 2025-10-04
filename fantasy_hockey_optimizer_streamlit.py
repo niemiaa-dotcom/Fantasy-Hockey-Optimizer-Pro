@@ -1,4 +1,3 @@
-
 import streamlit as st
 import datetime
 import pandas as pd
@@ -1270,20 +1269,21 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             }), use_container_width=True)
         else:
             st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
-            
+
+
 with tab2:
-   with tab2:
     st.header("🆚 Joukkuevertailu")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
 
+    # Puretaan rosterit turvallisesti
     my_roster = st.session_state.get("roster", pd.DataFrame())
     opponent_healthy, opponent_injured = st.session_state.get("opponent_roster", (pd.DataFrame(), pd.DataFrame()))
 
+    # Tarkistetaan että molemmilla on dataa
     if my_roster.empty or (opponent_healthy.empty and opponent_injured.empty):
         st.warning("Lataa molemmat rosterit vertailua varten.")
     elif st.session_state['schedule'].empty:
         st.warning("Lataa peliaikataulu vertailua varten.")
-        
     else:
         schedule_filtered = st.session_state['schedule'][
             (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
@@ -1362,50 +1362,49 @@ with tab2:
                         opponent_df = opponent_df.sort_values(by='Ennakoidut FP', ascending=False)
 
                     # --- Näytetään tulokset ---
-                   # --- Näytetään tulokset ---
-st.subheader("Yksityiskohtainen vertailu")
-col1_detail, col2_detail = st.columns(2)
+                    st.subheader("Yksityiskohtainen vertailu")
+                    col1_detail, col2_detail = st.columns(2)
 
-with col1_detail:
-    st.markdown("**Oma joukkueesi**")
-    if not my_df.empty:
-        my_display = my_df.merge(
-            my_roster_to_use[["name", "positions", "team"]],
-            left_on="Pelaaja", right_on="name", how="left"
-        )
-        my_display = my_display.drop(columns=["name"])
-        my_display.insert(0, "#", range(1, len(my_display) + 1))
-        st.dataframe(
-            my_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
-            use_container_width=True, hide_index=True
-        )
-    if not my_injured.empty:
-        st.markdown("🚑 **Loukkaantuneet**")
-        inj_display = my_injured.copy().reset_index(drop=True)
-        inj_display.insert(0, "#", range(1, len(inj_display) + 1))
-        st.dataframe(
-            inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
-            use_container_width=True, hide_index=True
-        )
+                    with col1_detail:
+                        st.markdown("**Oma joukkueesi**")
+                        if not my_df.empty:
+                            my_display = my_df.merge(
+                                my_roster_to_use[["name", "positions", "team"]],
+                                left_on="Pelaaja", right_on="name", how="left"
+                            )
+                            my_display = my_display.drop(columns=["name"])
+                            my_display.insert(0, "#", range(1, len(my_display) + 1))
+                            st.dataframe(
+                                my_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
+                                use_container_width=True, hide_index=True
+                            )
+                        if not my_injured.empty:
+                            st.markdown("🚑 **Loukkaantuneet**")
+                            inj_display = my_injured.copy().reset_index(drop=True)
+                            inj_display.insert(0, "#", range(1, len(inj_display) + 1))
+                            st.dataframe(
+                                inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
+                                use_container_width=True, hide_index=True
+                            )
 
-with col2_detail:
-    st.markdown("**Vastustajan joukkue**")
-    if not opponent_df.empty:
-        opp_display = opponent_df.merge(
-            opponent_roster_to_use[["name", "positions", "team"]],
-            left_on="Pelaaja", right_on="name", how="left"
-        )
-        opp_display = opp_display.drop(columns=["name"])
-        opp_display.insert(0, "#", range(1, len(opp_display) + 1))
-        st.dataframe(
-            opp_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
-            use_container_width=True, hide_index=True
-        )
-    if not opponent_injured.empty:
-        st.markdown("🚑 **Loukkaantuneet**")
-        inj_display = opponent_injured.copy().reset_index(drop=True)
-        inj_display.insert(0, "#", range(1, len(inj_display) + 1))
-        st.dataframe(
-            inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
-            use_container_width=True, hide_index=True
-        )
+                    with col2_detail:
+                        st.markdown("**Vastustajan joukkue**")
+                        if not opponent_df.empty:
+                            opp_display = opponent_df.merge(
+                                opponent_roster_to_use[["name", "positions", "team"]],
+                                left_on="Pelaaja", right_on="name", how="left"
+                            )
+                            opp_display = opp_display.drop(columns=["name"])
+                            opp_display.insert(0, "#", range(1, len(opp_display) + 1))
+                            st.dataframe(
+                                opp_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
+                                use_container_width=True, hide_index=True
+                            )
+                        if not opponent_injured.empty:
+                            st.markdown("🚑 **Loukkaantuneet**")
+                            inj_display = opponent_injured.copy().reset_index(drop=True)
+                            inj_display.insert(0, "#", range(1, len(inj_display) + 1))
+                            st.dataframe(
+                                inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
+                                use_container_width=True, hide_index=True
+                            )
