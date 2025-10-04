@@ -1432,18 +1432,26 @@ with tab2:
                                 use_container_width=True, hide_index=True
                             )
 
-                    # --- Yhteenveto: kokonaispisteet ---
+                    # --- Yhteenveto: kokonaispisteet ja aktiiviset pelit ---
                     st.subheader("📊 Yhteenveto")
 
                     col1_sum, col2_sum = st.columns(2)
                     with col1_sum:
-                        st.metric("Oma joukkue", round(my_fp, 2))
+                        st.metric("Oma joukkue",
+                                  f"{round(my_fp, 2)} FP",
+                                  help=f"Aktiivisia pelejä: {my_total_games}")
                     with col2_sum:
-                        st.metric("Vastustaja", round(opponent_fp, 2))
+                        st.metric("Vastustaja",
+                                  f"{round(opponent_fp, 2)} FP",
+                                  help=f"Aktiivisia pelejä: {opponent_total_games}")
 
+                    # Näytetään kumpi voittaa
                     if my_fp > opponent_fp:
-                        st.success(f"✅ Oma joukkueesi on vahvempi valitulla aikavälillä! (+{round(my_fp - opponent_fp, 2)} FP)")
+                        st.success(f"✅ Oma joukkueesi on vahvempi valitulla aikavälillä! "
+                                   f"(+{round(my_fp - opponent_fp, 2)} FP, {my_total_games} vs {opponent_total_games} peliä)")
                     elif opponent_fp > my_fp:
-                        st.error(f"❌ Vastustaja on vahvempi valitulla aikavälillä. ({round(opponent_fp - my_fp, 2)} FP enemmän)")
+                        st.error(f"❌ Vastustaja on vahvempi valitulla aikavälillä. "
+                                 f"({round(opponent_fp - my_fp, 2)} FP enemmän, {opponent_total_games} vs {my_total_games} peliä)")
                     else:
-                        st.info("Tasapeli – molemmilla joukkueilla on yhtä paljon ennakoituja pisteitä!")
+                        st.info(f"Tasapeli – molemmilla joukkueilla on yhtä paljon ennakoituja pisteitä! "
+                                f"({my_total_games} vs {opponent_total_games} peliä)")
