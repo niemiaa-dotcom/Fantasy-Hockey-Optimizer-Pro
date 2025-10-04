@@ -297,7 +297,12 @@ if st.sidebar.button("Lataa vapaat agentit Google Sheetsistä", key="free_agents
 st.sidebar.subheader("Lataa vastustajan rosteri")
 
 # --- Vastustajan rosterin lataus Google Sheetistä ---
+# --- SIVUPALKKI: VASTUSTAJAN ROSTERI ---
 st.sidebar.subheader("📋 Lataa vastustajan rosteri")
+
+# Alustetaan aina tupleksi, jos ei vielä olemassa
+if "opponent_roster" not in st.session_state:
+    st.session_state["opponent_roster"] = (pd.DataFrame(), pd.DataFrame())
 
 client = get_gspread_client()
 available_teams = []
@@ -317,24 +322,24 @@ if client:
 
 if available_teams:
     selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
-    
+
     if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
         opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
 
-    if not opponent_healthy.empty or not opponent_injured.empty:
-        st.session_state['opponent_roster'] = (opponent_healthy, opponent_injured)
-        st.sidebar.success(
-            f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
-            f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
-        )
-    else:
-        st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
-
+        if not opponent_healthy.empty or not opponent_injured.empty:
+            st.session_state["opponent_roster"] = (opponent_healthy, opponent_injured)
+            st.sidebar.success(
+                f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
+                f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
+            )
+        else:
+            st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
-    st.session_state["opponent_roster"] = None
+    st.session_state["opponent_roster"] = (pd.DataFrame(), pd.DataFrame())
     st.sidebar.info("Vastustajan rosteri nollattu.")
+
 
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
