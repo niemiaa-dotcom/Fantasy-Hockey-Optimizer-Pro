@@ -1431,3 +1431,22 @@ with tab2:
                                 inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
                                 use_container_width=True, hide_index=True
                             )
+            # --- Yhteenveto: kokonaispisteet ---
+            st.subheader("📊 Yhteenveto")
+
+            col1_sum, col2_sum = st.columns(2)
+
+            with col1_sum:
+                st.metric("Oma joukkue", round(my_fp, 2))
+
+            with col2_sum:
+                st.metric("Vastustaja", round(opponent_fp, 2))
+
+            # Näytetään kumpi voittaa
+            if my_fp > opponent_fp:
+                st.success(f"✅ Oma joukkueesi on vahvempi valitulla aikavälillä! (+{round(my_fp - opponent_fp, 2)} FP)")
+            elif opponent_fp > my_fp:
+                st.error(f"❌ Vastustaja on vahvempi valitulla aikavälillä. ({round(opponent_fp - my_fp, 2)} FP enemmän)")
+            else:
+                st.info("Tasapeli – molemmilla joukkueilla on yhtä paljon ennakoituja pisteitä!")
+
