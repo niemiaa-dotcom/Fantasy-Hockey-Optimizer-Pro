@@ -84,8 +84,14 @@ def load_roster_from_gsheets():
         # Muutetaan FP numeroksi
         df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
 
-        # Erotellaan loukkaantuneet ja terveet
-        injured = df[df['injury_status'].notna() & (df['injury_status'].str.lower() != "healthy")]
+        # Normalisoidaan injury_status
+        df['injury_status'] = df['injury_status'].fillna("").astype(str).str.strip().str.upper()
+
+        # Loukkaantuneiksi lasketaan vain nämä statukset
+        problem_statuses = {"O", "OUT", "IR", "DTD", "INJURED"}
+        injured = df[df['injury_status'].isin(problem_statuses)]
+
+        # Terveet = kaikki muut
         healthy = df[~df.index.isin(injured.index)]
 
         st.success(f"Rosterivälilehti 'ZeroxG' ladattu: {len(df)} riviä.")
