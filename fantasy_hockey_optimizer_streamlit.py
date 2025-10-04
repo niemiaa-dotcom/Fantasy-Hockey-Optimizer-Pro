@@ -47,6 +47,7 @@ def get_gspread_client():
         return None
 
 def load_roster_from_gsheets():
+def load_roster_from_gsheets():
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
@@ -94,6 +95,7 @@ def load_roster_from_gsheets():
     except Exception as e:
         st.error(f"Virhe rosterin Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame(), pd.DataFrame()
+
 
 
 def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
