@@ -1348,48 +1348,50 @@ with tab2:
                         opponent_df = opponent_df.sort_values(by='Ennakoidut FP', ascending=False)
 
                     # --- Näytetään tulokset ---
-                    st.subheader("Yksityiskohtainen vertailu")
-                    col1_detail, col2_detail = st.columns(2)
-                    with col1_detail:
-                        st.markdown("**Oma joukkueesi**")
-                        st.dataframe(my_df, use_container_width=True, hide_index=True)
-                        if not my_injured.empty:
-                            st.markdown("🚑 **Loukkaantuneet**")
-                            st.dataframe(my_injured.reset_index(drop=True), use_container_width=True, hide_index=True)
-                    with col2_detail:
-                        st.markdown("**Vastustajan joukkue**")
-                        st.dataframe(opponent_df, use_container_width=True, hide_index=True)
-                        if not opponent_injured.empty:
-                            st.markdown("🚑 **Loukkaantuneet**")
-                            st.dataframe(opponent_injured.reset_index(drop=True), use_container_width=True, hide_index=True)
+                   # --- Näytetään tulokset ---
+st.subheader("Yksityiskohtainen vertailu")
+col1_detail, col2_detail = st.columns(2)
 
-                    # --- Yhteenveto ---
-                    st.subheader("Yhteenveto")
-                    vertailu_col1, vertailu_col2 = st.columns(2)
-                    with vertailu_col1:
-                        st.metric("Oman joukkueen aktiiviset pelit", my_total_games)
-                    with vertailu_col2:
-                        st.metric("Vastustajan aktiiviset pelit", opponent_total_games)
+with col1_detail:
+    st.markdown("**Oma joukkueesi**")
+    if not my_df.empty:
+        my_display = my_df.merge(
+            my_roster_to_use[["name", "positions", "team"]],
+            left_on="Pelaaja", right_on="name", how="left"
+        )
+        my_display = my_display.drop(columns=["name"])
+        my_display.insert(0, "#", range(1, len(my_display) + 1))
+        st.dataframe(
+            my_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
+            use_container_width=True, hide_index=True
+        )
+    if not my_injured.empty:
+        st.markdown("🚑 **Loukkaantuneet**")
+        inj_display = my_injured.copy().reset_index(drop=True)
+        inj_display.insert(0, "#", range(1, len(inj_display) + 1))
+        st.dataframe(
+            inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
+            use_container_width=True, hide_index=True
+        )
 
-                    st.markdown("---")
-
-                    vertailu_fp_col1, vertailu_fp_col2 = st.columns(2)
-                    with vertailu_fp_col1:
-                        st.metric("Oman joukkueen FP", f"{my_fp:.2f}")
-                    with vertailu_fp_col2:
-                        st.metric("Vastustajan FP", f"{opponent_fp:.2f}")
-
-                    # --- Viestit ---
-                    if my_total_games > opponent_total_games:
-                        st.success(f"Oma joukkueesi saa arviolta **{my_total_games - opponent_total_games}** enemmän aktiivisia pelejä kuin vastustaja.")
-                    elif my_total_games < opponent_total_games:
-                        st.error(f"Vastustajan joukkue saa arviolta **{opponent_total_games - my_total_games}** enemmän aktiivisia pelejä kuin sinun joukkueesi.")
-                    else:
-                        st.info("Ennakoiduissa aktiivisissa peleissä ei ole eroa.")
-
-                    if my_fp > opponent_fp:
-                        st.success(f"Oma joukkueesi saa arviolta **{my_fp - opponent_fp:.2f}** enemmän fantasiapisteitä kuin vastustaja. Hyvin todennäköisesti voitat tämän viikon!")
-                    elif my_fp < opponent_fp:
-                        st.error(f"Vastustajasi saa arviolta **{opponent_fp - my_fp:.2f}** enemmän fantasiapisteitä kuin sinun joukkueesi. Sinun kannattaa harkita rosterisi muutoksia.")
-                    else:
-                        st.info("Ennakoiduissa fantasiapisteissä ei ole eroa.")
+with col2_detail:
+    st.markdown("**Vastustajan joukkue**")
+    if not opponent_df.empty:
+        opp_display = opponent_df.merge(
+            opponent_roster_to_use[["name", "positions", "team"]],
+            left_on="Pelaaja", right_on="name", how="left"
+        )
+        opp_display = opp_display.drop(columns=["name"])
+        opp_display.insert(0, "#", range(1, len(opp_display) + 1))
+        st.dataframe(
+            opp_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
+            use_container_width=True, hide_index=True
+        )
+    if not opponent_injured.empty:
+        st.markdown("🚑 **Loukkaantuneet**")
+        inj_display = opponent_injured.copy().reset_index(drop=True)
+        inj_display.insert(0, "#", range(1, len(inj_display) + 1))
+        st.dataframe(
+            inj_display[["#", "name", "positions", "team", "fantasy_points_avg"]],
+            use_container_width=True, hide_index=True
+        )
