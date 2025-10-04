@@ -322,15 +322,7 @@ if available_teams:
 
     if st.session_state.get("opponent_roster"):
         opponent_healthy, opponent_injured = st.session_state["opponent_roster"]
-    if not opponent_healthy.empty or not opponent_injured.empty:
-        # jatka käsittelyä
-
-        st.session_state["opponent_roster"] = (opponent_healthy, opponent_injured)
-        st.sidebar.success(
-            f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
-            f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
-        )
-        st.dataframe(pd.concat([opponent_healthy, opponent_injured]))
+   
     else:
         st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
 
