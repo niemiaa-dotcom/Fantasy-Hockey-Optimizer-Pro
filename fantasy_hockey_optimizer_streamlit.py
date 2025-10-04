@@ -104,25 +104,21 @@ def load_roster_from_gsheets():
 
 
 def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'
-    samasta tiedostosta kuin oma rosteri.
+    """Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'.
     Palauttaa kaksi DataFramea: (healthy_roster, injured_roster).
     """
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
         return pd.DataFrame(), pd.DataFrame()
-
     try:
-        # Käytetään samaa tiedostoa kuin oma rosteri
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
         worksheet = sheet.worksheet("T2 Lindgren Roster")
 
-        # Lataa data
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
+
         if df.empty:
             st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
             return pd.DataFrame(), pd.DataFrame()
@@ -130,7 +126,6 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
         # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
 
-        # Varmistetaan että tarvittavat sarakkeet löytyvät
         required = ["fantasy team", "player name", "position(s)", "nhl team", "fp", "injury status"]
         missing = [c for c in required if c not in df.columns]
         if missing:
@@ -144,7 +139,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
             st.warning(f"Joukkueella '{selected_team_name}' ei löytynyt pelaajia.")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Muutetaan sarakenimet sovelluksen logiikkaan sopiviksi
+        # Uudelleennimetään sarakkeet
         team_df = team_df.rename(columns={
             "player name": "name",
             "nhl team": "team",
@@ -156,11 +151,12 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
         # Muutetaan FP numeroksi
         team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
 
-        # Säilytetään vain oleelliset sarakkeet
-        team_df = team_df[["name", "team", "positions", "fantasy_points_avg", "injury_status"]]
+        # Normalisoidaan injury_status
+        team_df["injury_status"] = team_df["injury_status"].fillna("").astype(str).str.strip().str.upper()
 
-        # Erotellaan loukkaantuneet ja terveet
-        injured = team_df[team_df['injury_status'].notna() & (team_df['injury_status'].str.lower() != "healthy")]
+        # Loukkaantuneiksi lasketaan vain nämä statukset
+        problem_statuses = {"O", "OUT", "IR", "DTD", "INJURED"}
+        injured = team_df[team_df["injury_status"].isin(problem_statuses)]
         healthy = team_df[~team_df.index.isin(injured.index)]
 
         return healthy, injured
@@ -168,6 +164,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
     except Exception as e:
         st.error(f"Virhe vastustajan rosterin lataamisessa: {e}")
         return pd.DataFrame(), pd.DataFrame()
+
 
 def load_free_agents_from_gsheets():
     client = get_gspread_client()
