@@ -52,14 +52,9 @@ def load_roster_from_gsheets():
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
         return pd.DataFrame(), pd.DataFrame()
     try:
-        # Käytetään samaa taulukkoa kuin free agents -data
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-
-        # Avataan nimenomaan välilehti "ZeroxG"
         worksheet = sheet.worksheet("ZeroxG")
-
-        # Luetaan tiedot
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
@@ -67,46 +62,32 @@ def load_roster_from_gsheets():
             st.warning("⚠️ 'ZeroxG' välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
-
-        # Varmistetaan vaaditut sarakkeet
         required_columns = ['name', 'positions', 'team', 'fantasy_points_avg', 'injury status']
         missing_columns = [col for col in required_columns if col not in df.columns]
         if missing_columns:
-            st.error(f"Seuraavat sarakkeet puuttuvat rosterivälilehdeltä 'ZeroxG': {', '.join(missing_columns)}")
-            st.write("Löydetyt sarakkeet:", df.columns.tolist())
+            st.error(f"Seuraavat sarakkeet puuttuvat: {', '.join(missing_columns)}")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Uudelleennimetään injury status
         df = df.rename(columns={"injury status": "injury_status"})
-
-        # Muutetaan FP numeroksi
         df['fantasy_points_avg'] = pd.to_numeric(df['fantasy_points_avg'], errors='coerce').fillna(0)
-
-        # Normalisoidaan injury_status
         df['injury_status'] = df['injury_status'].fillna("").astype(str).str.strip().str.upper()
 
-        # Loukkaantuneiksi lasketaan vain nämä statukset
-        problem_statuses = {"O", "OUT", "IR", "DTD", "INJURED"}
-        injured = df[df['injury_status'].isin(problem_statuses)]
-
-        # Terveet = kaikki muut
+        # Yahoo-statukset
+        yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ"}
+        injured = df[df['injury_status'].isin(yahoo_injury_statuses)]
         healthy = df[~df.index.isin(injured.index)]
 
-        st.success(f"Rosterivälilehti 'ZeroxG' ladattu: {len(df)} riviä.")
         return healthy, injured
 
     except Exception as e:
-        st.error(f"Virhe rosterin Google Sheets -tiedoston lukemisessa: {e}")
+        st.error(f"Virhe rosterin lukemisessa: {e}")
         return pd.DataFrame(), pd.DataFrame()
 
 
 
+
 def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Lataa valitun vastustajan rosterin Google Sheets -välilehdeltä 'T2 Lindgren Roster'.
-    Palauttaa kaksi DataFramea: (healthy_roster, injured_roster).
-    """
     client = get_gspread_client()
     if client is None:
         st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
@@ -115,7 +96,6 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
         worksheet = sheet.worksheet("T2 Lindgren Roster")
-
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
@@ -123,23 +103,18 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
             st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip().str.lower()
-
         required = ["fantasy team", "player name", "position(s)", "nhl team", "fp", "injury status"]
         missing = [c for c in required if c not in df.columns]
         if missing:
-            st.error(f"Puuttuvia sarakkeita 'T2 Lindgren Roster' -välilehdeltä: {missing}")
-            st.write("Löydetyt sarakkeet:", df.columns.tolist())
+            st.error(f"Puuttuvia sarakkeita: {missing}")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Suodatetaan valitun joukkueen mukaan
         team_df = df[df["fantasy team"] == selected_team_name].copy()
         if team_df.empty:
             st.warning(f"Joukkueella '{selected_team_name}' ei löytynyt pelaajia.")
             return pd.DataFrame(), pd.DataFrame()
 
-        # Uudelleennimetään sarakkeet
         team_df = team_df.rename(columns={
             "player name": "name",
             "nhl team": "team",
@@ -148,15 +123,12 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
             "injury status": "injury_status"
         })
 
-        # Muutetaan FP numeroksi
         team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
-
-        # Normalisoidaan injury_status
         team_df["injury_status"] = team_df["injury_status"].fillna("").astype(str).str.strip().str.upper()
 
-        # Loukkaantuneiksi lasketaan vain nämä statukset
-        problem_statuses = {"O", "OUT", "IR", "DTD", "INJURED"}
-        injured = team_df[team_df["injury_status"].isin(problem_statuses)]
+        # Yahoo-statukset
+        yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ"}
+        injured = team_df[team_df["injury_status"].isin(yahoo_injury_statuses)]
         healthy = team_df[~team_df.index.isin(injured.index)]
 
         return healthy, injured
