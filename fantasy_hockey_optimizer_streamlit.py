@@ -318,16 +318,17 @@ if client:
 if available_teams:
     selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
     if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
-        opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
+    opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
 
-if not opponent_healthy.empty or not opponent_injured.empty:
-    st.session_state['opponent_roster'] = (opponent_healthy, opponent_injured)
-    st.sidebar.success(
-        f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
-        f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
-    )
-else:
-    st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
+    if not opponent_healthy.empty or not opponent_injured.empty:
+        st.session_state['opponent_roster'] = (opponent_healthy, opponent_injured)
+        st.sidebar.success(
+            f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
+            f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
+        )
+    else:
+        st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
+
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
@@ -1265,13 +1266,18 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
             
 with tab2:
+   with tab2:
     st.header("🆚 Joukkuevertailu")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
 
-    if st.session_state['roster'].empty or not st.session_state.get('opponent_roster'):
+    my_roster = st.session_state.get("roster", pd.DataFrame())
+    opponent_healthy, opponent_injured = st.session_state.get("opponent_roster", (pd.DataFrame(), pd.DataFrame()))
+
+    if my_roster.empty or (opponent_healthy.empty and opponent_injured.empty):
         st.warning("Lataa molemmat rosterit vertailua varten.")
     elif st.session_state['schedule'].empty:
         st.warning("Lataa peliaikataulu vertailua varten.")
+        
     else:
         schedule_filtered = st.session_state['schedule'][
             (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
