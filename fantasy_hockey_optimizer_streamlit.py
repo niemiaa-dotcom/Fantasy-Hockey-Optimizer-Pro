@@ -327,15 +327,17 @@ if client:
 if available_teams:
     selected_opponent_team = st.sidebar.selectbox("Valitse vastustajan joukkue", [""] + available_teams)
     if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
-        opponent_df = load_opponent_roster_from_gsheets(selected_opponent_team)
-        if not opponent_df.empty:
-            st.session_state["opponent_roster"] = opponent_df
-            st.sidebar.success(f"{selected_opponent_team} rosteri ladattu onnistuneesti! ({len(opponent_df)} pelaajaa)")
-            st.dataframe(opponent_df)
-        else:
-            st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
-else:
-    st.sidebar.warning("Ei joukkueita ladattavissa. Tarkista välilehti 'T2 Lindgren Roster'.")
+    opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
+
+    if not opponent_healthy.empty or not opponent_injured.empty:
+        st.session_state["opponent_roster"] = (opponent_healthy, opponent_injured)
+        st.sidebar.success(
+            f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
+            f"({len(opponent_healthy) + len(opponent_injured)} pelaajaa)"
+        )
+        st.dataframe(pd.concat([opponent_healthy, opponent_injured]))
+    else:
+        st.sidebar.error("Vastustajan rosterin lataus epäonnistui tai tulos on tyhjä.")
 
 # Nollauspainike
 if st.sidebar.button("Nollaa vastustajan rosteri"):
