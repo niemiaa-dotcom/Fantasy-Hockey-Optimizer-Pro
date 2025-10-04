@@ -260,23 +260,32 @@ else:
         except Exception as e:
             st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
 
-# Rosterin lataus
+# --- SIVUPALKKI: OMA ROSTERI ---
+st.sidebar.subheader("📋 Lataa oma rosteri")
+
 if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     try:
         healthy, injured = load_roster_from_gsheets()
+
         if not healthy.empty or not injured.empty:
+            # Tallennetaan kaikki kolme versiota session_stateen
             st.session_state['roster_healthy'] = healthy
             st.session_state['roster_injured'] = injured
-            # Jos haluat myös yhdistetyn rosterin:
-            st.session_state['roster'] = pd.concat([healthy, injured])
+            st.session_state['roster'] = pd.concat([healthy, injured], ignore_index=True)
+
+            # Debug: näytä ladattujen pelaajien määrät
+            st.sidebar.write(f"✅ Terveitä: {len(healthy)}, Loukkaantuneita: {len(injured)}")
+
+            # Tallennetaan myös CSV:hen
+            st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
 
             st.sidebar.success("Rosteri ladattu onnistuneesti Google Sheetsistä!")
-            st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
         else:
             st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
         st.rerun()
+
 
 # Vapaiden agenttien lataus
 st.sidebar.subheader("Lataa vapaat agentit")
