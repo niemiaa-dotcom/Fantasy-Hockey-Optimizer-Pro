@@ -734,10 +734,15 @@ tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 with tab1:
     st.header("📊 Nykyinen rosteri (APL)")
 
-    if st.session_state['roster'].empty or st.session_state['opponent_roster'] == (pd.DataFrame(), pd.DataFrame()):
+    my_roster = st.session_state.get("roster", pd.DataFrame())
+    opponent_healthy, opponent_injured = st.session_state.get("opponent_roster", (pd.DataFrame(), pd.DataFrame()))
+
+    if my_roster.empty or (opponent_healthy.empty and opponent_injured.empty):
         st.warning("Lataa molemmat rosterit vertailua varten.")
     else:
-        opponent_healthy, opponent_injured = st.session_state['opponent_roster']
+        # käytä omaa rosteria
+        healthy = st.session_state.get("roster_healthy", pd.DataFrame())
+        injured = st.session_state.get("roster_injured", pd.DataFrame())
 
         # Toggle: näytetäänkö kaikki vai vain terveet
         show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)", value=False, key="show_all_roster")
@@ -761,7 +766,7 @@ with tab1:
             st.dataframe(injured.reset_index(drop=True), use_container_width=True, hide_index=True)
 
     st.subheader("Joukkueiden jakauma")
-    team_counts = st.session_state['roster']['team'].value_counts()
+    team_counts = my_roster['team'].value_counts()
     st.bar_chart(team_counts)
 
     
