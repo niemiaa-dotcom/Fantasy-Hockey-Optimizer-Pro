@@ -329,7 +329,11 @@ if available_teams:
     if selected_opponent_team and st.sidebar.button("Lataa valitun joukkueen rosteri"):
         opponent_healthy, opponent_injured = load_opponent_roster_from_gsheets(selected_opponent_team)
 
+    if st.session_state.get("opponent_roster"):
+        opponent_healthy, opponent_injured = st.session_state["opponent_roster"]
     if not opponent_healthy.empty or not opponent_injured.empty:
+        # jatka käsittelyä
+
         st.session_state["opponent_roster"] = (opponent_healthy, opponent_injured)
         st.sidebar.success(
             f"{selected_opponent_team} rosteri ladattu onnistuneesti! "
