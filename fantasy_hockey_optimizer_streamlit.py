@@ -141,16 +141,17 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
         )
 
         # 🔍 Debug: näytä mitä arvoja oikeasti tulee
-        st.write("DEBUG: Vastustajan injury_status-arvot:", team_df["injury_status"].unique().tolist())
+        st.write("DEBUG opponent injury_status unique values:",
+                 team_df["injury_status"].unique().tolist())
 
-        # Yahoo-statukset, jotka tulkitaan loukkaantuneiksi
+        # Yahoo-statukset jotka lasketaan loukkaantuneiksi
         yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ"}
 
         # Loukkaantuneet = vain nämä
         injured = team_df[team_df["injury_status"].isin(yahoo_injury_statuses)]
 
-        # Kaikki muu (myös "", "NA", "HEALTHY") = terveet
-        healthy = team_df[~team_df.index.isin(injured.index)]
+        # Kaikki muu = terveet
+        healthy = team_df[~team_df["injury_status"].isin(yahoo_injury_statuses)]
 
         return healthy, injured
 
