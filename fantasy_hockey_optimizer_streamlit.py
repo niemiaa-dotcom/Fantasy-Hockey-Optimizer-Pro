@@ -11,7 +11,7 @@ from google.oauth2.service_account import Credentials
 
 # Aseta sivun konfiguraatio
 st.set_page_config(
-    page_title="Fantasy Hockey Optimizer (APL)",
+    page_title="Fantasy Hockey Optimizer (KKUPFL)",
     page_icon="🏒",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -739,7 +739,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
 tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
 with tab1:
-    st.header("📊 Nykyinen rosteri (APL)")
+    st.header("📊 Nykyinen rosteri (KKUPFL)")
 
     # Puretaan rosterit turvallisesti
     my_roster = st.session_state.get("roster", pd.DataFrame())
