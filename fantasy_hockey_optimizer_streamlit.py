@@ -753,9 +753,11 @@ with tab1:
     roster_to_use = pd.DataFrame()
 
     # Tarkistus: molemmat rosterit oltava ladattuna
-    if my_roster.empty or (opponent_healthy.empty and opponent_injured.empty):
-        st.warning("Lataa molemmat rosterit vertailua varten.")
+    if my_roster.empty:
+        st.warning("Lataa oma rosteri nähdäksesi pelaajat.")
     else:
+    # jatka näyttämään oma rosteri
+
         # Toggle: näytetäänkö kaikki vai vain terveet
         show_all = st.toggle("Näytä kaikki pelaajat (myös loukkaantuneet)",
                              value=False, key="show_all_roster")
