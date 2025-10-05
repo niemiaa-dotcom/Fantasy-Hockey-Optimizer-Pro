@@ -1325,10 +1325,16 @@ with tab2:
                     my_healthy = st.session_state.get('roster_healthy', pd.DataFrame())
                     my_injured = st.session_state.get('roster_injured', pd.DataFrame())
 
-                    show_all_my = st.toggle("Oman joukkueen analyysissä mukana myös loukkaantuneet",
-                                            value=False, key="show_all_my_roster")
+                    # Toggle tallennetaan session_stateen
+                    if "show_all_my_roster" not in st.session_state:
+                        st.session_state["show_all_my_roster"] = False
+                    st.session_state["show_all_my_roster"] = st.toggle(
+                        "Oman joukkueen analyysissä mukana myös loukkaantuneet",
+                        value=st.session_state["show_all_my_roster"],
+                        key="show_all_my_roster_toggle"
+                    )
 
-                    if show_all_my:
+                    if st.session_state["show_all_my_roster"]:
                         my_roster_to_use = pd.concat([my_healthy, my_injured])
                     else:
                         my_roster_to_use = my_healthy
@@ -1342,10 +1348,15 @@ with tab2:
                     # --- Vastustajan rosteri ---
                     opponent_healthy, opponent_injured = st.session_state['opponent_roster']
 
-                    show_all_opponent = st.toggle("Vastustajan analyysissä mukana myös loukkaantuneet",
-                                                  value=False, key="show_all_opponent_roster")
+                    if "show_all_opponent_roster" not in st.session_state:
+                        st.session_state["show_all_opponent_roster"] = False
+                    st.session_state["show_all_opponent_roster"] = st.toggle(
+                        "Vastustajan analyysissä mukana myös loukkaantuneet",
+                        value=st.session_state["show_all_opponent_roster"],
+                        key="show_all_opponent_roster_toggle"
+                    )
 
-                    if show_all_opponent:
+                    if st.session_state["show_all_opponent_roster"]:
                         opponent_roster_to_use = pd.concat([opponent_healthy, opponent_injured])
                     else:
                         opponent_roster_to_use = opponent_healthy
@@ -1367,9 +1378,7 @@ with tab2:
                             'Aktiiviset pelit': games,
                             'Ennakoidut FP': round(total_fp_player, 2)
                         })
-                    my_df = pd.DataFrame(my_players_data)
-                    if not my_df.empty and 'Ennakoidut FP' in my_df.columns:
-                        my_df = my_df.sort_values(by='Ennakoidut FP', ascending=False)
+                    my_df = pd.DataFrame(my_players_data).sort_values(by='Ennakoidut FP', ascending=False) if not pd.DataFrame(my_players_data).empty else pd.DataFrame()
 
                     # --- Vastustajan joukkue DataFrame ---
                     opponent_players_data = []
@@ -1382,9 +1391,7 @@ with tab2:
                             'Aktiiviset pelit': games,
                             'Ennakoidut FP': round(total_fp_player, 2)
                         })
-                    opponent_df = pd.DataFrame(opponent_players_data)
-                    if not opponent_df.empty and 'Ennakoidut FP' in opponent_df.columns:
-                        opponent_df = opponent_df.sort_values(by='Ennakoidut FP', ascending=False)
+                    opponent_df = pd.DataFrame(opponent_players_data).sort_values(by='Ennakoidut FP', ascending=False) if not pd.DataFrame(opponent_players_data).empty else pd.DataFrame()
 
                     # --- Näytetään tulokset ---
                     st.subheader("Yksityiskohtainen vertailu")
@@ -1396,8 +1403,7 @@ with tab2:
                             my_display = my_df.merge(
                                 my_roster_to_use[["name", "positions", "team"]],
                                 left_on="Pelaaja", right_on="name", how="left"
-                            )
-                            my_display = my_display.drop(columns=["name"])
+                            ).drop(columns=["name"])
                             my_display.insert(0, "#", range(1, len(my_display) + 1))
                             st.dataframe(
                                 my_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
@@ -1418,8 +1424,7 @@ with tab2:
                             opp_display = opponent_df.merge(
                                 opponent_roster_to_use[["name", "positions", "team"]],
                                 left_on="Pelaaja", right_on="name", how="left"
-                            )
-                            opp_display = opp_display.drop(columns=["name"])
+                            ).drop(columns=["name"])
                             opp_display.insert(0, "#", range(1, len(opp_display) + 1))
                             st.dataframe(
                                 opp_display[["#", "Pelaaja", "positions", "team", "Aktiiviset pelit", "Ennakoidut FP"]],
@@ -1436,18 +1441,12 @@ with tab2:
 
                     # --- Yhteenveto: kokonaispisteet ja aktiiviset pelit ---
                     st.subheader("📊 Yhteenveto")
-
                     col1_sum, col2_sum = st.columns(2)
                     with col1_sum:
-                        st.metric("Oma joukkue",
-                                  f"{round(my_fp, 2)} FP",
-                                  help=f"Aktiivisia pelejä: {my_total_games}")
+                        st.metric("Oma joukkue", f"{round(my_fp, 2)} FP", help=f"Aktiivisia pelejä: {my_total_games}")
                     with col2_sum:
-                        st.metric("Vastustaja",
-                                  f"{round(opponent_fp, 2)} FP",
-                                  help=f"Aktiivisia pelejä: {opponent_total_games}")
+                        st.metric("Vastustaja", f"{round(opponent_fp, 2)} FP", help=f"Aktiivisia pelejä: {opponent_total_games}")
 
-                    # Näytetään kumpi voittaa
                     if my_fp > opponent_fp:
                         st.success(f"✅ Oma joukkueesi on vahvempi valitulla aikavälillä! "
                                    f"(+{round(my_fp - opponent_fp, 2)} FP, {my_total_games} vs {opponent_total_games} peliä)")
