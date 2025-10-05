@@ -53,12 +53,12 @@ def load_roster_from_gsheets():
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("ZeroxG")
+        worksheet = sheet.worksheet("Finnishers")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
         if df.empty:
-            st.warning("⚠️ 'ZeroxG' välilehti on tyhjä tai sitä ei löytynyt.")
+            st.warning("⚠️ 'Finnishers' välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame(), pd.DataFrame()
 
         df.columns = df.columns.str.strip().str.lower()
@@ -96,12 +96,12 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        worksheet = sheet.worksheet("T3 Småland Roster")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
         if df.empty:
-            st.warning("Välilehti 'T2 Lindgren Roster' on tyhjä.")
+            st.warning("Välilehti 'T3 Småland Roster' on tyhjä.")
             return pd.DataFrame(), pd.DataFrame()
 
         # Normalisoidaan sarakenimet
@@ -165,13 +165,13 @@ def load_free_agents_from_gsheets():
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
 
-        # Avataan nimenomaan "FA" välilehti
-        worksheet = sheet.worksheet("FA")
+        # Avataan nimenomaan "FA KKUPFL" välilehti
+        worksheet = sheet.worksheet("FA KKUPFL")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
         if df.empty:
-            st.warning("⚠️ FA-välilehti on tyhjä tai sitä ei löytynyt.")
+            st.warning("⚠️ FA KKUPFL KKUPFL-välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame()
 
         # ✅ Normalisoidaan sarakenimet pieniksi kirjaimiksi
@@ -316,7 +316,7 @@ if client:
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        worksheet = sheet.worksheet("T3 Småland Roster")
         data = worksheet.get_all_records()
         df_vs = pd.DataFrame(data)
         if not df_vs.empty:
