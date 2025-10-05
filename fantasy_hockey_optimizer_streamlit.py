@@ -117,7 +117,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
         df.columns = df.columns.str.strip().str.lower()
 
         # Varmistetaan että tarvittavat sarakkeet löytyvät
-        required = ["fantasy team", "player name", "position(s)", "nhl team", "fp"]
+        required = ["team name", "player name", "position(s)", "nhl team", "fp"]
         missing = [c for c in required if c not in df.columns]
         if missing:
             st.error(f"Puuttuvia sarakkeita 'Draft Results' -välilehdeltä: {missing}")
@@ -125,7 +125,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> pd.DataFrame:
             return pd.DataFrame()
 
         # Suodatetaan valitun joukkueen mukaan
-        team_df = df[df["fantasy team"] == selected_team_name].copy()
+        team_df = df[df["team name"] == selected_team_name].copy()
         if team_df.empty:
             st.warning(f"Joukkueella '{selected_team_name}' ei löytynyt pelaajia.")
             return pd.DataFrame()
@@ -299,8 +299,8 @@ if client:
         df_vs = pd.DataFrame(data)
         if not df_vs.empty:
             df_vs.columns = df_vs.columns.str.strip().str.lower()
-            if "fantasy team" in df_vs.columns:
-                available_teams = sorted(df_vs["fantasy team"].dropna().unique().tolist())
+            if "team name" in df_vs.columns:
+                available_teams = sorted(df_vs["team name"].dropna().unique().tolist())
     except Exception as e:
         st.sidebar.error(f"Virhe joukkueiden lataamisessa: {e}")
 
