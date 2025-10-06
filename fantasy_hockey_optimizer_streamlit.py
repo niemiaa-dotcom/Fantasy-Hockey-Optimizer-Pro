@@ -971,175 +971,175 @@ with tab1:
                 use_container_width=True
             )
 
-                # --- Simuloi uuden pelaajan vaikutus ---
-                st.header("🔮 Simuloi uuden pelaajan vaikutus")
-                
-                if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
-                    st.subheader("Valitse vertailutyyppi")
-                    comparison_type = st.radio(
-                        "Valitse vertailutyyppi:",
-                        ["Vertaa kahta uutta pelaajaa", "Lisää uusi pelaaja ja poista valittu omasta rosterista"],
-                        key="comparison_type"
+        # --- Simuloi uuden pelaajan vaikutus ---
+        st.header("🔮 Simuloi uuden pelaajan vaikutus")
+        
+        if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
+            st.subheader("Valitse vertailutyyppi")
+            comparison_type = st.radio(
+                "Valitse vertailutyyppi:",
+                ["Vertaa kahta uutta pelaajaa", "Lisää uusi pelaaja ja poista valittu omasta rosterista"],
+                key="comparison_type"
+            )
+        
+            # --- Käytettävä rosteri: sama logiikka kuin Rosterin optimoinnissa ---
+            healthy = st.session_state.get("roster_healthy", pd.DataFrame())
+            injured = st.session_state.get("roster_injured", pd.DataFrame())
+            if st.session_state.get("show_all_roster", False):
+                roster_to_use = pd.concat([healthy, injured]) if not healthy.empty or not injured.empty else healthy
+            else:
+                roster_to_use = healthy
+        
+            # --- Syötteet ---
+            if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
+                st.markdown("#### Pudotettava pelaaja")
+                drop_player_name = st.selectbox(
+                    "Valitse pudotettava pelaaja",
+                    list(roster_to_use['name']),
+                    key="drop_player_name"
+                )
+        
+                st.markdown("#### Lisättävä pelaaja")
+                colN1, colN2, colN3, colN4 = st.columns(4)
+                with colN1:
+                    new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
+                with colN2:
+                    new_player_team = st.text_input("Joukkue", key="new_player_team")
+                with colN3:
+                    new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
+                with colN4:
+                    new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
+        
+            # --- Suoritus ---
+            if st.button("Suorita vertailu"):
+                schedule_filtered = st.session_state['schedule'][
+                    (st.session_state['schedule']['Date'].dt.date >= start_date) &
+                    (st.session_state['schedule']['Date'].dt.date <= end_date)
+                ]
+                if schedule_filtered.empty:
+                    st.warning("Ei pelejä valitulla aikavälillä.")
+                    st.stop()
+        
+                # Baseline: käytetään roster_to_use (eli toggle huomioitu)
+                daily_base, base_games_dict, base_fp, base_total_active_games, base_bench_dict = optimize_roster_advanced(
+                    schedule_filtered, roster_to_use, pos_limits, num_attempts=200
+                )
+        
+                if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
+                    if not drop_player_name:
+                        st.warning("Valitse pudotettava pelaaja.")
+                        st.stop()
+                    if not (new_player_name and new_player_team and new_player_positions):
+                        st.warning("Täytä lisättävän pelaajan kentät (nimi, joukkue, pelipaikat).")
+                        st.stop()
+        
+                    # Baseline: pudotettava mukana
+                    base_drop_active = base_games_dict.get(drop_player_name, 0)
+                    base_drop_fpa = (
+                        roster_to_use.loc[roster_to_use['name'] == drop_player_name, 'fantasy_points_avg']
                     )
-                
-                    # --- Käytettävä rosteri: sama logiikka kuin Rosterin optimoinnissa ---
-                    healthy = st.session_state.get("roster_healthy", pd.DataFrame())
-                    injured = st.session_state.get("roster_injured", pd.DataFrame())
-                    if st.session_state.get("show_all_roster", False):
-                        roster_to_use = pd.concat([healthy, injured]) if not healthy.empty or not injured.empty else healthy
-                    else:
-                        roster_to_use = healthy
-                
-                    # --- Syötteet ---
-                    if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
-                        st.markdown("#### Pudotettava pelaaja")
-                        drop_player_name = st.selectbox(
-                            "Valitse pudotettava pelaaja",
-                            list(roster_to_use['name']),
-                            key="drop_player_name"
-                        )
-                
-                        st.markdown("#### Lisättävä pelaaja")
-                        colN1, colN2, colN3, colN4 = st.columns(4)
-                        with colN1:
-                            new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
-                        with colN2:
-                            new_player_team = st.text_input("Joukkue", key="new_player_team")
-                        with colN3:
-                            new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
-                        with colN4:
-                            new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
-                
-                    # --- Suoritus ---
-                    if st.button("Suorita vertailu"):
-                        schedule_filtered = st.session_state['schedule'][
-                            (st.session_state['schedule']['Date'].dt.date >= start_date) &
-                            (st.session_state['schedule']['Date'].dt.date <= end_date)
-                        ]
-                        if schedule_filtered.empty:
-                            st.warning("Ei pelejä valitulla aikavälillä.")
-                            st.stop()
-                
-                        # Baseline: käytetään roster_to_use (eli toggle huomioitu)
-                        daily_base, base_games_dict, base_fp, base_total_active_games, base_bench_dict = optimize_roster_advanced(
-                            schedule_filtered, roster_to_use, pos_limits, num_attempts=200
-                        )
-                
-                        if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
-                            if not drop_player_name:
-                                st.warning("Valitse pudotettava pelaaja.")
-                                st.stop()
-                            if not (new_player_name and new_player_team and new_player_positions):
-                                st.warning("Täytä lisättävän pelaajan kentät (nimi, joukkue, pelipaikat).")
-                                st.stop()
-                
-                            # Baseline: pudotettava mukana
-                            base_drop_active = base_games_dict.get(drop_player_name, 0)
-                            base_drop_fpa = (
-                                roster_to_use.loc[roster_to_use['name'] == drop_player_name, 'fantasy_points_avg']
-                            )
-                            base_drop_fpa = float(base_drop_fpa.iloc[0]) if not base_drop_fpa.empty else 0.0
-                
-                            # Swap: pudotettava pois, uusi sisään
-                            new_player_row = {
-                                'name': new_player_name,
-                                'team': new_player_team,
-                                'positions': new_player_positions,
-                                'fantasy_points_avg': new_player_fpa
-                            }
-                            swap_roster = roster_to_use[roster_to_use['name'] != drop_player_name].copy()
-                            swap_roster = pd.concat([swap_roster, pd.DataFrame([new_player_row])], ignore_index=True)
-                
-                            daily_swap, swap_games_dict, swap_fp, swap_total_active_games, swap_bench_dict = optimize_roster_advanced(
-                                schedule_filtered, swap_roster, pos_limits, num_attempts=200
-                            )
-                            new_player_active = swap_games_dict.get(new_player_name, 0)
-                
-                            # Rinnakkainen näyttö
-                            st.subheader("Skenaarioiden vertailu (kokonaisluvut)")
-                            colBL, colSW = st.columns(2)
-                            with colBL:
-                                st.markdown(f"**Baseline (pudotettava mukana): {drop_player_name}**")
-                                st.metric("Aktiiviset pelit (yht.)", base_total_active_games)
-                                st.metric("Fantasiapisteet (yht.)", f"{base_fp:.1f}")
-                                st.metric(f"{drop_player_name} aktiiviset pelit", base_drop_active)
-                                st.metric(f"{drop_player_name} ennakoidut FP", f"{base_drop_active * base_drop_fpa:.1f}")
-                            with colSW:
-                                st.markdown(f"**Swap (pudotettava pois, uusi sisään): {new_player_name}**")
-                                st.metric("Aktiiviset pelit (yht.)", swap_total_active_games)
-                                st.metric("Fantasiapisteet (yht.)", f"{swap_fp:.1f}")
-                                st.metric(f"{new_player_name} aktiiviset pelit", new_player_active)
-                                st.metric(f"{new_player_name} ennakoidut FP", f"{new_player_active * new_player_fpa:.1f}")
-                
-                            # Erot baselineen
-                            st.subheader("Erot verrattuna baselineen")
-                            st.metric("Δ Aktiiviset pelit (yht.)", f"{swap_total_active_games - base_total_active_games:+}")
-                            st.metric("Δ Fantasiapisteet (yht.)", f"{swap_fp - base_fp:+.1f}")
-                            st.caption(
-                                "Huom: Kokonaispelimäärä voi kasvaa pienistäkin muutoksista, koska pudottaminen voi vapauttaa paikan "
-                                "toiselle pelaajalle aktiiviseen rosteriin (myös UTIL-paikalle), vaikka lisättävän pelaajan pelimäärä olisi sama."
-                            )
-                
-                
-                       # --- Joukkueanalyysi ---
-                st.markdown("---")
-                st.header("🔍 Joukkueanalyysi")
-                st.markdown("""
-                Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää,
-                mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
-                """)
-                
-                if st.session_state['schedule'].empty or roster_to_use.empty:
-                    st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+                    base_drop_fpa = float(base_drop_fpa.iloc[0]) if not base_drop_fpa.empty else 0.0
+        
+                    # Swap: pudotettava pois, uusi sisään
+                    new_player_row = {
+                        'name': new_player_name,
+                        'team': new_player_team,
+                        'positions': new_player_positions,
+                        'fantasy_points_avg': new_player_fpa
+                    }
+                    swap_roster = roster_to_use[roster_to_use['name'] != drop_player_name].copy()
+                    swap_roster = pd.concat([swap_roster, pd.DataFrame([new_player_row])], ignore_index=True)
+        
+                    daily_swap, swap_games_dict, swap_fp, swap_total_active_games, swap_bench_dict = optimize_roster_advanced(
+                        schedule_filtered, swap_roster, pos_limits, num_attempts=200
+                    )
+                    new_player_active = swap_games_dict.get(new_player_name, 0)
+        
+                    # Rinnakkainen näyttö
+                    st.subheader("Skenaarioiden vertailu (kokonaisluvut)")
+                    colBL, colSW = st.columns(2)
+                    with colBL:
+                        st.markdown(f"**Baseline (pudotettava mukana): {drop_player_name}**")
+                        st.metric("Aktiiviset pelit (yht.)", base_total_active_games)
+                        st.metric("Fantasiapisteet (yht.)", f"{base_fp:.1f}")
+                        st.metric(f"{drop_player_name} aktiiviset pelit", base_drop_active)
+                        st.metric(f"{drop_player_name} ennakoidut FP", f"{base_drop_active * base_drop_fpa:.1f}")
+                    with colSW:
+                        st.markdown(f"**Swap (pudotettava pois, uusi sisään): {new_player_name}**")
+                        st.metric("Aktiiviset pelit (yht.)", swap_total_active_games)
+                        st.metric("Fantasiapisteet (yht.)", f"{swap_fp:.1f}")
+                        st.metric(f"{new_player_name} aktiiviset pelit", new_player_active)
+                        st.metric(f"{new_player_name} ennakoidut FP", f"{new_player_active * new_player_fpa:.1f}")
+        
+                    # Erot baselineen
+                    st.subheader("Erot verrattuna baselineen")
+                    st.metric("Δ Aktiiviset pelit (yht.)", f"{swap_total_active_games - base_total_active_games:+}")
+                    st.metric("Δ Fantasiapisteet (yht.)", f"{swap_fp - base_fp:+.1f}")
+                    st.caption(
+                        "Huom: Kokonaispelimäärä voi kasvaa pienistäkin muutoksista, koska pudottaminen voi vapauttaa paikan "
+                        "toiselle pelaajalle aktiiviseen rosteriin (myös UTIL-paikalle), vaikka lisättävän pelaajan pelimäärä olisi sama."
+                    )
+        
+        
+               # --- Joukkueanalyysi ---
+        st.markdown("---")
+        st.header("🔍 Joukkueanalyysi")
+        st.markdown("""
+        Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää,
+        mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
+        """)
+        
+        if st.session_state['schedule'].empty or roster_to_use.empty:
+            st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+        else:
+            # ✅ Suodatetaan aikataulu valitun aikavälin mukaan – varmistetaan että tyypit täsmäävät
+            schedule_filtered = st.session_state['schedule'][
+                (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+                (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+            ]
+        
+            # Näytetään nappi aina, vaikka schedule_filtered olisi tyhjä
+            if st.button("Suorita joukkueanalyysi"):
+                if schedule_filtered.empty:
+                    st.warning("Valitulla aikavälillä ei löytynyt otteluita.")
                 else:
-                    # ✅ Suodatetaan aikataulu valitun aikavälin mukaan – varmistetaan että tyypit täsmäävät
-                    schedule_filtered = st.session_state['schedule'][
-                        (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-                        (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-                    ]
-                
-                    # Näytetään nappi aina, vaikka schedule_filtered olisi tyhjä
-                    if st.button("Suorita joukkueanalyysi"):
-                        if schedule_filtered.empty:
-                            st.warning("Valitulla aikavälillä ei löytynyt otteluita.")
+                    with st.spinner("Lasketaan joukkueanalyysiä..."):
+                        st.session_state['team_impact_results'] = calculate_team_impact_by_position(
+                            schedule_filtered, roster_to_use, pos_limits
+                        )
+        
+            # Näytetään tulokset, jos analyysi on ajettu
+            if st.session_state.get('team_impact_results') is not None:
+                for pos, df in st.session_state['team_impact_results'].items():
+                    st.subheader(f"Joukkueet pelipaikalle: {pos}")
+                    st.dataframe(df, use_container_width=True)
+        
+        
+                    # --- Vapaiden agenttien analyysi UI ---
+                    st.markdown("---")
+                    st.header("🆓 Vapaiden agenttien analyysi")
+                    
+                    if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
+                        if st.session_state.get('team_impact_results') is None:
+                            st.warning("Suorita ensin joukkueanalyysi.")
+                        elif st.session_state['free_agents'].empty:
+                            st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
                         else:
-                            with st.spinner("Lasketaan joukkueanalyysiä..."):
-                                st.session_state['team_impact_results'] = calculate_team_impact_by_position(
-                                    schedule_filtered, roster_to_use, pos_limits
+                            with st.spinner("Analysoidaan vapaat agentit..."):
+                                st.session_state['free_agent_results'] = analyze_free_agents(
+                                    st.session_state['team_impact_results'],
+                                    st.session_state['free_agents'],
+                                    roster_to_use
                                 )
-                
-                    # Näytetään tulokset, jos analyysi on ajettu
-                    if st.session_state.get('team_impact_results') is not None:
-                        for pos, df in st.session_state['team_impact_results'].items():
-                            st.subheader(f"Joukkueet pelipaikalle: {pos}")
-                            st.dataframe(df, use_container_width=True)
-                
-                
-                            # --- Vapaiden agenttien analyysi UI ---
-                            st.markdown("---")
-                            st.header("🆓 Vapaiden agenttien analyysi")
-                            
-                            if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
-                                if st.session_state.get('team_impact_results') is None:
-                                    st.warning("Suorita ensin joukkueanalyysi.")
-                                elif st.session_state['free_agents'].empty:
-                                    st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
-                                else:
-                                    with st.spinner("Analysoidaan vapaat agentit..."):
-                                        st.session_state['free_agent_results'] = analyze_free_agents(
-                                            st.session_state['team_impact_results'],
-                                            st.session_state['free_agents'],
-                                            roster_to_use
-                                        )
-                            
-                            if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
-                                st.dataframe(
-                                    st.session_state['free_agent_results'].style.format({
-                                        'total_impact': "{:.2f}",
-                                        'fantasy_points_avg': "{:.1f}"
-                                    }),
-                                    use_container_width=True
-                                )
+                    
+                    if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
+                        st.dataframe(
+                            st.session_state['free_agent_results'].style.format({
+                                'total_impact': "{:.2f}",
+                                'fantasy_points_avg': "{:.1f}"
+                            }),
+                            use_container_width=True
+                        )
 
 
 with tab2:
