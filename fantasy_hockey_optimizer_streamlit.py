@@ -215,14 +215,6 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
-def is_valid_player_input(name, team, positions, fpa):
-    return all([
-        isinstance(name, str) and name.strip(),
-        isinstance(team, str) and team.strip(),
-        isinstance(positions, str) and positions.strip(),
-        isinstance(fpa, (int, float)) and fpa > 0
-    ])
-
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
@@ -745,7 +737,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df, roster_df):
 tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
 with tab1:
-    st.header("📊 Nykyinen rosteri (Valioliika)")
+    st.header("📊 Nykyinen rosteri (APL)")
 
     # Puretaan rosterit turvallisesti
     my_roster = st.session_state.get("roster", pd.DataFrame())
