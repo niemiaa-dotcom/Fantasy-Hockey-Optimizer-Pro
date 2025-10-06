@@ -1174,12 +1174,12 @@ with tab1:
                     
                     # Lasketaan alkuperäinen rosteri
                     with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää ja pisteitä..."):
-                        _, original_total_games_dict, original_fp, _ = optimize_roster_advanced(
+                        _, original_total_games_dict, original_fp, original_total_games, original_bench_games_dict = optimize_roster_advanced(
                             schedule_filtered,
                             st.session_state['roster'],
                             pos_limits
                         )
-                        original_total_games = sum(original_total_games_dict.values())
+
                     
                     # Luodaan muokattu rosteri: poistetaan pudotettava pelaaja ja lisätään uusi pelaaja
                     modified_roster = st.session_state['roster'][st.session_state['roster']['name'] != drop_player_name].copy()
