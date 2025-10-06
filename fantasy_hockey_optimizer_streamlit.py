@@ -1135,9 +1135,9 @@ with tab1:
                             sim_roster_B,
                             pos_limits
                         )
-
-                        new_total_games_B = sum(total_games_B_dict.values())
-                        player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
+                        
+                            new_total_games_B = sum(total_games_B_dict.values())
+                            player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
 
                     st.subheader("Vertailun tulokset")
                     
