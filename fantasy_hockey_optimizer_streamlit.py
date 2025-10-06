@@ -1125,7 +1125,16 @@ else:
                 delta_games_swap, delta_fp_swap = total_games_swap - baseline_total_games, fp_swap - baseline_fp
 
                 st.subheader("Vaihdon tulokset")
-                st.metric(label=f
+                st.metric(
+                    label=f"{sim_name_A} kokonais FP",
+                    value=f"{fp_swap:.1f}",
+                    delta=f"{delta_fp_swap:+.1f}"
+                )
+                st.metric(
+                    label="Aktiiviset pelit",
+                    value=total_games_swap,
+                    delta=f"{delta_games_swap:+}"
+                )
 
 
     # Alkuperäinen joukkueanalyysi osio
