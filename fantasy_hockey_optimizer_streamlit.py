@@ -1077,7 +1077,7 @@ with tab1:
 
         if st.button("Suorita vertailu"):
             if comparison_type == "Vertaa kahta uutta pelaajaa":
-                if is_valid_player_input(sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A) and \ 
+                if is_valid_player_input(sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A) and \
                    is_valid_player_input(sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B):
 
                     
