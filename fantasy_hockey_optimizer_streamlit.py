@@ -982,10 +982,21 @@ with tab1:
             )
             
 # --- Simuloi uuden pelaajan vaikutus ---
+# --- Simuloi uuden pelaajan vaikutus ---
 st.header("🔮 Simuloi uuden pelaajan vaikutus")
 
+def compute_opt(schedule_filtered, roster_df, pos_limits):
+    daily, games_dict, total_fp, total_active, _ = optimize_roster_advanced(
+        schedule_filtered, roster_df, pos_limits
+    )
+    return {
+        "daily": daily,
+        "games_dict": games_dict,
+        "total_fp": total_fp,
+        "total_active": total_active
+    }
+
 if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
-    st.subheader("Valitse vertailutyyppi")
     comparison_type = st.radio(
         "Valitse vertailutyyppi:",
         [
@@ -996,35 +1007,33 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
         key="comparison_type"
     )
 
-    # Pelaaja A syötteet
+    # Pelaaja A
     st.markdown("#### Pelaaja A")
     colA1, colA2, colA3, colA4 = st.columns(4)
     with colA1:
-        sim_name_A = st.text_input("Pelaajan nimi", key="sim_name_A")
+        sim_name_A = st.text_input("Nimi", key="sim_name_A")
     with colA2:
         sim_team_A = st.text_input("Joukkue", key="sim_team_A")
     with colA3:
-        sim_positions_A = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_A")
+        sim_positions_A = st.text_input("Pelipaikat", key="sim_positions_A")
     with colA4:
         sim_fpa_A = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_A")
 
-    # Pelaaja B syötteet (vain jos kahden pelaajan vertailu)
+    # Pelaaja B (vain jos kahden pelaajan vertailu)
     if comparison_type == "Vertaa kahta uutta pelaajaa":
         st.markdown("#### Pelaaja B")
         colB1, colB2, colB3, colB4 = st.columns(4)
         with colB1:
-            sim_name_B = st.text_input("Pelaajan nimi", key="sim_name_B")
+            sim_name_B = st.text_input("Nimi", key="sim_name_B")
         with colB2:
             sim_team_B = st.text_input("Joukkue", key="sim_team_B")
         with colB3:
-            sim_positions_B = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_B")
+            sim_positions_B = st.text_input("Pelipaikat", key="sim_positions_B")
         with colB4:
             sim_fpa_B = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B")
 
-        # Pudotettava pelaaja (valinnainen)
         drop_candidates = [""] + list(st.session_state['roster']['name'])
-        player_to_drop_dual = st.selectbox("Pelaaja vertailussa poistettava (valinnainen)", drop_candidates, key="drop_dual")
-
+        player_to_drop_dual = st.selectbox("Pudotettava pelaaja (valinnainen)", drop_candidates, key="drop_dual")
     else:
         sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B = "", "", "", 0.0
         player_to_drop_dual = ""
@@ -1033,7 +1042,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
     player_to_drop = ""
     if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
         drop_candidates = [""] + list(st.session_state['roster']['name'])
-        player_to_drop = st.selectbox("Pelaaja vertailussa poistettava", drop_candidates, key="drop_single")
+        player_to_drop = st.selectbox("Pudotettava pelaaja", drop_candidates, key="drop_single")
 
     if st.button("Suorita vertailu", key="run_compare"):
         schedule_filtered = st.session_state['schedule'][
@@ -1042,54 +1051,71 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
         ]
 
         # Baseline
-        _, base_games_dict, base_fp, _, _ = optimize_roster_advanced(schedule_filtered, st.session_state['roster'], pos_limits)
-        base_total_games = sum(base_games_dict.values())
+        base = compute_opt(schedule_filtered, st.session_state['roster'], pos_limits)
 
         # --- Kahden pelaajan vertailu ---
         if comparison_type == "Vertaa kahta uutta pelaajaa":
-            # Rosterit A ja B
             sim_roster_A = st.session_state['roster'].copy()
             sim_roster_B = st.session_state['roster'].copy()
             if player_to_drop_dual:
                 sim_roster_A = sim_roster_A[sim_roster_A['name'] != player_to_drop_dual]
                 sim_roster_B = sim_roster_B[sim_roster_B['name'] != player_to_drop_dual]
 
-            sim_roster_A.loc[len(sim_roster_A)] = {'name': sim_name_A, 'team': sim_team_A, 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A}
-            sim_roster_B.loc[len(sim_roster_B)] = {'name': sim_name_B, 'team': sim_team_B, 'positions': sim_positions_B, 'fantasy_points_avg': sim_fpa_B}
+            sim_roster_A.loc[len(sim_roster_A)] = {
+                'name': sim_name_A, 'team': sim_team_A,
+                'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A
+            }
+            sim_roster_B.loc[len(sim_roster_B)] = {
+                'name': sim_name_B, 'team': sim_team_B,
+                'positions': sim_positions_B, 'fantasy_points_avg': sim_fpa_B
+            }
 
-            _, games_A_dict, fp_A, _, _ = optimize_roster_advanced(schedule_filtered, sim_roster_A, pos_limits)
-            _, games_B_dict, fp_B, _, _ = optimize_roster_advanced(schedule_filtered, sim_roster_B, pos_limits)
+            res_A = compute_opt(schedule_filtered, sim_roster_A, pos_limits)
+            res_B = compute_opt(schedule_filtered, sim_roster_B, pos_limits)
 
-            total_games_A, total_games_B = sum(games_A_dict.values()), sum(games_B_dict.values())
-            delta_games_A, delta_fp_A = total_games_A - base_total_games, fp_A - base_fp
-            delta_games_B, delta_fp_B = total_games_B - base_total_games, fp_B - base_fp
+            delta_games_A = res_A["total_active"] - base["total_active"]
+            delta_fp_A = res_A["total_fp"] - base["total_fp"]
+            delta_games_B = res_B["total_active"] - base["total_active"]
+            delta_fp_B = res_B["total_fp"] - base["total_fp"]
+
+            added_games_A = res_A["games_dict"].get(sim_name_A, 0)
+            added_games_B = res_B["games_dict"].get(sim_name_B, 0)
+            dropped_games = base["games_dict"].get(player_to_drop_dual, 0) if player_to_drop_dual else 0
 
             st.subheader("Vertailun tulokset")
             col1, col2 = st.columns(2)
             with col1:
                 st.markdown(f"**{sim_name_A or 'Pelaaja A'}**")
-                st.metric("Pelien muutos", f"{delta_games_A:+}")
-                st.metric("Omat pelit", games_A_dict.get(sim_name_A, 0))
+                st.metric("Pelien muutos (kokonais)", f"{delta_games_A:+}")
+                st.metric("Omat pelit", added_games_A)
+                if player_to_drop_dual:
+                    st.metric(f"{player_to_drop_dual} menetetyt pelit", dropped_games)
                 st.metric("Fantasiapiste-ero", f"{delta_fp_A:+.1f}")
             with col2:
                 st.markdown(f"**{sim_name_B or 'Pelaaja B'}**")
-                st.metric("Pelien muutos", f"{delta_games_B:+}")
-                st.metric("Omat pelit", games_B_dict.get(sim_name_B, 0))
+                st.metric("Pelien muutos (kokonais)", f"{delta_games_B:+}")
+                st.metric("Omat pelit", added_games_B)
+                if player_to_drop_dual:
+                    st.metric(f"{player_to_drop_dual} menetetyt pelit", dropped_games)
                 st.metric("Fantasiapiste-ero", f"{delta_fp_B:+.1f}")
-            
 
         # --- Yhden pelaajan lisäys ---
         elif comparison_type == "Lisää yksi uusi pelaaja rosteriin":
             sim_roster_add = st.session_state['roster'].copy()
-            sim_roster_add.loc[len(sim_roster_add)] = {'name': sim_name_A, 'team': sim_team_A, 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A}
-            _, games_add_dict, fp_add, _, _ = optimize_roster_advanced(schedule_filtered, sim_roster_add, pos_limits)
+            sim_roster_add.loc[len(sim_roster_add)] = {
+                'name': sim_name_A, 'team': sim_team_A,
+                'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A
+            }
+            res_add = compute_opt(schedule_filtered, sim_roster_add, pos_limits)
 
-            total_games_add = sum(games_add_dict.values())
-            delta_games_add, delta_fp_add = total_games_add - base_total_games, fp_add - base_fp
+            delta_games_add = res_add["total_active"] - base["total_active"]
+            delta_fp_add = res_add["total_fp"] - base["total_fp"]
+            added_games = res_add["games_dict"].get(sim_name_A, 0)
 
             st.subheader("Lisäyksen tulokset")
-            st.metric("Pelien muutos", f"{delta_games_add:+}")
-            st.metric("Omat pelit", games_add_dict.get(sim_name_A, 0))
+            st.markdown(f"**{sim_name_A or 'Lisättävä pelaaja'}**")
+            st.metric("Pelien muutos (kokonais)", f"{delta_games_add:+}")
+            st.metric("Omat pelit", added_games)
             st.metric("Fantasiapiste-ero", f"{delta_fp_add:+.1f}")
 
         # --- Yhden pelaajan lisäys ja pudotus ---
@@ -1097,20 +1123,20 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             sim_roster_swap = st.session_state['roster'].copy()
             if player_to_drop:
                 sim_roster_swap = sim_roster_swap[sim_roster_swap['name'] != player_to_drop]
-            sim_roster_swap.loc[len(sim_roster_swap)] = {'name': sim_name_A, 'team': sim_team_A, 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A}
+            sim_roster_swap.loc[len(sim_roster_swap)] = {
+                'name': sim_name_A, 'team': sim_team_A,
+                'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A
+            }
+            res_swap = compute_opt(schedule_filtered, sim_roster_swap, pos_limits)
 
-            _, games_swap_dict, fp_swap, _, _ = optimize_roster_advanced(schedule_filtered, sim_roster_swap, pos_limits)
-
-            total_games_swap = sum(games_swap_dict.values())
-            delta_games_swap, delta_fp_swap = total_games_swap - base_total_games, fp_swap - base_fp
+            delta_games_swap = res_swap["total_active"] - base["total_active"]
+            delta_fp_swap = res_swap["total_fp"] - base["total_fp"]
+            added_games = res_swap["games_dict"].get(sim_name_A, 0)
+            dropped_games = base["games_dict"].get(player_to_drop, 0) if player_to_drop else 0
 
             st.subheader("Vaihdon tulokset")
-            st.metric("Pelien muutos", f"{delta_games_swap:+}")
-            st.metric("Omat pelit", games_swap_dict.get(sim_name_A, 0))
-            st.metric("Fantasiapiste-ero", f"{delta_fp_swap:+.1f}")
-            if player_to_drop:
-                st.metric("Menetetyt pelit (drop)", games_swap_dict.get(player_to_drop, 0))
-
+            st.markdown(f"**{sim_name_A or 'Lisättävä pelaaja'}**")
+            st.metric("
 
 
     # Alkuperäinen joukkueanalyysi osio
