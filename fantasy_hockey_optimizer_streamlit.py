@@ -1030,8 +1030,8 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
         ]
 
-        # Baseline
-        _, base_games_dict, base_fp, base_total_games, _ = optimize_roster_advanced(
+        # Baseline (täsmälleen sama funktio ja parametrit kuin Rosterin optimointi -osiossa)
+        _, base_games_dict, base_fp, base_total_games, base_bench_dict = optimize_roster_advanced(
             schedule_filtered, st.session_state['roster'], pos_limits, num_attempts=200
         )
 
