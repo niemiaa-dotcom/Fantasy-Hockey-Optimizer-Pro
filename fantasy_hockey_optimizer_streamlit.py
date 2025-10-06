@@ -1087,6 +1087,10 @@ with tab1:
         sim_positions_B = st.session_state.get("sim_positions_B", "")
         sim_fpa_B = st.session_state.get("sim_fpa_B", 0.0)
 
+        st.write("DEBUG A:", repr(sim_name_A), repr(sim_team_A), repr(sim_positions_A), repr(sim_fpa_A))
+        st.write("DEBUG B:", repr(sim_name_B), repr(sim_team_B), repr(sim_positions_B), repr(sim_fpa_B))
+
+
         if st.button("Suorita vertailu"):
             if comparison_type == "Vertaa kahta uutta pelaajaa":
                 st.write("DEBUG A:", sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A)
