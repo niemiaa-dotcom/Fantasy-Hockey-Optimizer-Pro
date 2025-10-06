@@ -1428,14 +1428,26 @@ with tab2:
                                 use_container_width=True, hide_index=True
                             )
 
-                    # --- Yhteenveto ---
+                # --- Yhteenveto: FP ja pelimäärät markdown-tyylillä ---
                     st.subheader("📊 Yhteenveto")
-                    col1_sum, col2_sum = st.columns(2)
-                    with col1_sum:
-                        st.metric("Oma joukkue", f"{round(my_fp, 2)} FP", help=f"Aktiivisia pelejä: {my_total_games}")
-                    with col2_sum:
-                        st.metric("Vastustaja", f"{round(opponent_fp, 2)} FP", help=f"Aktiivisia pelejä: {opponent_total_games}")
-
+                    
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"""
+                        ### 🟦 Oma joukkue  
+                        **{round(my_fp, 2)} FP**  
+                        {my_total_games} peliä
+                        """)
+                    
+                    with col2:
+                        st.markdown(f"""
+                        ### 🟥 Vastustaja  
+                        **{round(opponent_fp, 2)} FP**  
+                        {opponent_total_games} peliä
+                        """)
+                    
+                    # Voittoviesti
                     if my_fp > opponent_fp:
                         st.success(f"✅ Oma joukkueesi on vahvempi! (+{round(my_fp - opponent_fp, 2)} FP, "
                                    f"{my_total_games} vs {opponent_total_games} peliä)")
