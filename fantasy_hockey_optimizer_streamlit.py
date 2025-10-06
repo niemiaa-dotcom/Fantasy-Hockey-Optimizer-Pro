@@ -1130,7 +1130,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             st.metric("Omat pelit", added)
             if player_to_drop:
                 st.metric(f"{player_to_drop} menetetyt pelit", dropped)
-            st.metric("Fantasiapiste-ero", f"{delta_fp_swap:+.
+            st.metric("Fantasiapiste-ero", f"{delta_fp_swap:+.1f}")
 
 
     # Alkuperäinen joukkueanalyysi osio
