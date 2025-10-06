@@ -1136,7 +1136,25 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
 
             st.subheader("Vaihdon tulokset")
             st.markdown(f"**{sim_name_A or 'Lisättävä pelaaja'}**")
-            st.metric("
+            st.metric(
+                label="Pelien muutos (kokonais)",
+                value=f"{delta_games_swap:+}"
+            )
+            st.metric(
+                label="Omat pelit",
+                value=added_games
+            )
+            if player_to_drop:
+                st.markdown(f"**{player_to_drop}**")
+                st.metric(
+                    label="Menetetyt pelit (baseline)",
+                    value=dropped_games
+                )
+            st.metric(
+                label="Fantasiapiste-ero",
+                value=f"{delta_fp_swap:+.1f}"
+            )
+
 
 
     # Alkuperäinen joukkueanalyysi osio
