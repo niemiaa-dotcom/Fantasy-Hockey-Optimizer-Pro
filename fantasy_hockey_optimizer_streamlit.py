@@ -1081,35 +1081,38 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             )
 
 
-        # --- Joukkueanalyysi ---
-        st.markdown("---")
-        st.header("🔍 Joukkueanalyysi")
-        st.markdown("""
-        Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää,
-        mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
-        """)
-        
-        if st.session_state['schedule'].empty or roster_to_use.empty:
-            st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+       # --- Joukkueanalyysi ---
+st.markdown("---")
+st.header("🔍 Joukkueanalyysi")
+st.markdown("""
+Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää,
+mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
+""")
+
+if st.session_state['schedule'].empty or roster_to_use.empty:
+    st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+else:
+    # ✅ Suodatetaan aikataulu valitun aikavälin mukaan – varmistetaan että tyypit täsmäävät
+    schedule_filtered = st.session_state['schedule'][
+        (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+        (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+    ]
+
+    # Näytetään nappi aina, vaikka schedule_filtered olisi tyhjä
+    if st.button("Suorita joukkueanalyysi"):
+        if schedule_filtered.empty:
+            st.warning("Valitulla aikavälillä ei löytynyt otteluita.")
         else:
-            # Suodatetaan aikataulu valitun aikavälin mukaan
-            schedule_filtered = st.session_state['schedule'][
-                (st.session_state['schedule']['Date'].dt.date >= start_date) &
-                (st.session_state['schedule']['Date'].dt.date <= end_date)
-            ]
-        
-            if not schedule_filtered.empty:
-                if st.button("Suorita joukkueanalyysi"):
-                    # ✅ Käytetään roster_to_use, jolloin toggle loukkaantuneiden mukaan ottamisesta huomioidaan
-                    st.session_state['team_impact_results'] = calculate_team_impact_by_position(
-                        schedule_filtered, roster_to_use, pos_limits
-                    )
-        
-            # Näytetään tulokset, jos analyysi on ajettu
-            if st.session_state.get('team_impact_results') is not None:
-                for pos, df in st.session_state['team_impact_results'].items():
-                    st.subheader(f"Joukkueet pelipaikalle: {pos}")
-                    st.dataframe(df, use_container_width=True)
+            with st.spinner("Lasketaan joukkueanalyysiä..."):
+                st.session_state['team_impact_results'] = calculate_team_impact_by_position(
+                    schedule_filtered, roster_to_use, pos_limits
+                )
+
+    # Näytetään tulokset, jos analyysi on ajettu
+    if st.session_state.get('team_impact_results') is not None:
+        for pos, df in st.session_state['team_impact_results'].items():
+            st.subheader(f"Joukkueet pelipaikalle: {pos}")
+            st.dataframe(df, use_container_width=True)
 
 
 # --- Vapaiden agenttien analyysi UI ---
