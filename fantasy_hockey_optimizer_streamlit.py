@@ -1076,16 +1076,18 @@ with tab1:
                     drop_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", value=0.0, key="drop_player_fpa_empty")
 
 
-        # Pakota syötteet session statesta
-        sim_name_A = st.session_state.get("sim_name_A", "")
-        sim_team_A = st.session_state.get("sim_team_A", "")
-        sim_positions_A = st.session_state.get("sim_positions_A", "")
-        sim_fpa_A = st.session_state.get("sim_fpa_A", 0.0)
+
+        # Tallenna suoraan paluuarvot
+        sim_name_A = st.text_input("Pelaajan nimi", key="sim_name_A")
+        sim_team_A = st.text_input("Joukkue", key="sim_team_A")
+        sim_positions_A = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_A")
+        sim_fpa_A = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_A")
         
-        sim_name_B = st.session_state.get("sim_name_B", "")
-        sim_team_B = st.session_state.get("sim_team_B", "")
-        sim_positions_B = st.session_state.get("sim_positions_B", "")
-        sim_fpa_B = st.session_state.get("sim_fpa_B", 0.0)
+        sim_name_B = st.text_input("Pelaajan nimi", key="sim_name_B")
+        sim_team_B = st.text_input("Joukkue", key="sim_team_B")
+        sim_positions_B = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_B")
+        sim_fpa_B = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B")
+
 
         st.write("DEBUG A:", repr(sim_name_A), repr(sim_team_A), repr(sim_positions_A), repr(sim_fpa_A))
         st.write("DEBUG B:", repr(sim_name_B), repr(sim_team_B), repr(sim_positions_B), repr(sim_fpa_B))
