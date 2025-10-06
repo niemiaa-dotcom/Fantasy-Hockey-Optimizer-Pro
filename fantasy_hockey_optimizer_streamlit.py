@@ -11,7 +11,7 @@ from google.oauth2.service_account import Credentials
 
 # Aseta sivun konfiguraatio
 st.set_page_config(
-    page_title="Fantasy Hockey Optimizer (APL)",
+    page_title="Fantasy Hockey Optimizer (Valioliika)",
     page_icon="🏒",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -53,12 +53,12 @@ def load_roster_from_gsheets():
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("ZeroxG")
+        worksheet = sheet.worksheet("Moose")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
         if df.empty:
-            st.warning("⚠️ 'ZeroxG' välilehti on tyhjä tai sitä ei löytynyt.")
+            st.warning("⚠️ 'Moose' välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame(), pd.DataFrame()
 
         df.columns = df.columns.str.strip().str.lower()
@@ -96,7 +96,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        worksheet = sheet.worksheet("Valioliika Roster")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
@@ -165,13 +165,13 @@ def load_free_agents_from_gsheets():
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
 
-        # Avataan nimenomaan "FA APL" välilehti
-        worksheet = sheet.worksheet("FA APL")
+        # Avataan nimenomaan "Valioliika FA" välilehti
+        worksheet = sheet.worksheet("Valioliika FA")
         data = worksheet.get_all_records()
         df = pd.DataFrame(data)
 
         if df.empty:
-            st.warning("⚠️ FA APL-välilehti on tyhjä tai sitä ei löytynyt.")
+            st.warning("⚠️ Valioliika FA-välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame()
 
         # ✅ Normalisoidaan sarakenimet pieniksi kirjaimiksi
@@ -316,7 +316,7 @@ if client:
     try:
         sheet_url = st.secrets["free_agents_sheet"]["url"]
         sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("T2 Lindgren Roster")
+        worksheet = sheet.worksheet("Valioliika Roster")
         data = worksheet.get_all_records()
         df_vs = pd.DataFrame(data)
         if not df_vs.empty:
