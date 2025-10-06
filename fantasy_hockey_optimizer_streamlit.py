@@ -1032,7 +1032,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
 
         # Baseline
         _, base_games_dict, base_fp, base_total_games, _ = optimize_roster_advanced(
-            schedule_filtered, st.session_state['roster'], pos_limits
+            schedule_filtered, st.session_state['roster'], pos_limits, num_attempts=200
         )
 
         # --- Kahden pelaajan vertailu ---
@@ -1051,8 +1051,8 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
                 'positions': sim_positions_B, 'fantasy_points_avg': sim_fpa_B
             }])], ignore_index=True)
 
-            _, games_A, fp_A, total_A, _ = optimize_roster_advanced(schedule_filtered, roster_A, pos_limits)
-            _, games_B, fp_B, total_B, _ = optimize_roster_advanced(schedule_filtered, roster_B, pos_limits)
+            _, games_A, fp_A, total_A, _ = optimize_roster_advanced(schedule_filtered, roster_A, pos_limits, num_attempts=200)
+            _, games_B, fp_B, total_B, _ = optimize_roster_advanced(schedule_filtered, roster_B, pos_limits, num_attempts=200)
 
             delta_games_A = total_A - base_total_games
             delta_fp_A = fp_A - base_fp
@@ -1087,7 +1087,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
                 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A
             }])], ignore_index=True)
 
-            _, games_add, fp_add, total_add, _ = optimize_roster_advanced(schedule_filtered, roster_add, pos_limits)
+            _, games_add, fp_add, total_add, _ = optimize_roster_advanced(schedule_filtered, roster_add, pos_limits, num_attempts=200)
 
             delta_games_add = total_add - base_total_games
             delta_fp_add = fp_add - base_fp
@@ -1109,7 +1109,7 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
                 'positions': sim_positions_A, 'fantasy_points_avg': sim_fpa_A
             }])], ignore_index=True)
 
-            _, games_swap, fp_swap, total_swap, _ = optimize_roster_advanced(schedule_filtered, roster_swap, pos_limits)
+            _, games_swap, fp_swap, total_swap, _ = optimize_roster_advanced(schedule_filtered, roster_swap, pos_limits, num_attempts=200)
 
             delta_games_swap = total_swap - base_total_games
             delta_fp_swap = fp_swap - base_fp
@@ -1123,6 +1123,8 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             if player_to_drop:
                 st.metric(f"{player_to_drop} menetetyt pelit", dropped)
             st.metric("Fantasiapiste-ero", f"{delta_fp_swap:+.1f}")
+
+
 
     
     # Alkuperäinen joukkueanalyysi osio
