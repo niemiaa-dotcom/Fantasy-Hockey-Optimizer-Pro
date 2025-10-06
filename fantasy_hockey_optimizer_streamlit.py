@@ -1127,11 +1127,11 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
 
     if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
         with st.spinner("Analysoidaan vapaat agentit..."):
-        # ✅ Käytetään roster_to_use, ei aina koko rosteria
-        free_agent_results = analyze_free_agents(
-            st.session_state['team_impact_results'],
-            st.session_state['free_agents'],
-            roster_to_use
+            # ✅ Käytetään roster_to_use, ei aina koko rosteria
+            free_agent_results = analyze_free_agents(
+                st.session_state['team_impact_results'],
+                st.session_state['free_agents'],
+                roster_to_use
         )
 
         
