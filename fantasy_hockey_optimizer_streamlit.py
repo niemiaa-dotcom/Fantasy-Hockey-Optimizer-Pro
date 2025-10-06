@@ -1107,16 +1107,15 @@ with tab1:
                             pos_limits
                         )
 
-
-
                         original_total_games = sum(original_total_games_dict.values())
                     
                     with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
-                        _, total_games_A_dict, new_fp_A, _ = optimize_roster_advanced(
+                        _, total_games_A_dict, new_fp_A, _, _ = optimize_roster_advanced(
                             schedule_filtered,
                             sim_roster_A,
                             pos_limits
                         )
+
                         new_total_games_A = sum(total_games_A_dict.values())
                         player_A_impact_days = total_games_A_dict.get(sim_name_A, 0)
                     
