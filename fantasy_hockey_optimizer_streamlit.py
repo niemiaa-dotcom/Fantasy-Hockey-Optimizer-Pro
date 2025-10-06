@@ -1079,10 +1079,7 @@ with tab1:
             if comparison_type == "Vertaa kahta uutta pelaajaa":
                 st.write("DEBUG A:", sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A)
                 st.write("DEBUG B:", sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B)
-                if (
-                    is_valid_player_input(sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A)
-                    and is_valid_player_input(sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B)                              
-                ):
+                if True:
 
                     
                     original_roster_copy = st.session_state['roster'].copy()
