@@ -1115,31 +1115,31 @@ else:
             st.dataframe(df, use_container_width=True)
 
 
-# --- Vapaiden agenttien analyysi UI ---
-st.markdown("---")
-st.header("🆓 Vapaiden agenttien analyysi")
-
-if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
-    if st.session_state.get('team_impact_results') is None:
-        st.warning("Suorita ensin joukkueanalyysi.")
-    elif st.session_state['free_agents'].empty:
-        st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
-    else:
-        with st.spinner("Analysoidaan vapaat agentit..."):
-            st.session_state['free_agent_results'] = analyze_free_agents(
-                st.session_state['team_impact_results'],
-                st.session_state['free_agents'],
-                roster_to_use
-            )
-
-if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
-    st.dataframe(
-        st.session_state['free_agent_results'].style.format({
-            'total_impact': "{:.2f}",
-            'fantasy_points_avg': "{:.1f}"
-        }),
-        use_container_width=True
-    )
+            # --- Vapaiden agenttien analyysi UI ---
+            st.markdown("---")
+            st.header("🆓 Vapaiden agenttien analyysi")
+            
+            if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
+                if st.session_state.get('team_impact_results') is None:
+                    st.warning("Suorita ensin joukkueanalyysi.")
+                elif st.session_state['free_agents'].empty:
+                    st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
+                else:
+                    with st.spinner("Analysoidaan vapaat agentit..."):
+                        st.session_state['free_agent_results'] = analyze_free_agents(
+                            st.session_state['team_impact_results'],
+                            st.session_state['free_agents'],
+                            roster_to_use
+                        )
+            
+            if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
+                st.dataframe(
+                    st.session_state['free_agent_results'].style.format({
+                        'total_impact': "{:.2f}",
+                        'fantasy_points_avg': "{:.1f}"
+                    }),
+                    use_container_width=True
+                )
 
 
 with tab2:
