@@ -1108,6 +1108,7 @@ with tab1:
                         )
 
 
+
                         original_total_games = sum(original_total_games_dict.values())
                     
                     with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
