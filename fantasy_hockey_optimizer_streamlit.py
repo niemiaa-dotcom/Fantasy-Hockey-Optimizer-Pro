@@ -1186,7 +1186,7 @@ else:
     st.info("Tarvitaan rosteri, otteluohjelma ja validi aikaväli (start_date ≤ end_date).")
 
  # Alkuperäinen joukkueanalyysi osio
-    st.markdown("---")
+  
     st.header("🔍 Joukkueanalyysi")
     st.markdown("""
     Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
