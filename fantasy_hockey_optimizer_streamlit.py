@@ -1173,7 +1173,19 @@ with tab1:
                         st.info("Fantasiapisteissä ei ole eroa näiden pelaajien välillä.")
 
                 else:
-                    st.warning("Syötä molempien pelaajien tiedot suorittaaksesi vertailun.")
+                    missing_fields = []
+                    if not sim_name_A.strip(): missing_fields.append("Pelaaja A: nimi")
+                    if not sim_team_A.strip(): missing_fields.append("Pelaaja A: joukkue")
+                    if not sim_positions_A.strip(): missing_fields.append("Pelaaja A: pelipaikat")
+                    if sim_fpa_A <= 0: missing_fields.append("Pelaaja A: FP/GP")
+                    
+                    if not sim_name_B.strip(): missing_fields.append("Pelaaja B: nimi")
+                    if not sim_team_B.strip(): missing_fields.append("Pelaaja B: joukkue")
+                    if not sim_positions_B.strip(): missing_fields.append("Pelaaja B: pelipaikat")
+                    if sim_fpa_B <= 0: missing_fields.append("Pelaaja B: FP/GP")
+                    
+                    st.warning("Täydennä seuraavat kentät: " + ", ".join(missing_fields))
+
             
             else:  # Vertaa uutta pelaajaa Lindgren rostersissa olevan pudottamista
                 if new_player_name and new_player_team and new_player_positions and drop_player_name:
