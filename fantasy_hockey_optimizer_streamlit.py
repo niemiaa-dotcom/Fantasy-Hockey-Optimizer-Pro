@@ -1101,11 +1101,12 @@ with tab1:
                             team_game_days[team].add(date)
 
                     with st.spinner("Lasketaan alkuperäistä kokonaispelimäärää ja pisteitä..."):
-                        _, original_total_games_dict, original_fp, _ = optimize_roster_advanced(
+                        _, original_total_games_dict, original_fp, _, _ = optimize_roster_advanced(
                             schedule_filtered,
                             st.session_state['roster'],
                             pos_limits
                         )
+
                         original_total_games = sum(original_total_games_dict.values())
                     
                     with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
