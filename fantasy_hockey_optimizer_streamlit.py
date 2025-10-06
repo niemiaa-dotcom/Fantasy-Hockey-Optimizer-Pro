@@ -1130,11 +1130,12 @@ with tab1:
                         player_A_impact_days = total_games_A_dict.get(sim_name_A, 0)
                     
                     with st.spinner(f"Lasketaan {sim_name_B}:n vaikutusta..."):
-                        _, total_games_B_dict, new_fp_B, _ = optimize_roster_advanced(
+                       _, total_games_B_dict, new_fp_B, _, _ = optimize_roster_advanced(
                             schedule_filtered,
                             sim_roster_B,
                             pos_limits
                         )
+
                         new_total_games_B = sum(total_games_B_dict.values())
                         player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
 
