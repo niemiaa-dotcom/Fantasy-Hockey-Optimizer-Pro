@@ -1185,8 +1185,8 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
 else:
     st.info("Tarvitaan rosteri, otteluohjelma ja validi aikaväli (start_date ≤ end_date).")
 
- # Alkuperäinen joukkueanalyysi osio
-  
+   # Alkuperäinen joukkueanalyysi osio
+    st.markdown("---")
     st.header("🔍 Joukkueanalyysi")
     st.markdown("""
     Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
@@ -1253,7 +1253,6 @@ if st.session_state.get('free_agents') is not None and not st.session_state['fre
             }), use_container_width=True)
         else:
             st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
-
 
 with tab2:
     st.header("🆚 Joukkuevertailu")
