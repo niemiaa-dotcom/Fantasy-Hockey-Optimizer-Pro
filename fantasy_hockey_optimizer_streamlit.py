@@ -983,79 +983,79 @@ with tab1:
 
    st.markdown("### Simuloi uuden pelaajan vaikutus")
 
-colA1, colA2, colA3, colA4 = st.columns(4)
-with colA1:
-    sim_name_A = st.text_input("Pelaaja A: nimi", key="sim_name_A_compare")
-with colA2:
-    sim_team_A = st.text_input("Pelaaja A: joukkue", key="sim_team_A_compare")
-with colA3:
-    sim_positions_A = st.text_input("Pelaaja A: pelipaikat (esim. C/LW)", key="sim_positions_A_compare")
-with colA4:
-    sim_fpa_A = st.number_input("Pelaaja A: FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_A_compare")
-
-colB1, colB2, colB3, colB4 = st.columns(4)
-with colB1:
-    sim_name_B = st.text_input("Pelaaja B: nimi", key="sim_name_B_compare")
-with colB2:
-    sim_team_B = st.text_input("Pelaaja B: joukkue", key="sim_team_B_compare")
-with colB3:
-    sim_positions_B = st.text_input("Pelaaja B: pelipaikat (esim. C/LW)", key="sim_positions_B_compare")
-with colB4:
-    sim_fpa_B = st.number_input("Pelaaja B: FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B_compare")
-
-# Debug-tulosteet
-st.write("DEBUG A:", repr(sim_name_A), repr(sim_team_A), repr(sim_positions_A), repr(sim_fpa_A))
-st.write("DEBUG B:", repr(sim_name_B), repr(sim_team_B), repr(sim_positions_B), repr(sim_fpa_B))
-
-if st.button("Suorita vertailu"):
-    if comparison_type == "Vertaa kahta uutta pelaajaa":
-        original_roster_copy = st.session_state['roster'].copy()
-        if 'fantasy_points_avg' not in original_roster_copy.columns:
-            original_roster_copy['fantasy_points_avg'] = 0.0
-
-        # Luo simuloidut rosterit
-        sim_roster_A = original_roster_copy.copy()
-        sim_roster_A.loc[len(sim_roster_A)] = {
-            'name': sim_name_A,
-            'team': sim_team_A,
-            'positions': sim_positions_A,
-            'fantasy_points_avg': sim_fpa_A
-        }
-
-        sim_roster_B = original_roster_copy.copy()
-        sim_roster_B.loc[len(sim_roster_B)] = {
-            'name': sim_name_B,
-            'team': sim_team_B,
-            'positions': sim_positions_B,
-            'fantasy_points_avg': sim_fpa_B
-        }
-
-        with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
-            _, total_games_A_dict, new_fp_A, _, _ = optimize_roster_advanced(
-                schedule_filtered,
-                sim_roster_A,
-                pos_limits
-            )
-            new_total_games_A = sum(total_games_A_dict.values())
-            player_A_impact_days = total_games_A_dict.get(sim_name_A, 0)
-
-        with st.spinner(f"Lasketaan {sim_name_B}:n vaikutusta..."):
-            _, total_games_B_dict, new_fp_B, _, _ = optimize_roster_advanced(
-                schedule_filtered,
-                sim_roster_B,
-                pos_limits
-            )
-            new_total_games_B = sum(total_games_B_dict.values())
-            player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
-
-        st.subheader("Vertailun tulokset")
-        col1, col2 = st.columns(2)
-        with col1:
-            st.metric(label=f"{sim_name_A} FP", value=f"{new_fp_A:.1f}")
-            st.metric(label="Pelipäiviä", value=player_A_impact_days)
-        with col2:
-            st.metric(label=f"{sim_name_B} FP", value=f"{new_fp_B:.1f}")
-            st.metric(label="Pelipäiviä", value=player_B_impact_days)
+    colA1, colA2, colA3, colA4 = st.columns(4)
+    with colA1:
+        sim_name_A = st.text_input("Pelaaja A: nimi", key="sim_name_A_compare")
+    with colA2:
+        sim_team_A = st.text_input("Pelaaja A: joukkue", key="sim_team_A_compare")
+    with colA3:
+        sim_positions_A = st.text_input("Pelaaja A: pelipaikat (esim. C/LW)", key="sim_positions_A_compare")
+    with colA4:
+        sim_fpa_A = st.number_input("Pelaaja A: FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_A_compare")
+    
+    colB1, colB2, colB3, colB4 = st.columns(4)
+    with colB1:
+        sim_name_B = st.text_input("Pelaaja B: nimi", key="sim_name_B_compare")
+    with colB2:
+        sim_team_B = st.text_input("Pelaaja B: joukkue", key="sim_team_B_compare")
+    with colB3:
+        sim_positions_B = st.text_input("Pelaaja B: pelipaikat (esim. C/LW)", key="sim_positions_B_compare")
+    with colB4:
+        sim_fpa_B = st.number_input("Pelaaja B: FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B_compare")
+    
+    # Debug-tulosteet
+    st.write("DEBUG A:", repr(sim_name_A), repr(sim_team_A), repr(sim_positions_A), repr(sim_fpa_A))
+    st.write("DEBUG B:", repr(sim_name_B), repr(sim_team_B), repr(sim_positions_B), repr(sim_fpa_B))
+    
+    if st.button("Suorita vertailu"):
+        if comparison_type == "Vertaa kahta uutta pelaajaa":
+            original_roster_copy = st.session_state['roster'].copy()
+            if 'fantasy_points_avg' not in original_roster_copy.columns:
+                original_roster_copy['fantasy_points_avg'] = 0.0
+    
+            # Luo simuloidut rosterit
+            sim_roster_A = original_roster_copy.copy()
+            sim_roster_A.loc[len(sim_roster_A)] = {
+                'name': sim_name_A,
+                'team': sim_team_A,
+                'positions': sim_positions_A,
+                'fantasy_points_avg': sim_fpa_A
+            }
+    
+            sim_roster_B = original_roster_copy.copy()
+            sim_roster_B.loc[len(sim_roster_B)] = {
+                'name': sim_name_B,
+                'team': sim_team_B,
+                'positions': sim_positions_B,
+                'fantasy_points_avg': sim_fpa_B
+            }
+    
+            with st.spinner(f"Lasketaan {sim_name_A}:n vaikutusta..."):
+                _, total_games_A_dict, new_fp_A, _, _ = optimize_roster_advanced(
+                    schedule_filtered,
+                    sim_roster_A,
+                    pos_limits
+                )
+                new_total_games_A = sum(total_games_A_dict.values())
+                player_A_impact_days = total_games_A_dict.get(sim_name_A, 0)
+    
+            with st.spinner(f"Lasketaan {sim_name_B}:n vaikutusta..."):
+                _, total_games_B_dict, new_fp_B, _, _ = optimize_roster_advanced(
+                    schedule_filtered,
+                    sim_roster_B,
+                    pos_limits
+                )
+                new_total_games_B = sum(total_games_B_dict.values())
+                player_B_impact_days = total_games_B_dict.get(sim_name_B, 0)
+    
+            st.subheader("Vertailun tulokset")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(label=f"{sim_name_A} FP", value=f"{new_fp_A:.1f}")
+                st.metric(label="Pelipäiviä", value=player_A_impact_days)
+            with col2:
+                st.metric(label=f"{sim_name_B} FP", value=f"{new_fp_B:.1f}")
+                st.metric(label="Pelipäiviä", value=player_B_impact_days)
 
     # Alkuperäinen joukkueanalyysi osio
     st.markdown("---")
