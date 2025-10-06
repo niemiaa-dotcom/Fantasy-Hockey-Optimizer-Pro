@@ -739,7 +739,7 @@ def analyze_free_agents(team_impact_dict, free_agents_df):
 tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
 with tab1:
-    st.header("📊 Nykyinen rosteri (APL)")
+    st.header("📊 Nykyinen rosteri (Valioliika)")
 
     # Puretaan rosterit turvallisesti
     my_roster = st.session_state.get("roster", pd.DataFrame())
