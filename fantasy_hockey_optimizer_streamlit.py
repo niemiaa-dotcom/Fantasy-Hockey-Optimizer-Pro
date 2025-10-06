@@ -980,8 +980,8 @@ with tab1:
                 availability_df.style.applymap(color_cells),
                 use_container_width=True
             )
-
-   st.markdown("### Simuloi uuden pelaajan vaikutus")
+            
+    st.markdown("### Simuloi uuden pelaajan vaikutus")
 
     colA1, colA2, colA3, colA4 = st.columns(4)
     with colA1:
