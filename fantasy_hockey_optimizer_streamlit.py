@@ -1116,69 +1116,76 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
                 st.dataframe(df, use_container_width=True)
     
 
-# --- Vapaiden agenttien analyysi ---
-st.markdown("---")
-st.header("🆓 Vapaiden agenttien analyysi")
+def analyze_free_agents(team_impact_dict, free_agents_df, roster_df):
+    """
+    Analysoi vapaat agentit aiemmin lasketun joukkueanalyysin perusteella.
+    Suodattaa pois kaikki jo rosterissa olevat pelaajat (terveet ja loukkaantuneet).
+    """
+    if not team_impact_dict or free_agents_df.empty:
+        st.warning("Joukkueanalyysiä tai vapaiden agenttien listaa ei ole ladattu.")
+        return pd.DataFrame()
 
-if st.session_state.get('team_impact_results') is None:
-    st.info("Suorita ensin joukkueanalyysi.")
-elif st.session_state['free_agents'].empty:
-    st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
-else:
-    # Suodatusvalikot
-    all_positions = sorted(
-        list(
-            set(
-                p.strip()
-                for player_pos in st.session_state['free_agents']['positions'].unique()
-                for p in player_pos.replace('/', ',').split(',')
-            )
-        )
+    # Poista kaikki rosterissa olevat pelaajat (terveet + loukkaantuneet)
+    current_names = set(st.session_state['roster']['name'])
+    free_agents_df = free_agents_df[~free_agents_df['name'].isin(current_names)].copy()
+
+    # Jätä pois maalivahdit
+    free_agents_df = free_agents_df[~free_agents_df['positions'].str.contains('G')].copy()
+    if free_agents_df.empty:
+        st.info("Vapaita agentteja ei löytynyt maalivahtien suodatuksen jälkeen.")
+        return pd.DataFrame()
+
+    # Yhdistä joukkueanalyysin tulokset
+    team_impact_df_list = []
+    for pos, df in team_impact_dict.items():
+        if not df.empty and pos != 'G':
+            df = df.copy()
+            df['position'] = pos
+            team_impact_df_list.append(df)
+
+    if not team_impact_df_list:
+        st.warning("Joukkueanalyysin tuloksia ei löytynyt kenttäpelaajille.")
+        return pd.DataFrame()
+
+    combined_impact_df = pd.concat(team_impact_df_list, ignore_index=True)
+    combined_impact_df.rename(columns={'Joukkue': 'team', 'Lisäpelit': 'extra_games_total'}, inplace=True)
+
+    results = free_agents_df.copy()
+    results['total_impact'] = 0.0
+    results['games_added'] = 0.0
+
+    # Käsittele monipaikkaiset pelaajat
+    results['positions_list'] = results['positions'].apply(
+        lambda x: [p.strip() for p in str(x).replace('/', ',').split(',')]
     )
-    selected_pos = st.multiselect(
-        "Suodata pelipaikkojen mukaan:",
-        all_positions,
-        default=all_positions
-    )
 
-    all_teams = sorted(st.session_state['free_agents']['team'].unique())
-    selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
-
-    if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
-        with st.spinner("Analysoidaan vapaat agentit..."):
-            # ✅ Käytetään roster_to_use optimoinnissa
-            free_agent_results = analyze_free_agents(
-                st.session_state['team_impact_results'],
-                st.session_state['free_agents'],
-                roster_to_use
-            )
-            st.session_state['free_agent_results'] = free_agent_results
-
-    if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
-        filtered_results = st.session_state['free_agent_results'].copy()
-
-        # Suodatus pelipaikan mukaan
-        if selected_pos:
-            filtered_results = filtered_results[
-                filtered_results['positions'].apply(
-                    lambda x: any(pos in x.split('/') for pos in selected_pos)
-                )
+    def calculate_impact(row):
+        team = row['team']
+        fpa = row['fantasy_points_avg']
+        positions = row['positions_list']
+        max_extra_games = 0.0
+        if not positions:
+            return 0.0, 0.0
+        for pos in positions:
+            match = combined_impact_df[
+                (combined_impact_df['team'] == team) & (combined_impact_df['position'] == pos)
             ]
+            if not match.empty:
+                extra_games = match['extra_games_total'].iloc[0]
+                if extra_games > max_extra_games:
+                    max_extra_games = extra_games
+        total_impact = max_extra_games * fpa
+        return total_impact, max_extra_games
 
-        # Suodatus joukkueen mukaan
-        if selected_team != "Kaikki":
-            filtered_results = filtered_results[filtered_results['team'] == selected_team]
+    results[['total_impact', 'games_added']] = results.apply(calculate_impact, axis=1, result_type='expand')
+    results['games_added'] = results['games_added'].astype(int)
 
-        if not filtered_results.empty:
-            st.dataframe(
-                filtered_results.style.format({
-                    'total_impact': "{:.2f}",
-                    'fantasy_points_avg': "{:.1f}"
-                }),
-                use_container_width=True
-            )
-        else:
-            st.error("Analyysituloksia ei löytynyt valituilla suodattimilla.")
+    results.drop(columns=['positions_list'], inplace=True)
+    results = results[['name', 'team', 'positions', 'games_added', 'fantasy_points_avg', 'total_impact']]
+    results = results.sort_values(by='total_impact', ascending=False)
+
+    return results
+
 
 
 with tab2:
