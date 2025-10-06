@@ -215,6 +215,14 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+def is_valid_player_input(name, team, positions, fpa):
+    return all([
+        isinstance(name, str) and name.strip(),
+        isinstance(team, str) and team.strip(),
+        isinstance(positions, str) and positions.strip(),
+        isinstance(fpa, (int, float)) and fpa > 0
+    ])
+
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
@@ -1069,7 +1077,9 @@ with tab1:
 
         if st.button("Suorita vertailu"):
             if comparison_type == "Vertaa kahta uutta pelaajaa":
-                if sim_name_A and sim_team_A and sim_positions_A and sim_name_B and sim_team_B and sim_positions_B:
+                if is_valid_player_input(sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A) and \ 
+                   is_valid_player_input(sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B):
+
                     
                     original_roster_copy = st.session_state['roster'].copy()
                     if 'fantasy_points_avg' not in original_roster_copy.columns:
