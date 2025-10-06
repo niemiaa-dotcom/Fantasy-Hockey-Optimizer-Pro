@@ -1067,13 +1067,16 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             st.subheader("Vertailun tulokset")
             col1, col2 = st.columns(2)
             with col1:
+                st.markdown(f"**{sim_name_A or 'Pelaaja A'}**")
                 st.metric("Pelien muutos", f"{delta_games_A:+}")
                 st.metric("Omat pelit", games_A_dict.get(sim_name_A, 0))
                 st.metric("Fantasiapiste-ero", f"{delta_fp_A:+.1f}")
             with col2:
+                st.markdown(f"**{sim_name_B or 'Pelaaja B'}**")
                 st.metric("Pelien muutos", f"{delta_games_B:+}")
                 st.metric("Omat pelit", games_B_dict.get(sim_name_B, 0))
                 st.metric("Fantasiapiste-ero", f"{delta_fp_B:+.1f}")
+            
 
         # --- Yhden pelaajan lisäys ---
         elif comparison_type == "Lisää yksi uusi pelaaja rosteriin":
