@@ -1185,7 +1185,34 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
 else:
     st.info("Tarvitaan rosteri, otteluohjelma ja validi aikaväli (start_date ≤ end_date).")
 
+ # Alkuperäinen joukkueanalyysi osio
+    st.markdown("---")
+    st.header("🔍 Joukkueanalyysi")
+    st.markdown("""
+    Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta
+    ja näyttää, mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle
+    ottaen huomioon nykyisen rosterisi.
+    """)
+    if st.session_state['schedule'].empty or st.session_state['roster'].empty:
+        st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+    else:
+        schedule_filtered = st.session_state['schedule'][
+            (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+            (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+        ]
 
+        if not schedule_filtered.empty:
+            if st.button("Suorita joukkueanalyysi"):
+                st.session_state['team_impact_results'] = calculate_team_impact_by_position(
+                    schedule_filtered,
+                    st.session_state['roster'],
+                    pos_limits
+                )
+            
+            if st.session_state['team_impact_results'] is not None:
+                for pos, df in st.session_state['team_impact_results'].items():
+                    st.subheader(f"Joukkueet pelipaikalle: {pos}")
+                    st.dataframe(df, use_container_width=True)
 
 # --- Vapaiden agenttien analyysi ---
 if st.session_state.get('free_agents') is not None and not st.session_state['free_agents'].empty and \
