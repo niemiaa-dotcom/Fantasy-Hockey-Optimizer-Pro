@@ -1081,116 +1081,116 @@ if not st.session_state['roster'].empty and 'schedule' in st.session_state and n
             )
 
 
-       # --- Joukkueanalyysi ---
-st.markdown("---")
-st.header("🔍 Joukkueanalyysi")
-st.markdown("""
-Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää,
-mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
-""")
-
-if st.session_state['schedule'].empty or roster_to_use.empty:
-    st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
-else:
-    # ✅ Suodatetaan aikataulu valitun aikavälin mukaan – varmistetaan että tyypit täsmäävät
-    schedule_filtered = st.session_state['schedule'][
-        (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
-        (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
-    ]
-
-    # Näytetään nappi aina, vaikka schedule_filtered olisi tyhjä
-    if st.button("Suorita joukkueanalyysi"):
-        if schedule_filtered.empty:
-            st.warning("Valitulla aikavälillä ei löytynyt otteluita.")
-        else:
-            with st.spinner("Lasketaan joukkueanalyysiä..."):
-                st.session_state['team_impact_results'] = calculate_team_impact_by_position(
-                    schedule_filtered, roster_to_use, pos_limits
-                )
-
-    # Näytetään tulokset, jos analyysi on ajettu
-    if st.session_state.get('team_impact_results') is not None:
-        for pos, df in st.session_state['team_impact_results'].items():
-            st.subheader(f"Joukkueet pelipaikalle: {pos}")
-            st.dataframe(df, use_container_width=True)
-
-
-    # --- Vapaiden agenttien analyysi UI ---
+           # --- Joukkueanalyysi ---
     st.markdown("---")
-    st.header("🆓 Vapaiden agenttien analyysi")
+    st.header("🔍 Joukkueanalyysi")
+    st.markdown("""
+    Tämä osio simuloi kuvitteellisen pelaajan lisäämisen jokaisesta joukkueesta ja näyttää,
+    mikä joukkue tuottaisi eniten aktiivisia pelejä kullekin pelipaikalle ottaen huomioon nykyisen rosterisi.
+    """)
     
-    # Nappi analyysin ajamiseen
-    if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
-        if st.session_state.get('team_impact_results') is None:
-            st.warning("Suorita ensin joukkueanalyysi.")
-        elif st.session_state['free_agents'].empty:
-            st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
-        else:
-            with st.spinner("Analysoidaan vapaat agentit..."):
-                free_agent_results = analyze_free_agents(
-                    st.session_state['team_impact_results'],
-                    st.session_state['free_agents'],
-                    roster_to_use
+    if st.session_state['schedule'].empty or roster_to_use.empty:
+        st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi analyysin.")
+    else:
+        # ✅ Suodatetaan aikataulu valitun aikavälin mukaan – varmistetaan että tyypit täsmäävät
+        schedule_filtered = st.session_state['schedule'][
+            (st.session_state['schedule']['Date'] >= pd.to_datetime(start_date)) &
+            (st.session_state['schedule']['Date'] <= pd.to_datetime(end_date))
+        ]
+    
+        # Näytetään nappi aina, vaikka schedule_filtered olisi tyhjä
+        if st.button("Suorita joukkueanalyysi"):
+            if schedule_filtered.empty:
+                st.warning("Valitulla aikavälillä ei löytynyt otteluita.")
+            else:
+                with st.spinner("Lasketaan joukkueanalyysiä..."):
+                    st.session_state['team_impact_results'] = calculate_team_impact_by_position(
+                        schedule_filtered, roster_to_use, pos_limits
+                    )
+    
+        # Näytetään tulokset, jos analyysi on ajettu
+        if st.session_state.get('team_impact_results') is not None:
+            for pos, df in st.session_state['team_impact_results'].items():
+                st.subheader(f"Joukkueet pelipaikalle: {pos}")
+                st.dataframe(df, use_container_width=True)
+    
+
+            # --- Vapaiden agenttien analyysi UI ---
+            st.markdown("---")
+            st.header("🆓 Vapaiden agenttien analyysi")
+            
+            # Nappi analyysin ajamiseen
+            if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
+                if st.session_state.get('team_impact_results') is None:
+                    st.warning("Suorita ensin joukkueanalyysi.")
+                elif st.session_state['free_agents'].empty:
+                    st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
+                else:
+                    with st.spinner("Analysoidaan vapaat agentit..."):
+                        free_agent_results = analyze_free_agents(
+                            st.session_state['team_impact_results'],
+                            st.session_state['free_agents'],
+                            roster_to_use
+                        )
+                        st.session_state['free_agent_results'] = free_agent_results
+            
+            # Näytetään suodatusvalikot ja tulokset vain jos analyysi on ajettu
+            if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
+            
+                # --- Suodatusvalikot ---
+                all_positions = sorted(list(set(
+                    p.strip()
+                    for player_pos in st.session_state['free_agents']['positions'].unique()
+                    for p in str(player_pos).replace('/', ',').split(',')
+                )))
+                all_teams = sorted(st.session_state['free_agents']['team'].unique())
+            
+                # Alustetaan session_state jos ei vielä ole
+                if "fa_selected_pos" not in st.session_state:
+                    st.session_state["fa_selected_pos"] = all_positions
+                if "fa_selected_team" not in st.session_state:
+                    st.session_state["fa_selected_team"] = "Kaikki"
+            
+                # Multiselect pelipaikoille
+                st.session_state["fa_selected_pos"] = st.multiselect(
+                    "Suodata pelipaikkojen mukaan:",
+                    all_positions,
+                    default=st.session_state["fa_selected_pos"],
+                    key="fa_pos_filter_v1"
                 )
-                st.session_state['free_agent_results'] = free_agent_results
-    
-    # Näytetään suodatusvalikot ja tulokset vain jos analyysi on ajettu
-    if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
-    
-        # --- Suodatusvalikot ---
-        all_positions = sorted(list(set(
-            p.strip()
-            for player_pos in st.session_state['free_agents']['positions'].unique()
-            for p in str(player_pos).replace('/', ',').split(',')
-        )))
-        all_teams = sorted(st.session_state['free_agents']['team'].unique())
-    
-        # Alustetaan session_state jos ei vielä ole
-        if "fa_selected_pos" not in st.session_state:
-            st.session_state["fa_selected_pos"] = all_positions
-        if "fa_selected_team" not in st.session_state:
-            st.session_state["fa_selected_team"] = "Kaikki"
-    
-        # Multiselect pelipaikoille
-        st.session_state["fa_selected_pos"] = st.multiselect(
-            "Suodata pelipaikkojen mukaan:",
-            all_positions,
-            default=st.session_state["fa_selected_pos"],
-            key="fa_pos_filter_v1"
-        )
-    
-        # Selectbox joukkueelle
-        st.session_state["fa_selected_team"] = st.selectbox(
-            "Suodata joukkueen mukaan:",
-            ["Kaikki"] + list(all_teams),
-            index=(["Kaikki"] + list(all_teams)).index(st.session_state["fa_selected_team"])
-            if st.session_state["fa_selected_team"] in ["Kaikki"] + list(all_teams) else 0,
-            key="fa_team_filter_v1"
-        )
-    
-        # --- Suodatus tuloksiin ---
-        filtered_results = st.session_state['free_agent_results'].copy()
-    
-        if st.session_state["fa_selected_pos"]:
-            filtered_results = filtered_results[
-                filtered_results['positions'].apply(
-                    lambda x: any(pos in x.split('/') for pos in st.session_state["fa_selected_pos"])
+            
+                # Selectbox joukkueelle
+                st.session_state["fa_selected_team"] = st.selectbox(
+                    "Suodata joukkueen mukaan:",
+                    ["Kaikki"] + list(all_teams),
+                    index=(["Kaikki"] + list(all_teams)).index(st.session_state["fa_selected_team"])
+                    if st.session_state["fa_selected_team"] in ["Kaikki"] + list(all_teams) else 0,
+                    key="fa_team_filter_v1"
                 )
-            ]
-    
-        if st.session_state["fa_selected_team"] != "Kaikki":
-            filtered_results = filtered_results[
-                filtered_results['team'] == st.session_state["fa_selected_team"]
-            ]
-    
-        # Näytetään tulokset
-        st.dataframe(
-            filtered_results.style.format({
-                'total_impact': "{:.2f}",
-                'fantasy_points_avg': "{:.1f}"
-            }),
-            use_container_width=True
-        )
+            
+                # --- Suodatus tuloksiin ---
+                filtered_results = st.session_state['free_agent_results'].copy()
+            
+                if st.session_state["fa_selected_pos"]:
+                    filtered_results = filtered_results[
+                        filtered_results['positions'].apply(
+                            lambda x: any(pos in x.split('/') for pos in st.session_state["fa_selected_pos"])
+                        )
+                    ]
+            
+                if st.session_state["fa_selected_team"] != "Kaikki":
+                    filtered_results = filtered_results[
+                        filtered_results['team'] == st.session_state["fa_selected_team"]
+                    ]
+            
+                # Näytetään tulokset
+                st.dataframe(
+                    filtered_results.style.format({
+                        'total_impact': "{:.2f}",
+                        'fantasy_points_avg': "{:.1f}"
+                    }),
+                    use_container_width=True
+                )
 
 
 
