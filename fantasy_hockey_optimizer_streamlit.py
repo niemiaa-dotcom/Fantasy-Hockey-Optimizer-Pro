@@ -732,7 +732,70 @@ def analyze_free_agents(team_impact_dict, free_agents_df, roster_df):
 
     return results
 
-    
+def load_all_team_rosters_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        return {}
+
+    sheet_url = st.secrets["free_agents_sheet"]["url"]
+    sheet = client.open_by_url(sheet_url)
+    worksheet = sheet.worksheet("T3 Småland Roster")  # tai mikä välilehti rosterit sisältää
+    data = worksheet.get_all_records()
+    df = pd.DataFrame(data)
+
+    # Normalisoi sarakkeet
+    df.columns = df.columns.str.strip().str.lower()
+    required = ["fantasy team", "player name", "position(s)", "nhl team", "fp", "injury status"]
+    if not all(c in df.columns for c in required):
+        st.error("Rosteritaulukosta puuttuu vaadittuja sarakkeita")
+        return {}
+
+    # Normalisoi injury_status
+    df["injury status"] = df["injury status"].fillna("").astype(str).str.strip().str.upper()
+    yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ"}
+
+    # Muodosta dict: {joukkue_nimi: DataFrame} – vain terveet
+    team_rosters = {}
+    for team in df["fantasy team"].dropna().unique():
+        team_df = df[df["fantasy team"] == team].copy()
+        team_df = team_df.rename(columns={
+            "player name": "name",
+            "nhl team": "team",
+            "position(s)": "positions",
+            "fp": "fantasy_points_avg",
+            "injury status": "injury_status"
+        })
+        team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
+
+        # ✅ Suodata pois loukkaantuneet
+        healthy_df = team_df[~team_df["injury_status"].isin(yahoo_injury_statuses)].copy()
+
+        team_rosters[team] = healthy_df
+
+    return team_rosters
+
+
+def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_date):
+    results = []
+    schedule_filtered = schedule_df[
+        (schedule_df['Date'] >= pd.to_datetime(start_date)) &
+        (schedule_df['Date'] <= pd.to_datetime(end_date))
+    ]
+
+    for team_name, roster_df in team_rosters.items():
+        if roster_df.empty:
+            continue
+        _, player_games, total_fp, total_active_games, _ = optimize_roster_advanced(
+            schedule_filtered, roster_df, pos_limits, num_attempts=200
+        )
+        results.append({
+            "Joukkue": team_name,
+            "Aktiiviset pelit": total_active_games,
+            "Ennakoidut FP": round(total_fp, 1)
+        })
+
+    return pd.DataFrame(results).sort_values("Ennakoidut FP", ascending=False)
+
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
 tab1, tab2 = st.tabs(["Rosterin optimointi", "Joukkuevertailu"])
 
