@@ -941,7 +941,7 @@ with tab1:
             lineup_df = build_lineup_matrix(daily_results, max_bench=5)
             
             # Näytetään taulukko käyttöliittymässä
-            st.dataframe(lineup_df, use_container_width=True)
+             st.dataframe(lineup_df, use_container_width=True, height=800)
             
             st.subheader("Pelaajien kokonaispelimäärät (aktiiviset ja penkillä)")
             games_df = pd.DataFrame({
@@ -956,7 +956,7 @@ with tab1:
             # Järjestetään näkyvyys järkevästi
             games_df = games_df.sort_values('Aktiiviset pelit', ascending=False)
 
-            st.dataframe(lineup_df, use_container_width=True, height=800)
+            st.dataframe(games_df, use_container_width=True)
 
             # 📥 CSV-lataus
             csv = games_df.to_csv(index=False).encode('utf-8')
