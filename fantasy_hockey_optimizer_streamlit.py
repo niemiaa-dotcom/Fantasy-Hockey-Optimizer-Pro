@@ -900,7 +900,7 @@ with tab1:
                          use_container_width=True, hide_index=True)
 
     
-    st.header("🚀 Rosterin optimointi")
+    st.header("🚀 Rosterin optimointi KKUPFL")
     
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
         st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi optimoinnin")
@@ -956,7 +956,7 @@ with tab1:
                 mime='text/csv'
             )
 
-    st.subheader("Päivittäinen pelipaikkasaatavuus")
+    st.subheader("Päivittäinen pelipaikkasaatavuus KKUPFL")
     st.markdown("Tämä matriisi näyttää, onko rosteriin mahdollista lisätä uusi pelaaja kyseiselle pelipaikalle.")
 
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
@@ -1047,7 +1047,7 @@ with tab1:
             )
 
         # --- Simuloi uuden pelaajan vaikutus ---
-        st.header("🔮 Simuloi uuden pelaajan vaikutus")
+        st.header("🔮 Simuloi uuden pelaajan vaikutus KKUPFL")
         
         if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
             st.subheader("Valitse vertailutyyppi")
@@ -1270,7 +1270,7 @@ with tab1:
 
 
 with tab2:
-    st.header("🆚 Joukkuevertailu")
+    st.header("🆚 Joukkuevertailu KKUPFL")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
 
     # Puretaan rosterit turvallisesti
