@@ -1119,6 +1119,17 @@ with tab1:
                 st.markdown("---")
                 st.header("🆓 Vapaiden agenttien analyysi")
                 
+                # Suodatusvalikot
+                all_positions = sorted(list(set(
+                    p.strip()
+                    for player_pos in st.session_state['free_agents']['positions'].unique()
+                    for p in player_pos.replace('/', ',').split(',')
+                )))
+                selected_pos = st.multiselect("Suodata pelipaikkojen mukaan:", all_positions, default=all_positions)
+                
+                all_teams = sorted(st.session_state['free_agents']['team'].unique())
+                selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
+                
                 if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
                     if st.session_state.get('team_impact_results') is None:
                         st.warning("Suorita ensin joukkueanalyysi.")
@@ -1126,11 +1137,24 @@ with tab1:
                         st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
                     else:
                         with st.spinner("Analysoidaan vapaat agentit..."):
-                            st.session_state['free_agent_results'] = analyze_free_agents(
+                            free_agent_results = analyze_free_agents(
                                 st.session_state['team_impact_results'],
                                 st.session_state['free_agents'],
                                 roster_to_use
                             )
+                
+                            # ✅ Suodatus tuloksiin
+                            filtered_results = free_agent_results.copy()
+                            if selected_pos:
+                                filtered_results = filtered_results[
+                                    filtered_results['positions'].apply(
+                                        lambda x: any(pos in x.split('/') for pos in selected_pos)
+                                    )
+                                ]
+                            if selected_team != "Kaikki":
+                                filtered_results = filtered_results[filtered_results['team'] == selected_team]
+                
+                            st.session_state['free_agent_results'] = filtered_results
                 
                 if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
                     st.dataframe(
