@@ -848,6 +848,16 @@ def build_lineup_matrix(daily_results, max_bench=10):
     # Muodostetaan DataFrame
     df = pd.DataFrame(table).T  # slotit riveiksi
     df = df[sorted(df.columns)]  # järjestä päivät
+     # ✅ Muodostetaan uudet otsikot: YYYY-MM-DD (Mon)
+    new_cols = []
+    for d in df.columns:
+        if isinstance(d, (pd.Timestamp, datetime.date)):
+            d = pd.to_datetime(d)
+            new_cols.append(f"{d.strftime('%Y-%m-%d')} ({d.strftime('%a')})")
+        else:
+            new_cols.append(str(d))
+    df.columns = new_cols
+
     return df
 
 
