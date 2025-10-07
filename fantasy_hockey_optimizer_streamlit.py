@@ -1417,7 +1417,7 @@ with tab2:
                                 f"({my_total_games} vs {opponent_total_games} peliä)")
 
 
-              st.markdown("---")
+                        st.markdown("---")
                         st.header("📊 Liigan joukkueanalyysi")
                         
                         if st.button("Suorita kaikkien joukkueiden analyysi"):
