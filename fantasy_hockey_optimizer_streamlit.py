@@ -1125,7 +1125,7 @@ with tab1:
                     for player_pos in st.session_state['free_agents']['positions'].unique()
                     for p in player_pos.replace('/', ',').split(',')
                 )))
-                selected_pos = st.multiselect("Suodata pelipaikkojen mukaan:", all_positions, default=all_positions)
+                selected_pos = st.multiselect("Suodata pelipaikkojen mukaan:", all_positions, default=all_positions,  key="free_agents_pos_filter")
                 
                 all_teams = sorted(st.session_state['free_agents']['team'].unique())
                 selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
