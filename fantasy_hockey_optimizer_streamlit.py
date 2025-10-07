@@ -926,7 +926,7 @@ with tab1:
             st.subheader("Päivittäiset aktiiviset rosterit")
 
             # Rakennetaan matriisi optimoinnin tuloksista
-            lineup_df = build_lineup_matrix(daily_results, max_bench=8)
+            lineup_df = build_lineup_matrix(daily_results, max_bench=5)
             
             # Näytetään taulukko käyttöliittymässä
             st.dataframe(lineup_df, use_container_width=True)
