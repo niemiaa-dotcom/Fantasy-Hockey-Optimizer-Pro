@@ -936,26 +936,12 @@ with tab1:
 
                
             st.subheader("Päivittäiset aktiiviset rosterit")
-            daily_data = []
-            for result in daily_results:
-                active_list = []
-                if isinstance(result, dict) and 'Active' in result and result['Active'] is not None:
-                    for pos, players in result['Active'].items():
-                        for player in players:
-                            active_list.append(f"{player} ({pos})")
-                
-                bench_list = []
-                if isinstance(result, dict) and 'Bench' in result and result['Bench'] is not None:
-                    bench_list = result['Bench']
-                
-                daily_data.append({
-                    'Päivä': result['Date'] if isinstance(result, dict) and 'Date' in result else None,
-                    'Aktiiviset pelaajat': ", ".join(active_list),
-                    'Penkki': ", ".join(bench_list) if bench_list else "Ei pelaajia penkille"
-                })
 
-            daily_df = pd.DataFrame(daily_data)
-            st.dataframe(daily_df, use_container_width=True)
+            # Rakennetaan matriisi optimoinnin tuloksista
+            lineup_df = build_lineup_matrix(daily_results, max_bench=5)
+            
+            # Näytetään taulukko käyttöliittymässä
+            st.dataframe(lineup_df, use_container_width=True, height=800)
             
             st.subheader("Pelaajien kokonaispelimäärät (aktiiviset ja penkillä)")
             games_df = pd.DataFrame({
@@ -981,31 +967,6 @@ with tab1:
                 mime='text/csv'
             )
             
-            st.subheader("📈 Analyysit")
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                top_players = games_df.head(10)
-                st.write("Top 10 eniten pelanneet pelaajat")
-                st.dataframe(top_players)
-            
-            with col2:
-                position_data = {}
-                for _, row in st.session_state['roster'].iterrows():
-                    positions = row['positions'].split('/')
-                    for pos in positions:
-                        pos_clean = pos.strip()
-                        if pos_clean in ['C', 'LW', 'RW', 'D', 'G']:
-                            if pos_clean not in position_data:
-                                position_data[pos_clean] = 0
-                            position_data[pos_clean] += total_games.get(row['name'], 0)
-                
-                pos_df = pd.DataFrame({
-                    'Pelipaikka': list(position_data.keys()),
-                    'Pelit': list(position_data.values())
-                })
-                st.write("Pelipaikkojen kokonaispelimäärät")
-                st.dataframe(pos_df)
 
     st.subheader("Päivittäinen pelipaikkasaatavuus")
     st.markdown("Tämä matriisi näyttää, onko rosteriin mahdollista lisätä uusi pelaaja kyseiselle pelipaikalle.")
