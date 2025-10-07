@@ -941,7 +941,7 @@ with tab1:
             lineup_df = build_lineup_matrix(daily_results, max_bench=5)
             
             # Näytetään taulukko käyttöliittymässä
-             st.dataframe(lineup_df, use_container_width=True, height=800
+             st.dataframe(lineup_df, use_container_width=True, height=800)
             
             st.subheader("Pelaajien kokonaispelimäärät (aktiiviset ja penkillä)")
             games_df = pd.DataFrame({
