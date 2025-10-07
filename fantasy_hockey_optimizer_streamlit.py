@@ -780,13 +780,6 @@ with tab1:
             st.subheader("🚑 Loukkaantuneet pelaajat")
             st.dataframe(injured.reset_index(drop=True),
                          use_container_width=True, hide_index=True)
-
-    st.subheader("Joukkueiden jakauma")
-    if not my_roster.empty:
-        team_counts = my_roster['team'].value_counts()
-        st.bar_chart(team_counts)
-
-
     
     st.header("🚀 Rosterin optimointi")
     
