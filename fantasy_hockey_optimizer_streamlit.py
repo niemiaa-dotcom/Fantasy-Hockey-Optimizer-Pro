@@ -739,7 +739,7 @@ def load_all_team_rosters_from_gsheets():
 
     sheet_url = st.secrets["free_agents_sheet"]["url"]
     sheet = client.open_by_url(sheet_url)
-    worksheet = sheet.worksheet("T3 Småland Roster")  # vaihda tarvittaessa oikeaan välilehteen
+    worksheet = sheet.worksheet("T2 Lindgren Roster")  # vaihda tarvittaessa oikeaan välilehteen
     data = worksheet.get_all_records()
     df = pd.DataFrame(data)
 
