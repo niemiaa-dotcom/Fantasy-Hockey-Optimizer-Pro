@@ -807,7 +807,59 @@ def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_dat
 
     return pd.DataFrame(results).sort_values("Ennakoidut FP", ascending=False)
 
+def build_lineup_matrix(daily_results, max_bench=10):
+    # Määritellään slotit
+    slots = (
+        [f"C{i+1}" for i in range(3)] +
+        [f"LW{i+1}" for i in range(3)] +
+        [f"RW{i+1}" for i in range(3)] +
+        [f"D{i+1}" for i in range(4)] +
+        ["UTIL1"] +
+        [f"G{i+1}" for i in range(2)] +
+        [f"Bench{i+1}" for i in range(max_bench)]
+    )
 
+    # Kerätään data
+    table = {slot: {} for slot in slots}
+    for result in daily_results:
+        date = result["Date"]
+        active = result.get("Active", {})
+        bench = result.get("Bench", [])
+
+        # Täytetään aktiiviset
+        for pos, players in active.items():
+            for i, player in enumerate(players):
+                if pos in ["C", "LW", "RW", "D", "G"]:
+                    slot_name = f"{pos}{i+1}"
+                elif pos == "UTIL":
+                    slot_name = "UTIL1"
+                else:
+                    continue
+                if slot_name in table:
+                    surname = player.split()[-1]
+                    table[slot_name][date] = surname
+
+        # Täytetään penkki
+        for i, player in enumerate(bench):
+            if i < max_bench:
+                surname = player.split()[-1]
+                table[f"Bench{i+1}"][date] = surname
+
+    # Muodostetaan DataFrame
+    df = pd.DataFrame(table).T  # slotit riveiksi
+    df = df[sorted(df.columns)]  # järjestä päivät
+
+    # ✅ Muodostetaan uudet otsikot: YYYY-MM-DD (Mon)
+    new_cols = []
+    for d in df.columns:
+        try:
+            d = pd.to_datetime(d)
+            new_cols.append(f"{d.strftime('%Y-%m-%d')} ({d.strftime('%a')})")
+        except Exception:
+            new_cols.append(str(d))
+    df.columns = new_cols
+
+    return df
 
     
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
