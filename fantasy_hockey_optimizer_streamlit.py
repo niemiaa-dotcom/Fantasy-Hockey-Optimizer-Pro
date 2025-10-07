@@ -956,7 +956,7 @@ with tab1:
             # Järjestetään näkyvyys järkevästi
             games_df = games_df.sort_values('Aktiiviset pelit', ascending=False)
 
-            st.dataframe(games_df, use_container_width=True)
+            st.dataframe(lineup_df, use_container_width=True, height=800)
 
             # 📥 CSV-lataus
             csv = games_df.to_csv(index=False).encode('utf-8')
