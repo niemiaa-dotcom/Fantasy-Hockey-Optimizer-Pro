@@ -750,7 +750,11 @@ def load_all_team_rosters_from_gsheets():
         st.error("Rosteritaulukosta puuttuu vaadittuja sarakkeita")
         return {}
 
-    # Muodosta dict: {joukkue_nimi: DataFrame}
+    # Normalisoi injury_status
+    df["injury status"] = df["injury status"].fillna("").astype(str).str.strip().str.upper()
+    yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ"}
+
+    # Muodosta dict: {joukkue_nimi: DataFrame} – vain terveet
     team_rosters = {}
     for team in df["fantasy team"].dropna().unique():
         team_df = df[df["fantasy team"] == team].copy()
@@ -762,9 +766,14 @@ def load_all_team_rosters_from_gsheets():
             "injury status": "injury_status"
         })
         team_df["fantasy_points_avg"] = pd.to_numeric(team_df["fantasy_points_avg"], errors="coerce").fillna(0)
-        team_rosters[team] = team_df
+
+        # ✅ Suodata pois loukkaantuneet
+        healthy_df = team_df[~team_df["injury_status"].isin(yahoo_injury_statuses)].copy()
+
+        team_rosters[team] = healthy_df
 
     return team_rosters
+
 
 def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_date):
     results = []
