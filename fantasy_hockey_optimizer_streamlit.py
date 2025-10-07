@@ -1119,16 +1119,30 @@ with tab1:
                 st.markdown("---")
                 st.header("🆓 Vapaiden agenttien analyysi")
                 
+        
                 # Suodatusvalikot
-                all_positions = sorted(list(set(
-                    p.strip()
-                    for player_pos in st.session_state['free_agents']['positions'].unique()
-                    for p in player_pos.replace('/', ',').split(',')
-                )))
-                selected_pos = st.multiselect("Suodata pelipaikkojen mukaan:", all_positions, default=all_positions,  key="free_agents_pos_filter")
+                if 'free_agents' in st.session_state and not st.session_state['free_agents'].empty:
+                    all_positions = sorted(list(set(
+                        p.strip()
+                        for player_pos in st.session_state['free_agents']['positions'].unique()
+                        for p in str(player_pos).replace('/', ',').split(',')
+                    )))
                 
-                all_teams = sorted(st.session_state['free_agents']['team'].unique())
-                selected_team = st.selectbox("Suodata joukkueen mukaan:", ["Kaikki"] + list(all_teams))
+                    selected_pos = st.multiselect(
+                        "Suodata pelipaikkojen mukaan (FA):",
+                        all_positions,
+                        default=all_positions,
+                        key="fa_pos_filter_v1"
+                    )
+                
+                    all_teams = sorted(st.session_state['free_agents']['team'].unique())
+                    selected_team = st.selectbox(
+                        "Suodata joukkueen mukaan (FA):",
+                        ["Kaikki"] + list(all_teams),
+                        key="fa_team_filter_v1"
+                    )
+                else:
+                    st.info("Lataa vapaat agentit nähdäksesi suodatusvalikot.")
                 
                 if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
                     if st.session_state.get('team_impact_results') is None:
