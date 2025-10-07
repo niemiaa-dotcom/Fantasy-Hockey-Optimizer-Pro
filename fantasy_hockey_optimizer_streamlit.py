@@ -1417,20 +1417,20 @@ with tab2:
                                 f"({my_total_games} vs {opponent_total_games} peliä)")
 
 
-                  st.markdown("---")
-                            st.header("📊 Liigan joukkueanalyysi")
-                            
-                            if st.button("Suorita kaikkien joukkueiden analyysi"):
-                                team_rosters = load_all_team_rosters_from_gsheets()
-                                if not team_rosters:
-                                    st.warning("Rosteritaulukkoa ei voitu ladata.")
-                                else:
-                                    with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
-                                        league_results = analyze_all_teams(
-                                            st.session_state['schedule'],
-                                            team_rosters,
-                                            pos_limits,
-                                            start_date,
-                                            end_date
-                                        )
-                                        st.dataframe(league_results, use_container_width=True)
+              st.markdown("---")
+                        st.header("📊 Liigan joukkueanalyysi")
+                        
+                        if st.button("Suorita kaikkien joukkueiden analyysi"):
+                            team_rosters = load_all_team_rosters_from_gsheets()
+                            if not team_rosters:
+                                st.warning("Rosteritaulukkoa ei voitu ladata.")
+                            else:
+                                with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
+                                    league_results = analyze_all_teams(
+                                        st.session_state['schedule'],
+                                        team_rosters,
+                                        pos_limits,
+                                        start_date,
+                                        end_date
+                                    )
+                                    st.dataframe(league_results, use_container_width=True)
