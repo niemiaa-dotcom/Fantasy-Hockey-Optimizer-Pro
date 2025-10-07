@@ -784,8 +784,12 @@ def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_dat
     for team_name, roster_df in team_rosters.items():
         if roster_df.empty:
             continue
+
+        # ✅ Ota vain 20 parasta pelaajaa FP/game mukaan
+        top20 = roster_df.sort_values("fantasy_points_avg", ascending=False).head(20)
+
         _, player_games, total_fp, total_active_games, _ = optimize_roster_advanced(
-            schedule_filtered, roster_df, pos_limits, num_attempts=200
+            schedule_filtered, top20, pos_limits, num_attempts=200
         )
         results.append({
             "Joukkue": team_name,
@@ -794,6 +798,7 @@ def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_dat
         })
 
     return pd.DataFrame(results).sort_values("Ennakoidut FP", ascending=False)
+
 
     
 # --- PÄÄSIVU: KÄYTTÖLIITTYMÄ ---
