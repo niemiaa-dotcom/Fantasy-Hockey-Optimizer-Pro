@@ -960,7 +960,11 @@ with tab1:
 
                     del players_info_dict[sim_player_name]
 
-            availability_df = pd.DataFrame(availability_data, index=valid_dates)
+            # Muodostetaan indeksi, jossa mukana viikonpäivä
+            index_with_weekdays = [f"{d.strftime('%Y-%m-%d')} ({d.strftime('%a')})" for d in valid_dates]
+            
+            availability_df = pd.DataFrame(availability_data, index=index_with_weekdays)
+
             
             def color_cells(val):
                 color = 'green' if val else 'red'
