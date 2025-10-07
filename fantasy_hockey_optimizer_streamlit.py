@@ -1192,7 +1192,7 @@ with tab1:
                     use_container_width=True
                 )
 
-            )
+           
 
 with tab2:
     st.header("🆚 Joukkuevertailu")
