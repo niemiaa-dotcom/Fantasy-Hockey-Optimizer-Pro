@@ -1115,70 +1115,64 @@ with tab1:
                 st.dataframe(df, use_container_width=True)
     
     
-                # --- Vapaiden agenttien analyysi UI ---
-                st.markdown("---")
-                st.header("🆓 Vapaiden agenttien analyysi")
-                
-        
-                # Suodatusvalikot
-                if 'free_agents' in st.session_state and not st.session_state['free_agents'].empty:
-                    all_positions = sorted(list(set(
-                        p.strip()
-                        for player_pos in st.session_state['free_agents']['positions'].unique()
-                        for p in str(player_pos).replace('/', ',').split(',')
-                    )))
-                
-                    selected_pos = st.multiselect(
-                        "Suodata pelipaikkojen mukaan (FA):",
-                        all_positions,
-                        default=all_positions,
-                        key="fa_pos_filter_v1"
-                    )
-                
-                    all_teams = sorted(st.session_state['free_agents']['team'].unique())
-                    selected_team = st.selectbox(
-                        "Suodata joukkueen mukaan (FA):",
-                        ["Kaikki"] + list(all_teams),
-                        key="fa_team_filter_v1"
-                    )
-                else:
-                    st.info("Lataa vapaat agentit nähdäksesi suodatusvalikot.")
-                
-                if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
-                    if st.session_state.get('team_impact_results') is None:
-                        st.warning("Suorita ensin joukkueanalyysi.")
-                    elif st.session_state['free_agents'].empty:
-                        st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
-                    else:
-                        with st.spinner("Analysoidaan vapaat agentit..."):
-                            free_agent_results = analyze_free_agents(
-                                st.session_state['team_impact_results'],
-                                st.session_state['free_agents'],
-                                roster_to_use
-                            )
-                
-                            # ✅ Suodatus tuloksiin
-                            filtered_results = free_agent_results.copy()
-                            if selected_pos:
-                                filtered_results = filtered_results[
-                                    filtered_results['positions'].apply(
-                                        lambda x: any(pos in x.split('/') for pos in selected_pos)
-                                    )
-                                ]
-                            if selected_team != "Kaikki":
-                                filtered_results = filtered_results[filtered_results['team'] == selected_team]
-                
-                            st.session_state['free_agent_results'] = filtered_results
-                
-                if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
-                    st.dataframe(
-                        st.session_state['free_agent_results'].style.format({
-                            'total_impact': "{:.2f}",
-                            'fantasy_points_avg': "{:.1f}"
-                        }),
-                        use_container_width=True
-                    )
+               # --- Vapaiden agenttien analyysi UI ---
+st.markdown("---")
+st.header("🆓 Vapaiden agenttien analyysi")
 
+if st.button("Suorita vapaiden agenttien analyysi", key="free_agent_analysis_button_new"):
+    if st.session_state.get('team_impact_results') is None:
+        st.warning("Suorita ensin joukkueanalyysi.")
+    elif st.session_state['free_agents'].empty:
+        st.warning("Lataa vapaat agentit (CSV tai Google Sheet).")
+    else:
+        with st.spinner("Analysoidaan vapaat agentit..."):
+            free_agent_results = analyze_free_agents(
+                st.session_state['team_impact_results'],
+                st.session_state['free_agents'],
+                roster_to_use
+            )
+            st.session_state['free_agent_results'] = free_agent_results
+
+        # Näytetään suodatusvalikot ja tulokset VASTA kun analyysi on ajettu
+        if st.session_state.get('free_agent_results') is not None and not st.session_state['free_agent_results'].empty:
+            # Suodatusvalikot
+            all_positions = sorted(list(set(
+                p.strip()
+                for player_pos in st.session_state['free_agents']['positions'].unique()
+                for p in str(player_pos).replace('/', ',').split(',')
+            )))
+            selected_pos = st.multiselect(
+                "Suodata pelipaikkojen mukaan:",
+                all_positions,
+                default=all_positions,
+                key="fa_pos_filter_v1"
+            )
+        
+            all_teams = sorted(st.session_state['free_agents']['team'].unique())
+            selected_team = st.selectbox(
+                "Suodata joukkueen mukaan:",
+                ["Kaikki"] + list(all_teams),
+                key="fa_team_filter_v1"
+            )
+        
+            # Suodatus tuloksiin
+            filtered_results = st.session_state['free_agent_results'].copy()
+            if selected_pos:
+                filtered_results = filtered_results[
+                    filtered_results['positions'].apply(
+                        lambda x: any(pos in x.split('/') for pos in selected_pos)
+                    )
+                ]
+            if selected_team != "Kaikki":
+                filtered_results = filtered_results[filtered_results['team'] == selected_team]
+        
+            st.dataframe(
+                filtered_results.style.format({
+                    'total_impact': "{:.2f}",
+                    'fantasy_points_avg': "{:.1f}"
+                }),
+                use_container_width=True
+            )
 
 with tab2:
     st.header("🆚 Joukkuevertailu")
