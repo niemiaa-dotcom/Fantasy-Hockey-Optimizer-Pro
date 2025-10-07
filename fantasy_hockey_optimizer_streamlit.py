@@ -900,7 +900,7 @@ with tab1:
                          use_container_width=True, hide_index=True)
 
     
-    st.header("🚀 Rosterin optimointi KKUPFL")
+    st.header("🚀 Rosterin optimointi (KKUPFL)")
     
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
         st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi optimoinnin")
@@ -956,7 +956,7 @@ with tab1:
                 mime='text/csv'
             )
 
-    st.subheader("Päivittäinen pelipaikkasaatavuus KKUPFL")
+    st.subheader("Päivittäinen pelipaikkasaatavuus (KKUPFL)")
     st.markdown("Tämä matriisi näyttää, onko rosteriin mahdollista lisätä uusi pelaaja kyseiselle pelipaikalle.")
 
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
