@@ -1104,15 +1104,15 @@ with tab1:
                     with colN4:
                         new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
                         
-                            # --- Suoritus ---
-                            if st.button("Suorita vertailu"):
-                                schedule_filtered = st.session_state['schedule'][
-                                    (st.session_state['schedule']['Date'].dt.date >= start_date) &
-                                    (st.session_state['schedule']['Date'].dt.date <= end_date)
-                                ]
-                                if schedule_filtered.empty:
-                                    st.warning("Ei pelejä valitulla aikavälillä.")
-                                    st.stop()
+            # --- Suoritus ---
+            if st.button("Suorita vertailu"):
+                schedule_filtered = st.session_state['schedule'][
+                    (st.session_state['schedule']['Date'].dt.date >= start_date) &
+                    (st.session_state['schedule']['Date'].dt.date <= end_date)
+                ]
+                if schedule_filtered.empty:
+                    st.warning("Ei pelejä valitulla aikavälillä.")
+                    st.stop()
         
                 # Baseline: käytetään roster_to_use (eli toggle huomioitu)
                 daily_base, base_games_dict, base_fp, base_total_active_games, base_bench_dict = optimize_roster_advanced(
