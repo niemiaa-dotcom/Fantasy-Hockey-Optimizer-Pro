@@ -422,14 +422,14 @@ if start_date > end_date:
 st.sidebar.subheader("Pelipaikkojen rajoitukset")
 col1, col2 = st.sidebar.columns(2)
 with col1:
-    c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=3, key="c_limit")
-    lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=3, key="lw_limit")
-    rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", min_value=1, max_value=6, value=3, key="rw_limit")
+    c_limit = st.number_input("Hyökkääjät (C)", min_value=1, max_value=6, value=2, key="c_limit")
+    lw_limit = st.number_input("Vasen laitahyökkääjä (LW)", min_value=1, max_value=6, value=2, key="lw_limit")
+    rw_limit = st.number_input("Oikea laitahyökkääjä (RW)", min_value=1, max_value=6, value=2, key="rw_limit")
 
 with col2:
     d_limit = st.number_input("Puolustajat (D)", min_value=1, max_value=8, value=4, key="d_limit")
     g_limit = st.number_input("Maalivahdit (G)", min_value=1, max_value=4, value=2, key="g_limit")
-    util_limit = st.number_input("UTIL-paikat", min_value=0, max_value=3, value=1, key="util_limit")
+    util_limit = st.number_input("UTIL-paikat", min_value=0, max_value=3, value=2, key="util_limit")
 
 pos_limits = {
     'C': c_limit,
