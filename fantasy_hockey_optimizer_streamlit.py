@@ -1075,25 +1075,44 @@ with tab1:
                 )
         
                 st.markdown("#### Lisättävä pelaaja")
-                colN1, colN2, colN3, colN4 = st.columns(4)
-                with colN1:
-                    new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
-                with colN2:
-                    new_player_team = st.text_input("Joukkue", key="new_player_team")
-                with colN3:
-                    new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
-                with colN4:
-                    new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
-        
-            # --- Suoritus ---
-            if st.button("Suorita vertailu"):
-                schedule_filtered = st.session_state['schedule'][
-                    (st.session_state['schedule']['Date'].dt.date >= start_date) &
-                    (st.session_state['schedule']['Date'].dt.date <= end_date)
-                ]
-                if schedule_filtered.empty:
-                    st.warning("Ei pelejä valitulla aikavälillä.")
-                    st.stop()
+                if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
+                    fa_df = st.session_state["free_agents"]
+                
+                    selected_fa = st.selectbox(
+                        "Valitse vapaa agentti",
+                        [""] + list(fa_df["name"].unique()),
+                        key="new_player_select"
+                    )
+                
+                    if selected_fa:
+                        fa_row = fa_df[fa_df["name"] == selected_fa].iloc[0]
+                        new_player_name = fa_row["name"]
+                        new_player_team = fa_row["team"]
+                        new_player_positions = fa_row["positions"]
+                        new_player_fpa = float(fa_row["fantasy_points_avg"])
+                    else:
+                        new_player_name, new_player_team, new_player_positions, new_player_fpa = "", "", "", 0.0
+                
+                else:
+                    colN1, colN2, colN3, colN4 = st.columns(4)
+                    with colN1:
+                        new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
+                    with colN2:
+                        new_player_team = st.text_input("Joukkue", key="new_player_team")
+                    with colN3:
+                        new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
+                    with colN4:
+                        new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
+                        
+                            # --- Suoritus ---
+                            if st.button("Suorita vertailu"):
+                                schedule_filtered = st.session_state['schedule'][
+                                    (st.session_state['schedule']['Date'].dt.date >= start_date) &
+                                    (st.session_state['schedule']['Date'].dt.date <= end_date)
+                                ]
+                                if schedule_filtered.empty:
+                                    st.warning("Ei pelejä valitulla aikavälillä.")
+                                    st.stop()
         
                 # Baseline: käytetään roster_to_use (eli toggle huomioitu)
                 daily_base, base_games_dict, base_fp, base_total_active_games, base_bench_dict = optimize_roster_advanced(
