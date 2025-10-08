@@ -911,7 +911,7 @@ with tab1:
             st.dataframe(injured.reset_index(drop=True),
                          use_container_width=True, hide_index=True)
     
-    st.header("🚀 Rosterin optimointi")
+    st.header("🚀 Rosterin optimointi (Valioliika)")
     
     if st.session_state['schedule'].empty or st.session_state['roster'].empty:
         st.warning("Lataa sekä peliaikataulu että rosteri aloittaaksesi optimoinnin")
@@ -1282,7 +1282,7 @@ with tab1:
 
 
 with tab2:
-    st.header("🆚 Joukkuevertailu")
+    st.header("🆚 Joukkuevertailu (Valioliika)")
     st.markdown("Vertaa oman ja vastustajan joukkueiden ennakoituja tuloksia valitulla aikavälillä.")
 
     # Puretaan rosterit turvallisesti
