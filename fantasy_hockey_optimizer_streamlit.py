@@ -228,22 +228,43 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
     # Peliaikataulun lataus
-    def load_schedule_from_gsheets():
-        client = get_gspread_client()
-        if client is None:
-            st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+def load_schedule_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+        return pd.DataFrame()
+
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama tiedosto kuin rosterit
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("Schedule")  # välilehden nimi oltava täsmälleen "Schedule"
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            st.error("⚠️ 'Schedule' välilehti on tyhjä tai sitä ei löytynyt.")
             return pd.DataFrame()
-    
-        try:
-            sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama tiedosto kuin rosterit
-            sheet = client.open_by_url(sheet_url)
-            worksheet = sheet.worksheet("Schedule")  # välilehden nimi oltava täsmälleen "Schedule"
-            data = worksheet.get_all_records()
-            df = pd.DataFrame(data)
-    
-            if df.empty:
-                st.error("⚠️ 'Schedule' välilehti on tyhjä tai sitä ei löytynyt.")
-                return pd.DataFrame()
+
+        # Normalisoidaan sarakenimet
+        df.columns = df.columns.str.strip()
+
+        # Varmistetaan että vaaditut sarakkeet löytyvät
+        required = ["Date", "Visitor", "Home"]
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            st.error(f"Puuttuvia sarakkeita aikataulusta: {missing}")
+            return pd.DataFrame()
+
+        # Muutetaan päivämäärät
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+        return df
+
+    except Exception as e:
+        st.error(f"Virhe aikataulun lukemisessa: {e}")
+        return pd.DataFrame()
+
+
 
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
