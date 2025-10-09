@@ -228,35 +228,46 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
 # Peliaikataulun lataus
-schedule_file_exists = False
-try:
-    st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
-    st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date'])
-    schedule_file_exists = True
-except FileNotFoundError:
-    schedule_file_exists = False
+def load_schedule_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+        return pd.DataFrame()
 
-if schedule_file_exists and not st.sidebar.button("Lataa uusi aikataulu", key="upload_schedule_button"):
-    st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
-else:
-    schedule_file = st.sidebar.file_uploader(
-        "Lataa NHL-peliaikataulu (CSV)",
-        type=["csv"],
-        help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
-    )
-    if schedule_file is not None:
-        try:
-            schedule = pd.read_csv(schedule_file)
-            if not schedule.empty and all(col in schedule.columns for col in ['Date', 'Visitor', 'Home']):
-                schedule['Date'] = pd.to_datetime(schedule['Date'])
-                st.session_state['schedule'] = schedule
-                schedule.to_csv(SCHEDULE_FILE, index=False)
-                st.sidebar.success("Peliaikataulu ladattu ja tallennettu!")
-                st.rerun()
-            else:
-                st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home")
-        except Exception as e:
-            st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama tiedosto kuin rosterit
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("Schedule")  # välilehden nimi oltava täsmälleen "Schedule"
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            st.error("⚠️ 'Schedule' välilehti on tyhjä tai sitä ei löytynyt.")
+            return pd.DataFrame()
+
+        # Normalisoidaan sarakenimet
+        df.columns = df.columns.str.strip()
+
+        required = ["Date", "Visitor", "Home"]
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            st.error(f"Puuttuvia sarakkeita aikataulusta: {missing}")
+            return pd.DataFrame()
+
+        # Muutetaan päivämäärät
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        return df
+
+    except Exception as e:
+        st.error(f"Virhe aikataulun lukemisessa: {e}")
+        return pd.DataFrame()
+
+if "schedule" not in st.session_state or st.session_state["schedule"].empty:
+    st.session_state["schedule"] = load_schedule_from_gsheets()
+
+if not st.session_state["schedule"].empty:
+    st.sidebar.success("Peliaikataulu ladattu onnistuneesti Google Sheetistä ✅")
+
 
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
