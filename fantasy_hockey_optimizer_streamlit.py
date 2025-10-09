@@ -292,7 +292,6 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
             st.sidebar.error("Rosterin lataaminen epäonnistui. Tarkista Google Sheet -tiedoston sisältö.")
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
-        return pd.DataFrame(), pd.DataFrame()
 
 
 # Vapaiden agenttien lataus
