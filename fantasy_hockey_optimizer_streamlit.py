@@ -229,25 +229,44 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
 
 # Peliaikataulun lataus
 def load_schedule_from_gsheets():
-    sheet_id = "1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo"  # sama tiedosto kuin rosterit
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Schedule"
-    df = pd.read_csv(url)
-    
-    print("Schedule columns:", df.columns.tolist())
-    print(df.head())
-    
-    if "Date" in df.columns:
-        df["Date"] = pd.to_datetime(df["Date"])
-    return df
+    client = get_gspread_client()
+    if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+        return pd.DataFrame()
 
-if "schedule" not in st.session_state:
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama tiedosto kuin rosterit
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("Schedule")  # välilehden nimi oltava täsmälleen "Schedule"
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+
+        if df.empty:
+            st.error("⚠️ 'Schedule' välilehti on tyhjä tai sitä ei löytynyt.")
+            return pd.DataFrame()
+
+        # Normalisoidaan sarakenimet
+        df.columns = df.columns.str.strip()
+
+        required = ["Date", "Visitor", "Home"]
+        missing = [c for c in required if c not in df.columns]
+        if missing:
+            st.error(f"Puuttuvia sarakkeita aikataulusta: {missing}")
+            return pd.DataFrame()
+
+        # Muutetaan päivämäärät
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+        return df
+
+    except Exception as e:
+        st.error(f"Virhe aikataulun lukemisessa: {e}")
+        return pd.DataFrame()
+
+if "schedule" not in st.session_state or st.session_state["schedule"].empty:
     st.session_state["schedule"] = load_schedule_from_gsheets()
 
-if "schedule" in st.session_state and not st.session_state["schedule"].empty:
+if not st.session_state["schedule"].empty:
     st.sidebar.success("Peliaikataulu ladattu onnistuneesti Google Sheetistä ✅")
-if "schedule" not in st.session_state or st.session_state["schedule"].empty:
-    st.sidebar.error("Peliaikataulun lataus epäonnistui ❌")
-
 
 
 
