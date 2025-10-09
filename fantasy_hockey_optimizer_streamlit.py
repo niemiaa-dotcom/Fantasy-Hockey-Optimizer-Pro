@@ -227,23 +227,23 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.sidebar.success("Välimuisti tyhjennetty!")
     st.rerun()
 
-# Peliaikataulun lataus
-def load_schedule_from_gsheets():
-    client = get_gspread_client()
-    if client is None:
-        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
-        return pd.DataFrame()
-
-    try:
-        sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama tiedosto kuin rosterit
-        sheet = client.open_by_url(sheet_url)
-        worksheet = sheet.worksheet("Schedule")  # välilehden nimi oltava täsmälleen "Schedule"
-        data = worksheet.get_all_records()
-        df = pd.DataFrame(data)
-
-        if df.empty:
-            st.error("⚠️ 'Schedule' välilehti on tyhjä tai sitä ei löytynyt.")
+    # Peliaikataulun lataus
+    def load_schedule_from_gsheets():
+        client = get_gspread_client()
+        if client is None:
+            st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
             return pd.DataFrame()
+    
+        try:
+            sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama tiedosto kuin rosterit
+            sheet = client.open_by_url(sheet_url)
+            worksheet = sheet.worksheet("Schedule")  # välilehden nimi oltava täsmälleen "Schedule"
+            data = worksheet.get_all_records()
+            df = pd.DataFrame(data)
+    
+            if df.empty:
+                st.error("⚠️ 'Schedule' välilehti on tyhjä tai sitä ei löytynyt.")
+                return pd.DataFrame()
 
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
