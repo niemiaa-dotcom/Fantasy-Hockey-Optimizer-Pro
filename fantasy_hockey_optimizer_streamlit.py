@@ -228,7 +228,6 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
 # Peliaikataulun lataus
-@st.cache_data(ttl=None)  # välimuistiin pysyvästi, ei vanhene
 def load_schedule_from_gsheets():
     client = get_gspread_client()
     if client is None:
@@ -262,13 +261,12 @@ def load_schedule_from_gsheets():
     except Exception as e:
         st.error(f"Virhe aikataulun lukemisessa: {e}")
         return pd.DataFrame()
-# Ladataan aikataulu vain kerran ja pidetään session_statessa
+
 if "schedule" not in st.session_state or st.session_state["schedule"].empty:
     st.session_state["schedule"] = load_schedule_from_gsheets()
 
 if not st.session_state["schedule"].empty:
-    st.sidebar.success("📅 Peliaikataulu ladattu välimuistista ✅")
-
+    st.sidebar.success("Peliaikataulu ladattu onnistuneesti Google Sheetistä ✅")
 
 
 # --- SIVUPALKKI: OMA ROSTERI ---
