@@ -244,6 +244,9 @@ if "schedule" in st.session_state and not st.session_state["schedule"].empty:
 if "schedule" not in st.session_state or st.session_state["schedule"].empty:
     st.sidebar.error("Peliaikataulun lataus epäonnistui ❌")
 
+print("Schedule columns:", df.columns.tolist())
+print(df.head())
+
 
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
