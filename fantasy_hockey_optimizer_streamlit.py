@@ -369,16 +369,32 @@ if not st.session_state['roster'].empty:
         [""] + list(st.session_state['roster']['name']),
         key="remove_player_select"
     )
+    
     if st.sidebar.button("Poista valittu pelaaja", key="remove_player_button") and remove_player:
+        # Poistetaan pelaaja rosterista
         st.session_state['roster'] = st.session_state['roster'][
             st.session_state['roster']['name'] != remove_player
         ]
+    
+        # Päivitetään myös analyysien käyttämä lista
+        if "team_players" in st.session_state:
+            st.session_state['team_players'] = [
+                p for p in st.session_state['team_players'] if p != remove_player
+            ]
+    
+        # Tallennetaan rosteri tiedostoon
         if 'fantasy_points_avg' in st.session_state['roster'].columns:
             st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
         else:
-            st.session_state['roster'].to_csv(ROSTER_FILE, index=False, columns=['name', 'team', 'positions'])
+            st.session_state['roster'].to_csv(
+                ROSTER_FILE,
+                index=False,
+                columns=['name', 'team', 'positions']
+            )
+    
         st.sidebar.success(f"Pelaaja {remove_player} poistettu!")
         st.rerun()
+
 
     # Lisää uusi pelaaja -lomake
     st.sidebar.subheader("Lisää uusi pelaaja")
