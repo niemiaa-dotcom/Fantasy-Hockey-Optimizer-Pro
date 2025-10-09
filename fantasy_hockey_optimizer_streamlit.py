@@ -9,7 +9,7 @@ import os
 import gspread
 from google.oauth2.service_account import Credentials
 
-# Aseta sivun konfiguraatio
+# Aseta sivun konfiguraatio 
 st.set_page_config(
     page_title="Fantasy Hockey Optimizer (KKUPFL)",
     page_icon="🏒",
@@ -228,35 +228,17 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
 # Peliaikataulun lataus
-schedule_file_exists = False
-try:
-    st.session_state['schedule'] = pd.read_csv(SCHEDULE_FILE)
-    st.session_state['schedule']['Date'] = pd.to_datetime(st.session_state['schedule']['Date'])
-    schedule_file_exists = True
-except FileNotFoundError:
-    schedule_file_exists = False
+def load_schedule_from_gsheets():
+    sheet_id = "1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo"  # sama tiedosto kuin rosterit
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Schedule"
+    df = pd.read_csv(url)
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"])
+    return df
 
-if schedule_file_exists and not st.sidebar.button("Lataa uusi aikataulu", key="upload_schedule_button"):
-    st.sidebar.success("Peliaikataulu ladattu automaattisesti tallennetusta tiedostosta!")
-else:
-    schedule_file = st.sidebar.file_uploader(
-        "Lataa NHL-peliaikataulu (CSV)",
-        type=["csv"],
-        help="CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home"
-    )
-    if schedule_file is not None:
-        try:
-            schedule = pd.read_csv(schedule_file)
-            if not schedule.empty and all(col in schedule.columns for col in ['Date', 'Visitor', 'Home']):
-                schedule['Date'] = pd.to_datetime(schedule['Date'])
-                st.session_state['schedule'] = schedule
-                schedule.to_csv(SCHEDULE_FILE, index=False)
-                st.sidebar.success("Peliaikataulu ladattu ja tallennettu!")
-                st.rerun()
-            else:
-                st.sidebar.error("Peliaikataulun CSV-tiedoston tulee sisältää sarakkeet: Date, Visitor, Home")
-        except Exception as e:
-            st.sidebar.error(f"Virhe peliaikataulun lukemisessa: {str(e)}")
+if "schedule" not in st.session_state:
+    st.session_state["schedule"] = load_schedule_from_gsheets()
+
 
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
