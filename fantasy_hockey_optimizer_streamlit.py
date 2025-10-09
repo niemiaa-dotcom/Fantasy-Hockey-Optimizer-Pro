@@ -272,6 +272,8 @@ if not st.session_state["schedule"].empty:
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
 
+st.sidebar.subheader("📋 Lataa oma rosteri")
+
 if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     try:
         healthy, injured = load_roster_from_gsheets()
