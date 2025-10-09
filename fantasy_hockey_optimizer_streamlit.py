@@ -378,18 +378,19 @@ if not st.session_state['roster'].empty:
         [""] + list(st.session_state['roster']['name']),
         key="remove_player_select"
     )
+    
     if st.sidebar.button("Poista valittu pelaaja") and remove_player:
         st.session_state['roster'] = st.session_state['roster'][st.session_state['roster']['name'] != remove_player]
 
-    # Päivitä myös healthy/injured
-    if "roster_healthy" in st.session_state:
-        st.session_state['roster_healthy'] = st.session_state['roster_healthy'][st.session_state['roster_healthy']['name'] != remove_player]
-    if "roster_injured" in st.session_state:
-        st.session_state['roster_injured'] = st.session_state['roster_injured'][st.session_state['roster_injured']['name'] != remove_player]
-
-    st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
-    st.sidebar.success(f"Pelaaja {remove_player} poistettu!")
-    st.rerun()
+        # Päivitä myös healthy/injured
+        if "roster_healthy" in st.session_state:
+            st.session_state['roster_healthy'] = st.session_state['roster_healthy'][st.session_state['roster_healthy']['name'] != remove_player]
+        if "roster_injured" in st.session_state:
+            st.session_state['roster_injured'] = st.session_state['roster_injured'][st.session_state['roster_injured']['name'] != remove_player]
+    
+        st.session_state['roster'].to_csv(ROSTER_FILE, index=False)
+        st.sidebar.success(f"Pelaaja {remove_player} poistettu!")
+        st.rerun()
 
 
     # Lisää uusi pelaaja -lomake
