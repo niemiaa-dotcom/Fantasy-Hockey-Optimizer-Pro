@@ -378,7 +378,7 @@ if not st.session_state['roster'].empty:
         key="remove_player_select"
     )
     if st.sidebar.button("Poista valittu pelaaja") and remove_player:
-    st.session_state['roster'] = st.session_state['roster'][st.session_state['roster']['name'] != remove_player]
+        st.session_state['roster'] = st.session_state['roster'][st.session_state['roster']['name'] != remove_player]
 
     # Päivitä myös healthy/injured
     if "roster_healthy" in st.session_state:
