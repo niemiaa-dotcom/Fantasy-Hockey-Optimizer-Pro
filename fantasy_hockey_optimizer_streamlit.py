@@ -228,6 +228,7 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.rerun()
 
 # Peliaikataulun lataus
+@st.cache_data(ttl=None)
 def load_schedule_from_gsheets():
     client = get_gspread_client()
     if client is None:
