@@ -227,7 +227,7 @@ if st.sidebar.button("Tyhjennä kaikki välimuisti"):
     st.sidebar.success("Välimuisti tyhjennetty!")
     st.rerun()
 
-    # Peliaikataulun lataus
+# Peliaikataulun lataus
 def load_schedule_from_gsheets():
     client = get_gspread_client()
     if client is None:
@@ -248,7 +248,6 @@ def load_schedule_from_gsheets():
         # Normalisoidaan sarakenimet
         df.columns = df.columns.str.strip()
 
-        # Varmistetaan että vaaditut sarakkeet löytyvät
         required = ["Date", "Visitor", "Home"]
         missing = [c for c in required if c not in df.columns]
         if missing:
@@ -257,12 +256,18 @@ def load_schedule_from_gsheets():
 
         # Muutetaan päivämäärät
         df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
-
         return df
 
     except Exception as e:
         st.error(f"Virhe aikataulun lukemisessa: {e}")
         return pd.DataFrame()
+
+if "schedule" not in st.session_state or st.session_state["schedule"].empty:
+    st.session_state["schedule"] = load_schedule_from_gsheets()
+
+if not st.session_state["schedule"].empty:
+    st.sidebar.success("Peliaikataulu ladattu onnistuneesti Google Sheetistä ✅")
+
 
 
 
