@@ -812,7 +812,7 @@ def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_dat
         top18 = roster_df.sort_values("fantasy_points_avg", ascending=False).head(18)
 
         _, player_games, total_fp, total_active_games, _ = optimize_roster_advanced(
-            schedule_filtered, top20, pos_limits, num_attempts=200
+            schedule_filtered, top18, pos_limits, num_attempts=200
         )
         results.append({
             "Joukkue": team_name,
