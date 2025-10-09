@@ -587,7 +587,7 @@ def simulate_team_impact(schedule_df, my_roster_df, opponent_roster_df, pos_limi
 
     # Suoritetaan optimointi vastustajalle
     opponent_pos_limits = {
-        'C': 3, 'LW': 3, 'RW': 3, 'D': 4, 'G': 2, 'UTIL': 1
+        'C': 2, 'LW': 2, 'RW': 2, 'D': 4, 'G': 2, 'UTIL': 2
     }
     opponent_daily_results, opponent_player_games, opponent_total_points, opponent_total_games = optimize_roster_advanced(
         schedule_df, opponent_roster_df, opponent_pos_limits
@@ -822,7 +822,7 @@ def build_lineup_matrix(daily_results, max_bench=10):
                 if pos in ["C", "LW", "RW", "D", "G"]:
                     slot_name = f"{pos}{i+1}"
                 elif pos == "UTIL":
-                    slot_name = "UTIL1"
+                    slot_name = f"UTIL{i+1}"
                 else:
                     continue
                 if slot_name in table:
