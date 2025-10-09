@@ -803,8 +803,16 @@ def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_dat
     for team_name, roster_df in team_rosters.items():
         if roster_df.empty:
             continue
+
+        # ✅ Ota vain 20 parasta pelaajaa FP/game mukaan
+        if "fantasy_points_avg" not in roster_df.columns:
+            st.warning(f"Joukkue {team_name} ei sisällä saraketta fantasy_points_avg")
+            continue
+
+        top18 = roster_df.sort_values("fantasy_points_avg", ascending=False).head(18)
+
         _, player_games, total_fp, total_active_games, _ = optimize_roster_advanced(
-            schedule_filtered, roster_df, pos_limits, num_attempts=200
+            schedule_filtered, top20, pos_limits, num_attempts=200
         )
         results.append({
             "Joukkue": team_name,
