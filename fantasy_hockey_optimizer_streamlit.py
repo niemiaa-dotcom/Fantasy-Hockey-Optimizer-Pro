@@ -270,9 +270,6 @@ if not st.session_state["schedule"].empty:
 
 
 # --- SIVUPALKKI: OMA ROSTERI ---
-st.sidebar.subheader("📋 Lataa oma rosteri")
-
-st.sidebar.subheader("📋 Lataa oma rosteri")
 
 if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     try:
@@ -296,7 +293,6 @@ if st.sidebar.button("Lataa rosteri Google Sheetsistä", key="roster_button"):
     except Exception as e:
         st.sidebar.error(f"Virhe rosterin lataamisessa: {e}")
         return pd.DataFrame(), pd.DataFrame()
-
 
 
 # Vapaiden agenttien lataus
