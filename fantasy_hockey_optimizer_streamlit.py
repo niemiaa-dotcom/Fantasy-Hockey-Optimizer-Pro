@@ -232,6 +232,10 @@ def load_schedule_from_gsheets():
     sheet_id = "1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo"  # sama tiedosto kuin rosterit
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=Schedule"
     df = pd.read_csv(url)
+    
+    print("Schedule columns:", df.columns.tolist())
+    print(df.head())
+    
     if "Date" in df.columns:
         df["Date"] = pd.to_datetime(df["Date"])
     return df
@@ -244,8 +248,7 @@ if "schedule" in st.session_state and not st.session_state["schedule"].empty:
 if "schedule" not in st.session_state or st.session_state["schedule"].empty:
     st.sidebar.error("Peliaikataulun lataus epäonnistui ❌")
 
-print("Schedule columns:", df.columns.tolist())
-print(df.head())
+
 
 
 # --- SIVUPALKKI: OMA ROSTERI ---
