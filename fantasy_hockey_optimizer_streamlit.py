@@ -239,6 +239,11 @@ def load_schedule_from_gsheets():
 if "schedule" not in st.session_state:
     st.session_state["schedule"] = load_schedule_from_gsheets()
 
+if "schedule" in st.session_state and not st.session_state["schedule"].empty:
+    st.sidebar.success("Peliaikataulu ladattu onnistuneesti Google Sheetistä ✅")
+if "schedule" not in st.session_state or st.session_state["schedule"].empty:
+    st.sidebar.error("Peliaikataulun lataus epäonnistui ❌")
+
 
 # --- SIVUPALKKI: OMA ROSTERI ---
 st.sidebar.subheader("📋 Lataa oma rosteri")
