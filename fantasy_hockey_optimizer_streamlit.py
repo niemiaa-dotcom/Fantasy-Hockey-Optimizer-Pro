@@ -1217,6 +1217,7 @@ with tab1:
                     st.caption(
                         "Huom: Kokonaispelimäärä voi kasvaa pienistäkin muutoksista, koska pudottaminen voi vapauttaa paikan "
                         "toiselle pelaajalle aktiiviseen rosteriin (myös UTIL-paikalle), vaikka lisättävän pelaajan pelimäärä olisi sama."
+                    )
     
     
            # --- Joukkueanalyysi ---
