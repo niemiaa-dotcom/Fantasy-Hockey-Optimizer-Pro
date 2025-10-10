@@ -1092,12 +1092,15 @@ with tab1:
         
             # --- Syötteet ---
             if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
-                st.markdown("#### Pudotettava pelaaja")
+                drop_options = ["(ei pudotettavaa)"] + list(roster_to_use['name'])
                 drop_player_name = st.selectbox(
                     "Valitse pudotettava pelaaja",
-                    list(roster_to_use['name']),
+                    drop_options,
                     key="drop_player_name"
                 )
+                if drop_player_name == "(ei pudotettavaa)":
+                    drop_player_name = None
+
         
                 st.markdown("#### Lisättävä pelaaja")
                 
@@ -1119,16 +1122,29 @@ with tab1:
                     else:
                         new_player_name, new_player_team, new_player_positions, new_player_fpa = "", "", "", 0.0
                 
-                else:
-                    colN1, colN2, colN3, colN4 = st.columns(4)
-                    with colN1:
-                        new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
-                    with colN2:
-                        new_player_team = st.text_input("Joukkue", key="new_player_team")
-                    with colN3:
-                        new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
-                    with colN4:
-                        new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
+                else:  # Vertaa kahta uutta pelaajaa
+                    st.markdown("#### Uusi pelaaja 1")
+                    col1, col2, col3, col4 = st.columns(4)
+                    with col1:
+                        new1_name = st.text_input("Pelaajan nimi", key="new1_name")
+                    with col2:
+                        new1_team = st.text_input("Joukkue", key="new1_team")
+                    with col3:
+                        new1_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new1_positions")
+                    with col4:
+                        new1_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new1_fpa")
+                
+                    st.markdown("#### Uusi pelaaja 2")
+                    col5, col6, col7, col8 = st.columns(4)
+                    with col5:
+                        new2_name = st.text_input("Pelaajan nimi", key="new2_name")
+                    with col6:
+                        new2_team = st.text_input("Joukkue", key="new2_team")
+                    with col7:
+                        new2_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new2_positions")
+                    with col8:
+                        new2_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new2_fpa")
+
 
         
             # --- Suoritus ---
