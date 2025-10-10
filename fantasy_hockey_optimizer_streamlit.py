@@ -1164,9 +1164,6 @@ with tab1:
                 )
         
                 if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
-                    if not drop_player_name:
-                        st.warning("Valitse pudotettava pelaaja.")
-                        st.stop()
                     if not (new_player_name and new_player_team and new_player_positions):
                         st.warning("Täytä lisättävän pelaajan kentät (nimi, joukkue, pelipaikat).")
                         st.stop()
