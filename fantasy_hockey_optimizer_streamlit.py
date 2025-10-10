@@ -1098,10 +1098,7 @@ with tab1:
                     drop_options,
                     key="drop_player_name"
                 )
-                if drop_player_name == "(ei pudotettavaa)":
-                    drop_player_name = None
-
-                )
+                
                 if drop_player_name == "(ei pudotettavaa)":
                     drop_player_name = None
 
