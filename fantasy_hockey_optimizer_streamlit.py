@@ -1147,6 +1147,9 @@ with tab1:
                 with col8:
                     new2_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new2_fpa")
 
+
+
+        
             # --- Suoritus ---
             if st.button("Suorita vertailu"):
                 schedule_filtered = st.session_state['schedule'][
