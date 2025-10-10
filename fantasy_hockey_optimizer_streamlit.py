@@ -1123,7 +1123,7 @@ with tab1:
                     else:
                         new_player_name, new_player_team, new_player_positions, new_player_fpa = "", "", "", 0.0
                 
-                else:  # Vertaa kahta uutta pelaajaa
+               elif comparison_type == "Vertaa kahta uutta pelaajaa":
                     st.markdown("#### Uusi pelaaja 1")
                     col1, col2, col3, col4 = st.columns(4)
                     with col1:
@@ -1145,6 +1145,7 @@ with tab1:
                         new2_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new2_positions")
                     with col8:
                         new2_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new2_fpa")
+
 
 
         
