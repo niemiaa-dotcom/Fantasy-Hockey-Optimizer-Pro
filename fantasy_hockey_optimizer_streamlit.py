@@ -1101,6 +1101,10 @@ with tab1:
                 if drop_player_name == "(ei pudotettavaa)":
                     drop_player_name = None
 
+                )
+                if drop_player_name == "(ei pudotettavaa)":
+                    drop_player_name = None
+
         
                 st.markdown("#### Lisättävä pelaaja")
                 
