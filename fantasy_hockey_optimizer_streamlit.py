@@ -1128,10 +1128,17 @@ with tab1:
                 st.markdown("#### Uusi pelaaja A")
                 if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
                     fa_df = st.session_state["free_agents"]
-                    selected_fa_A = st.selectbox("Valitse vapaa agentti (pelaaja A)", [""] + list(fa_df["name"].unique()), key="fa_select_A")
+                    selected_fa_A = st.selectbox(
+                        "Valitse vapaa agentti (pelaaja A)",
+                        [""] + list(fa_df["name"].unique()),
+                        key="fa_select_A"
+                    )
                     if selected_fa_A:
                         fa_row_A = fa_df[fa_df["name"] == selected_fa_A].iloc[0]
-                        sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A = fa_row_A["name"], fa_row_A["team"], fa_row_A["positions"], float(fa_row_A["fantasy_points_avg"])
+                        sim_name_A = fa_row_A["name"]
+                        sim_team_A = fa_row_A["team"]
+                        sim_positions_A = fa_row_A["positions"]
+                        sim_fpa_A = float(fa_row_A["fantasy_points_avg"])
                     else:
                         sim_name_A, sim_team_A, sim_positions_A, sim_fpa_A = "", "", "", 0.0
                 else:
@@ -1143,10 +1150,17 @@ with tab1:
                 st.markdown("#### Uusi pelaaja B")
                 if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
                     fa_df = st.session_state["free_agents"]
-                    selected_fa_B = st.selectbox("Valitse vapaa agentti (pelaaja B)", [""] + list(fa_df["name"].unique()), key="fa_select_B")
+                    selected_fa_B = st.selectbox(
+                        "Valitse vapaa agentti (pelaaja B)",
+                        [""] + list(fa_df["name"].unique()),
+                        key="fa_select_B"
+                    )
                     if selected_fa_B:
                         fa_row_B = fa_df[fa_df["name"] == selected_fa_B].iloc[0]
-                        sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B = fa_row_B["name"], fa_row_B["team"], fa_row_B["positions"], float(fa_row_B["fantasy_points_avg"])
+                        sim_name_B = fa_row_B["name"]
+                        sim_team_B = fa_row_B["team"]
+                        sim_positions_B = fa_row_B["positions"]
+                        sim_fpa_B = float(fa_row_B["fantasy_points_avg"])
                     else:
                         sim_name_B, sim_team_B, sim_positions_B, sim_fpa_B = "", "", "", 0.0
                 else:
@@ -1154,6 +1168,7 @@ with tab1:
                     sim_team_B = st.text_input("Joukkue", key="sim_team_B")
                     sim_positions_B = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_B")
                     sim_fpa_B = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B")
+
             
                 if st.button("Suorita vertailu"):
                     if not (sim_name_A and sim_team_A and sim_positions_A and sim_name_B and sim_team_B and sim_positions_B):
