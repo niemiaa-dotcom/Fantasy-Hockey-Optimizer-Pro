@@ -1164,10 +1164,16 @@ with tab1:
                         st.markdown("**Baseline (nykyinen rosteri)**")
                         st.metric("Aktiiviset pelit", base_total_active_games)
                         st.metric("Fantasiapisteet", f"{base_fp:.1f}")
+                    new_player_active = swap_games_dict.get(new_player_name, 0)
+
                     with col2:
                         st.markdown(f"**Swap (uusi pelaaja: {new_player_name})**")
-                        st.metric("Aktiiviset pelit", swap_total_active_games)
-                        st.metric("Fantasiapisteet", f"{swap_fp:.1f}")
+                        st.metric("Aktiiviset pelit (yht.)", swap_total_active_games)
+                        st.metric("Fantasiapisteet (yht.)", f"{swap_fp:.1f}")
+                        # ✅ Näytä myös lisättävän pelaajan omat pelit
+                        st.metric(f"{new_player_name} aktiiviset pelit", new_player_active)
+                        st.metric(f"{new_player_name} ennakoidut FP", f"{new_player_active * new_player_fpa:.1f}")
+
             
                     st.subheader("Erot")
                     st.metric("Δ Aktiiviset pelit", f"{swap_total_active_games - base_total_active_games:+}")
@@ -1231,14 +1237,26 @@ with tab1:
             
                     st.subheader("Vertailun tulokset")
                     colA, colB = st.columns(2)
+
+                    new_player_A_games = games_A.get(sim_name_A, 0)
+                    new_player_B_games = games_B.get(sim_name_B, 0)
+                    
                     with colA:
                         st.markdown(f"**{sim_name_A} ({sim_team_A})**")
-                        st.metric("Aktiiviset pelit", total_games_A)
-                        st.metric("Fantasiapisteet", f"{fp_A:.1f}")
+                        st.metric("Aktiiviset pelit (yht.)", total_games_A)
+                        st.metric("Fantasiapisteet (yht.)", f"{fp_A:.1f}")
+                        # ✅ Pelaaja A:n omat pelit
+                        st.metric(f"{sim_name_A} aktiiviset pelit", new_player_A_games)
+                        st.metric(f"{sim_name_A} ennakoidut FP", f"{new_player_A_games * sim_fpa_A:.1f}")
+                    
                     with colB:
                         st.markdown(f"**{sim_name_B} ({sim_team_B})**")
-                        st.metric("Aktiiviset pelit", total_games_B)
-                        st.metric("Fantasiapisteet", f"{fp_B:.1f}")
+                        st.metric("Aktiiviset pelit (yht.)", total_games_B)
+                        st.metric("Fantasiapisteet (yht.)", f"{fp_B:.1f}")
+                        # ✅ Pelaaja B:n omat pelit
+                        st.metric(f"{sim_name_B} aktiiviset pelit", new_player_B_games)
+                        st.metric(f"{sim_name_B} ennakoidut FP", f"{new_player_B_games * sim_fpa_B:.1f}")
+
             
                     st.subheader("Erot")
 
