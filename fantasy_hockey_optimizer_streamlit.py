@@ -1071,8 +1071,7 @@ with tab1:
                 use_container_width=True
             )
 
-        # --- Simuloi uuden pelaajan vaikutus ---
-        st.header("🔮 Simuloi uuden pelaajan vaikutus")
+        st.header("🔮 Simuloi uuden pelaajan vaikutus KKUPFL")
         
         if not st.session_state['roster'].empty and 'schedule' in st.session_state and not st.session_state['schedule'].empty and start_date <= end_date:
             st.subheader("Valitse vertailutyyppi")
@@ -1162,7 +1161,7 @@ with tab1:
                         st.markdown("**Baseline (nykyinen rosteri)**")
                         st.metric("Aktiiviset pelit", base_total_active_games)
                         st.metric("Fantasiapisteet", f"{base_fp:.1f}")
-                    
+                    new_player_A_games = games_A.get(sim_name_A, 0)
 
                     with col2:
                         st.markdown(f"**Swap (uusi pelaaja: {new_player_name})**")
