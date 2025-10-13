@@ -1172,7 +1172,7 @@ with tab1:
                 st.metric("Δ Fantasiapisteet (kokonaisuus)", f"{swap_fp - base_fp:+.1f}")
 
             
-       elif comparison_type == "Vertaa kahta uutta pelaajaa":
+        elif comparison_type == "Vertaa kahta uutta pelaajaa":
             st.markdown("#### Uusi pelaaja A")
             if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
                 fa_df = st.session_state["free_agents"]
