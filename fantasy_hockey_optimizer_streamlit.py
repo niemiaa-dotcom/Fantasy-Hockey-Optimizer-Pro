@@ -1162,7 +1162,7 @@ with tab1:
                         st.markdown("**Baseline (nykyinen rosteri)**")
                         st.metric("Aktiiviset pelit", base_total_active_games)
                         st.metric("Fantasiapisteet", f"{base_fp:.1f}")
-                    new_player_A_games = games_A.get(sim_name_A, 0)
+                    
 
                     with col2:
                         st.markdown(f"**Swap (uusi pelaaja: {new_player_name})**")
