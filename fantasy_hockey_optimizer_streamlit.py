@@ -1094,29 +1094,22 @@ with tab1:
                 roster_to_use = healthy
         
             # --- Syötteet ---
-            if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
+            elif comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
                 drop_options = ["(ei pudotettavaa)"] + list(roster_to_use['name'])
                 drop_player_name = st.selectbox(
-                    "Valitse pudotettava pelaaja",
-                    drop_options,
-                    key="drop_player_name"
+                    "Valitse pudotettava pelaaja", drop_options, key="drop_player_name"
                 )
-                
                 if drop_player_name == "(ei pudotettavaa)":
                     drop_player_name = None
-
-        
+            
                 st.markdown("#### Lisättävä pelaaja")
-                
                 if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
                     fa_df = st.session_state["free_agents"]
-                
                     selected_fa = st.selectbox(
                         "Valitse vapaa agentti",
                         [""] + list(fa_df["name"].unique()),
                         key="new_player_select"
                     )
-                
                     if selected_fa:
                         fa_row = fa_df[fa_df["name"] == selected_fa].iloc[0]
                         new_player_name = fa_row["name"]
@@ -1131,7 +1124,7 @@ with tab1:
                     new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
                     new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
             
-                # ✅ Tässä kohtaa lisätään nappi
+                # ✅ Suorita vertailu -painike
                 if st.button("Suorita vertailu", key="swap_compare_button"):
                     if not (new_player_name and new_player_team and new_player_positions):
                         st.warning("Täytä lisättävän pelaajan kentät (nimi, joukkue, pelipaikat).")
@@ -1157,29 +1150,29 @@ with tab1:
                         schedule_filtered, swap_roster, pos_limits, num_attempts=200
                     )
             
+                    # Lisättävän pelaajan omat pelit
+                    new_player_active = swap_games_dict.get(new_player_name, 0)
+            
                     # Tulosten näyttö
                     st.subheader("Skenaarioiden vertailu")
                     col1, col2 = st.columns(2)
                     with col1:
                         st.markdown("**Baseline (nykyinen rosteri)**")
-                        st.metric("Aktiiviset pelit", base_total_active_games)
-                        st.metric("Fantasiapisteet", f"{base_fp:.1f}")
-                    new_player_active = swap_games_dict.get(new_player_name, 0)
-
+                        st.metric("Aktiiviset pelit (yht.)", base_total_active_games)
+                        st.metric("Fantasiapisteet (yht.)", f"{base_fp:.1f}")
                     with col2:
                         st.markdown(f"**Swap (uusi pelaaja: {new_player_name})**")
                         st.metric("Aktiiviset pelit (yht.)", swap_total_active_games)
                         st.metric("Fantasiapisteet (yht.)", f"{swap_fp:.1f}")
-                        # ✅ Näytä myös lisättävän pelaajan omat pelit
                         st.metric(f"{new_player_name} aktiiviset pelit", new_player_active)
                         st.metric(f"{new_player_name} ennakoidut FP", f"{new_player_active * new_player_fpa:.1f}")
-
             
                     st.subheader("Erot")
-                    st.metric("Δ Aktiiviset pelit", f"{swap_total_active_games - base_total_active_games:+}")
-                    st.metric("Δ Fantasiapisteet", f"{swap_fp - base_fp:+.1f}")
+                    st.metric("Δ Aktiiviset pelit (kokonaisuus)", f"{swap_total_active_games - base_total_active_games:+}")
+                    st.metric("Δ Fantasiapisteet (kokonaisuus)", f"{swap_fp - base_fp:+.1f}")
+
             
-            elif comparison_type == "Vertaa kahta uutta pelaajaa":
+           elif comparison_type == "Vertaa kahta uutta pelaajaa":
                 st.markdown("#### Uusi pelaaja A")
                 if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
                     fa_df = st.session_state["free_agents"]
@@ -1210,7 +1203,7 @@ with tab1:
                     sim_positions_B = st.text_input("Pelipaikat (esim. C/LW)", key="sim_positions_B")
                     sim_fpa_B = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="sim_fpa_B")
             
-                if st.button("Suorita vertailu"):
+                if st.button("Suorita vertailu", key="compare_two_button"):
                     if not (sim_name_A and sim_team_A and sim_positions_A and sim_name_B and sim_team_B and sim_positions_B):
                         st.warning("Täytä molempien pelaajien tiedot.")
                         st.stop()
@@ -1235,46 +1228,32 @@ with tab1:
                     _, games_A, fp_A, total_games_A, _ = optimize_roster_advanced(schedule_filtered, roster_A, pos_limits, num_attempts=200)
                     _, games_B, fp_B, total_games_B, _ = optimize_roster_advanced(schedule_filtered, roster_B, pos_limits, num_attempts=200)
             
-                    st.subheader("Vertailun tulokset")
-                    colA, colB = st.columns(2)
-
+                    # Pelaajakohtaiset aktiiviset pelit
                     new_player_A_games = games_A.get(sim_name_A, 0)
                     new_player_B_games = games_B.get(sim_name_B, 0)
-                    
+            
+                    st.subheader("Vertailun tulokset")
+                    colA, colB = st.columns(2)
                     with colA:
                         st.markdown(f"**{sim_name_A} ({sim_team_A})**")
                         st.metric("Aktiiviset pelit (yht.)", total_games_A)
                         st.metric("Fantasiapisteet (yht.)", f"{fp_A:.1f}")
-                        # ✅ Pelaaja A:n omat pelit
                         st.metric(f"{sim_name_A} aktiiviset pelit", new_player_A_games)
                         st.metric(f"{sim_name_A} ennakoidut FP", f"{new_player_A_games * sim_fpa_A:.1f}")
-                    
+            
                     with colB:
                         st.markdown(f"**{sim_name_B} ({sim_team_B})**")
                         st.metric("Aktiiviset pelit (yht.)", total_games_B)
                         st.metric("Fantasiapisteet (yht.)", f"{fp_B:.1f}")
-                        # ✅ Pelaaja B:n omat pelit
                         st.metric(f"{sim_name_B} aktiiviset pelit", new_player_B_games)
                         st.metric(f"{sim_name_B} ennakoidut FP", f"{new_player_B_games * sim_fpa_B:.1f}")
-
             
                     st.subheader("Erot")
-
                     delta_games = total_games_A - total_games_B
                     delta_fp = fp_A - fp_B
-                    
-                    st.metric(
-                        "Δ Aktiiviset pelit",
-                        f"{delta_games:+}",
-                        delta=f"{delta_games:+}"
-                    )
-                    
-                    st.metric(
-                        "Δ Fantasiapisteet",
-                        f"{delta_fp:+.1f}",
-                        delta=f"{delta_fp:+.1f}"
-                    )
-
+                    st.metric("Δ Aktiiviset pelit (kokonaisuus)", f"{delta_games:+}", delta=f"{delta_games:+}")
+                    st.metric("Δ Fantasiapisteet (kokonaisuus)", f"{delta_fp:+.1f}", delta=f"{delta_fp:+.1f}")
+ 
 
     
     
