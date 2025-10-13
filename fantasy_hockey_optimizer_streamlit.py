@@ -1163,10 +1163,16 @@ with tab1:
                         st.markdown("**Baseline (nykyinen rosteri)**")
                         st.metric("Aktiiviset pelit", base_total_active_games)
                         st.metric("Fantasiapisteet", f"{base_fp:.1f}")
+                    new_player_A_games = games_A.get(sim_name_A, 0)
+
                     with col2:
                         st.markdown(f"**Swap (uusi pelaaja: {new_player_name})**")
-                        st.metric("Aktiiviset pelit", swap_total_active_games)
-                        st.metric("Fantasiapisteet", f"{swap_fp:.1f}")
+                        st.metric("Aktiiviset pelit (yht.)", swap_total_active_games)
+                        st.metric("Fantasiapisteet (yht.)", f"{swap_fp:.1f}")
+                        # ✅ Näytä myös lisättävän pelaajan omat pelit
+                        st.metric(f"{new_player_name} aktiiviset pelit", new_player_active)
+                        st.metric(f"{new_player_name} ennakoidut FP", f"{new_player_active * new_player_fpa:.1f}")
+
             
                     st.subheader("Erot")
                     st.metric("Δ Aktiiviset pelit", f"{swap_total_active_games - base_total_active_games:+}")
