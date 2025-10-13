@@ -1125,7 +1125,54 @@ with tab1:
                         new_player_fpa = float(fa_row["fantasy_points_avg"])
                     else:
                         new_player_name, new_player_team, new_player_positions, new_player_fpa = "", "", "", 0.0
-                
+                else:
+                    new_player_name = st.text_input("Pelaajan nimi", key="new_player_name")
+                    new_player_team = st.text_input("Joukkue", key="new_player_team")
+                    new_player_positions = st.text_input("Pelipaikat (esim. C/LW)", key="new_player_positions")
+                    new_player_fpa = st.number_input("FP/GP", min_value=0.0, step=0.1, format="%.2f", key="new_player_fpa")
+            
+                # ✅ Tässä kohtaa lisätään nappi
+                if st.button("Suorita vertailu", key="swap_compare_button"):
+                    if not (new_player_name and new_player_team and new_player_positions):
+                        st.warning("Täytä lisättävän pelaajan kentät (nimi, joukkue, pelipaikat).")
+                        st.stop()
+            
+                    # Baseline: nykyinen rosteri
+                    daily_base, base_games_dict, base_fp, base_total_active_games, base_bench_dict = optimize_roster_advanced(
+                        schedule_filtered, roster_to_use, pos_limits, num_attempts=200
+                    )
+            
+                    # Swap: pudotettava pois, uusi sisään
+                    swap_roster = roster_to_use.copy()
+                    if drop_player_name:
+                        swap_roster = swap_roster[swap_roster['name'] != drop_player_name]
+                    swap_roster = pd.concat([swap_roster, pd.DataFrame([{
+                        'name': new_player_name,
+                        'team': new_player_team,
+                        'positions': new_player_positions,
+                        'fantasy_points_avg': new_player_fpa
+                    }])], ignore_index=True)
+            
+                    daily_swap, swap_games_dict, swap_fp, swap_total_active_games, swap_bench_dict = optimize_roster_advanced(
+                        schedule_filtered, swap_roster, pos_limits, num_attempts=200
+                    )
+            
+                    # Tulosten näyttö
+                    st.subheader("Skenaarioiden vertailu")
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        st.markdown("**Baseline (nykyinen rosteri)**")
+                        st.metric("Aktiiviset pelit", base_total_active_games)
+                        st.metric("Fantasiapisteet", f"{base_fp:.1f}")
+                    with col2:
+                        st.markdown(f"**Swap (uusi pelaaja: {new_player_name})**")
+                        st.metric("Aktiiviset pelit", swap_total_active_games)
+                        st.metric("Fantasiapisteet", f"{swap_fp:.1f}")
+            
+                    st.subheader("Erot")
+                    st.metric("Δ Aktiiviset pelit", f"{swap_total_active_games - base_total_active_games:+}")
+                    st.metric("Δ Fantasiapisteet", f"{swap_fp - base_fp:+.1f}")
+            
             elif comparison_type == "Vertaa kahta uutta pelaajaa":
                 st.markdown("#### Uusi pelaaja A")
                 if "free_agents" in st.session_state and not st.session_state["free_agents"].empty:
