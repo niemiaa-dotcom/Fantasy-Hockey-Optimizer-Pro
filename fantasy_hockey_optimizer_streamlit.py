@@ -1094,7 +1094,7 @@ with tab1:
                 roster_to_use = healthy
         
             # --- Syötteet ---
-            elif comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
+            if comparison_type == "Lisää uusi pelaaja ja poista valittu omasta rosterista":
                 drop_options = ["(ei pudotettavaa)"] + list(roster_to_use['name'])
                 drop_player_name = st.selectbox(
                     "Valitse pudotettava pelaaja", drop_options, key="drop_player_name"
