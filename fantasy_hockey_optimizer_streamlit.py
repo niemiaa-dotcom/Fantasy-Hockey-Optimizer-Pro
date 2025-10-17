@@ -850,13 +850,39 @@ def build_lineup_matrix(daily_results, max_bench=10):
                     continue
                 if slot_name in table:
                     surname = player.split()[-1]
-                    table[slot_name][date] = surname
+                    positions = None
+                    if "roster" in st.session_state and not st.session_state["roster"].empty:
+                        match = st.session_state["roster"][st.session_state["roster"]["name"] == player]
+                        if not match.empty:
+                            positions = match["positions"].iloc[0]
+                            # Poista UTIL näkyvistä
+                            if isinstance(positions, str):
+                                positions = "/".join([p for p in positions.split("/") if p != "UTIL"])
+                    if positions:
+                        display_name = f"{surname} {positions}"
+                    else:
+                        display_name = surname
+                    table[slot_name][date] = display_name
+
 
         # Täytetään penkki
         for i, player in enumerate(bench):
             if i < max_bench:
                 surname = player.split()[-1]
-                table[f"Bench{i+1}"][date] = surname
+                positions = None
+                if "roster" in st.session_state and not st.session_state["roster"].empty:
+                    match = st.session_state["roster"][st.session_state["roster"]["name"] == player]
+                    if not match.empty:
+                        positions = match["positions"].iloc[0]
+                        # Poista UTIL näkyvistä
+                        if isinstance(positions, str):
+                            positions = "/".join([p for p in positions.split("/") if p != "UTIL"])
+                if positions:
+                    display_name = f"{surname} {positions}"
+                else:
+                    display_name = surname
+                table[f"Bench{i+1}"][date] = display_name
+
 
     # Muodostetaan DataFrame
     df = pd.DataFrame(table).T  # slotit riveiksi
