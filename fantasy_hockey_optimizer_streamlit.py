@@ -73,7 +73,7 @@ def load_roster_from_gsheets():
         df['injury_status'] = df['injury_status'].fillna("").astype(str).str.strip().str.upper()
 
         # Yahoo-statukset
-        yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ", "IR-NR"}
+        yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ", "IR-NR", "IR-LT"}
         injured = df[df['injury_status'].isin(yahoo_injury_statuses)]
         healthy = df[~df.index.isin(injured.index)]
 
@@ -142,7 +142,7 @@ def load_opponent_roster_from_gsheets(selected_team_name: str) -> tuple[pd.DataF
 
 
         # Yahoo-statukset jotka lasketaan loukkaantuneiksi
-        yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ", "IR-NR"}
+        yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ", "IR-NR","IR-LT"}
 
         # Loukkaantuneet = vain nämä
         injured = team_df[team_df["injury_status"].isin(yahoo_injury_statuses)]
@@ -766,7 +766,7 @@ def load_all_team_rosters_from_gsheets():
 
     # Normalisoi injury_status
     df["injury status"] = df["injury status"].fillna("").astype(str).str.strip().str.upper()
-    yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ", "IR-NR"}
+    yahoo_injury_statuses = {"IR", "IR+", "DTD", "O", "OUT", "INJ", "IR-NR", "IR-LT"}
 
     # Muodosta dict: {joukkue_nimi: DataFrame} – vain terveet
     team_rosters = {}
