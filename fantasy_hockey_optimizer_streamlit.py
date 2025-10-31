@@ -1051,19 +1051,29 @@ with tab1:
                 valid_dates.append(date)
 
                 for pos_check in positions_to_show:
-                    sim_player_name = f'SIM_PLAYER_{pos_check}'
-                    
-                    sim_players_list = available_players_today + [sim_player_name]
-                    players_info_dict[sim_player_name] = {'team': 'TEMP', 'positions': [pos_check], 'fpa': 0}
-                    if pos_check in ['C', 'LW', 'RW', 'D']:
-                        players_info_dict[sim_player_name]['positions'].append('UTIL')
-
+                    # Laske baseline aktiiviset
                     original_active_count = get_daily_active_slots(available_players_today, pos_limits)
+                    
+                    # Luo simuloitu pelaaja
+                    sim_player_name = f"SIM_PLAYER_{pos_check}"
+                    sim_players_list = available_players_today + [sim_player_name]
+                    players_info_dict[sim_player_name] = {
+                        "team": "TEMP",
+                        "positions": [pos_check],
+                        "fpa": 0
+                    }
+                    if pos_check in ["C", "LW", "RW", "D"]:
+                        players_info_dict[sim_player_name]["positions"].append("UTIL")
+                    
+                    # Laske simuloidut aktiiviset
                     simulated_active_count = get_daily_active_slots(sim_players_list, pos_limits)
                     
-                    can_fit = simulated_active_count > original_active_count
-                    
-                    availability_data[pos_check].append(can_fit)
+                    # Lisää vain jos aktiivisten määrä kasvaa
+                    if simulated_active_count > original_active_count:
+                        availability_data[pos_check].append(1)
+                    else:
+                        availability_data[pos_check].append(0)
+
 
                     del players_info_dict[sim_player_name]
 
