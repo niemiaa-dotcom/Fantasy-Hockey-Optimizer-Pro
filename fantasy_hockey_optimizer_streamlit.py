@@ -642,6 +642,12 @@ def calculate_team_impact_by_position(schedule_df, roster_df, pos_limits):
     
     # Alustetaan tulokset jokaiselle pelipaikalle
     results = {}
+
+    # Lasketaan baseline: montako peliä nykyinen rosteri saa
+    _, base_player_games, *_ = optimize_roster_advanced(
+        schedule_df, roster_df, pos_limits, num_attempts=50
+    )
+    base_total = sum(base_player_games.values())
     
     # Käydään läpi jokainen pelipaikka
     for pos in ['C', 'LW', 'RW', 'D', 'G']:
@@ -660,18 +666,18 @@ def calculate_team_impact_by_position(schedule_df, roster_df, pos_limits):
             # Yhdistetään simuloitu pelaaja nykyiseen rosteriin
             sim_roster = pd.concat([roster_df, sim_player], ignore_index=True)
             
-            # Suoritetaan optimointi
-            _, player_games, *_ = optimize_roster_advanced(
+            # Suoritetaan optimointi simuloidulla pelaajalla
+            _, sim_player_games, *_ = optimize_roster_advanced(
                 schedule_df, sim_roster, pos_limits, num_attempts=50
             )
-
+            sim_total = sum(sim_player_games.values())
             
-            # Lasketaan kuinka monta peliä simuloitu pelaaja sai
-            sim_games = player_games.get(f'SIM_{team}_{pos}', 0)
+            # Erotus kertoo todellisen lisäyksen
+            added_games = sim_total - base_total
             
             impact_data.append({
                 'Joukkue': team,
-                'Lisäpelit': sim_games
+                'Lisäpelit': max(0, added_games)  # ei negatiivisia
             })
         
         # Luodaan DataFrame ja järjestetään se
