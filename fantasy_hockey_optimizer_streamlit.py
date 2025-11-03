@@ -831,11 +831,11 @@ def analyze_all_teams(schedule_df, team_rosters, pos_limits, start_date, end_dat
 def build_lineup_matrix(daily_results, max_bench=10):
     # Määritellään slotit
     slots = (
-        [f"C{i+1}" for i in range(3)] +
-        [f"LW{i+1}" for i in range(3)] +
-        [f"RW{i+1}" for i in range(3)] +
+        [f"C{i+1}" for i in range(2)] +
+        [f"LW{i+1}" for i in range(2)] +
+        [f"RW{i+1}" for i in range(2)] +
         [f"D{i+1}" for i in range(4)] +
-        ["UTIL1"] +
+        [f"UTIL{i+1}" for i in range(2)] +
         [f"G{i+1}" for i in range(2)] +
         [f"Bench{i+1}" for i in range(max_bench)]
     )
