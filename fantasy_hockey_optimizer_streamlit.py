@@ -1588,8 +1588,23 @@ with tab2:
                 )
                 st.dataframe(league_results, use_container_width=True)
 
-                # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä
+                # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
                 if not league_results.empty:
                     st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
-                    chart_data = league_results.set_index("Joukkue")["Ennakoidut FP"]
-                    st.bar_chart(chart_data)
+                
+                    chart = (
+                        alt.Chart(league_results)
+                        .mark_bar()
+                        .encode(
+                            x=alt.X(
+                                "Joukkue",
+                                sort="-y",  # järjestää palkit suurimmasta pienimpään
+                                axis=alt.Axis(labelAngle=-45)  # kääntää joukkueiden nimet luettaviksi
+                            ),
+                            y=alt.Y("Ennakoidut FP", title="Fantasiapisteet"),
+                            tooltip=["Joukkue", "Ennakoidut FP"]
+                        )
+                        .properties(width=700, height=400)
+                    )
+                
+                    st.altair_chart(chart, use_container_width=True)
