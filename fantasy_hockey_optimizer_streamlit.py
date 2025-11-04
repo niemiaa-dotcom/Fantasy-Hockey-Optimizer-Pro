@@ -1570,41 +1570,51 @@ with tab2:
                                 f"({my_total_games} vs {opponent_total_games} peliä)")
                     
 
-    st.markdown("---")
-    st.header("📊 Liigan joukkueanalyysi")
-    
-    if st.button("Suorita kaikkien joukkueiden analyysi"):
-        team_rosters = load_all_team_rosters_from_gsheets()
-        if not team_rosters:
-            st.warning("Rosteritaulukkoa ei voitu ladata.")
-        else:
-            with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
-                league_results = analyze_all_teams(
-                    st.session_state['schedule'],
-                    team_rosters,
-                    pos_limits,
-                    start_date,
-                    end_date
-                )
-                st.dataframe(league_results, use_container_width=True)
+    import altair as alt  # varmista että tämä on tiedoston yläosassa
 
-                # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
-                if not league_results.empty:
-                    st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
-                
-                    chart = (
-                        alt.Chart(league_results)
-                        .mark_bar()
-                        .encode(
-                            x=alt.X(
-                                "Joukkue",
-                                sort="-y",  # järjestää palkit suurimmasta pienimpään
-                                axis=alt.Axis(labelAngle=-45)  # kääntää joukkueiden nimet luettaviksi
-                            ),
-                            y=alt.Y("Ennakoidut FP", title="Fantasiapisteet"),
-                            tooltip=["Joukkue", "Ennakoidut FP"]
-                        )
-                        .properties(width=700, height=400)
+st.markdown("---")
+st.header("📊 Liigan joukkueanalyysi")
+
+if st.button("Suorita kaikkien joukkueiden analyysi"):
+    team_rosters = load_all_team_rosters_from_gsheets()
+    if not team_rosters:
+        st.warning("Rosteritaulukkoa ei voitu ladata.")
+    else:
+        with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
+            league_results = analyze_all_teams(
+                st.session_state['schedule'],
+                team_rosters,
+                pos_limits,
+                start_date,
+                end_date
+            )
+            st.dataframe(league_results, use_container_width=True)
+
+            # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
+            if not league_results.empty:
+                st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
+
+                # varmista että pisteet ovat numeerisia
+                league_results["Ennakoidut FP"] = pd.to_numeric(
+                    league_results["Ennakoidut FP"], errors="coerce"
+                ).fillna(0)
+
+                chart = (
+                    alt.Chart(league_results)
+                    .mark_bar()
+                    .encode(
+                        x=alt.X(
+                            "Joukkue:N",
+                            sort="-y",  # suurimmasta pienimpään
+                            axis=alt.Axis(labelAngle=-45)
+                        ),
+                        y=alt.Y("Ennakoidut FP:Q", title="Fantasiapisteet"),
+                        tooltip=[
+                            alt.Tooltip("Joukkue:N", title="Joukkue"),
+                            alt.Tooltip("Ennakoidut FP:Q", title="FP", format=".2f")
+                        ]
                     )
-                
-                    st.altair_chart(chart, use_container_width=True)
+                    .properties(width=700, height=400)
+                )
+
+                st.altair_chart(chart, use_container_width=True)
