@@ -1587,3 +1587,9 @@ with tab2:
                     end_date
                 )
                 st.dataframe(league_results, use_container_width=True)
+
+                # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä
+                if not league_results.empty:
+                    st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
+                    chart_data = league_results.set_index("Joukkue")["Ennakoidut FP"]
+                    st.bar_chart(chart_data)
