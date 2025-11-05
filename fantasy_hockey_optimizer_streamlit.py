@@ -1589,3 +1589,32 @@ if st.button("Suorita kaikkien joukkueiden analyysi"):
                 end_date
             )
             st.dataframe(league_results, use_container_width=True)
+
+            # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
+            if not league_results.empty:
+                st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
+
+                # varmista että pisteet ovat numeerisia
+                league_results["Ennakoidut FP"] = pd.to_numeric(
+                    league_results["Ennakoidut FP"], errors="coerce"
+                ).fillna(0)
+
+                chart = (
+                    alt.Chart(league_results)
+                    .mark_bar()
+                    .encode(
+                        x=alt.X(
+                            "Joukkue:N",
+                            sort="-y",  # suurimmasta pienimpään
+                            axis=alt.Axis(labelAngle=-45)
+                        ),
+                        y=alt.Y("Ennakoidut FP:Q", title="Fantasiapisteet"),
+                        tooltip=[
+                            alt.Tooltip("Joukkue:N", title="Joukkue"),
+                            alt.Tooltip("Ennakoidut FP:Q", title="FP", format=".2f")
+                        ]
+                    )
+                    .properties(width=700, height=400)
+                )
+
+                st.altair_chart(chart, use_container_width=True)
