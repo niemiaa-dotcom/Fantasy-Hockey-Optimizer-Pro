@@ -853,7 +853,7 @@ def build_lineup_matrix(daily_results, max_bench=10):
                 if pos in ["C", "LW", "RW", "D", "G"]:
                     slot_name = f"{pos}{i+1}"
                 elif pos == "UTIL":
-                    slot_name = "UTIL1"
+                    slot_name = f"UTIL{i+1}"
                 else:
                     continue
                 if slot_name in table:
