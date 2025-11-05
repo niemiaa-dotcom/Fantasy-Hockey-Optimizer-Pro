@@ -520,7 +520,7 @@ def optimize_roster_advanced(schedule_df, roster_df, limits, num_attempts=100):
                 
                 # Jos ei sijoitettu, yritä UTIL
                 if not placed and 'UTIL' in limits and len(active['UTIL']) < limits['UTIL']:
-                    if any(pos in ['C', 'LW', 'RW', 'D'] for pos in positions_list):
+                    if 'G' not in positions_list:
                         active['UTIL'].append(player_name)
                         placed = True
                 
