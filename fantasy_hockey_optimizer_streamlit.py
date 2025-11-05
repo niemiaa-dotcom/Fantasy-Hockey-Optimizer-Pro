@@ -1571,6 +1571,7 @@ with tab2:
                         st.info(f"Tasapeli – molemmilla joukkueilla yhtä paljon pisteitä "
                                 f"({my_total_games} vs {opponent_total_games} peliä)")
 
+    import altair as alt  # varmista että tämä on tiedoston yläosassa
 
 st.markdown("---")
 st.header("📊 Liigan joukkueanalyysi")
