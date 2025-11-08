@@ -1655,7 +1655,8 @@ with tab2:
         # Siirrä Rank ensimmäiseksi
         cols = ["Rank"] + [c for c in cat_points_df.columns if c != "Rank"]
         cat_points_df = cat_points_df[cols]
-
+        # Nollaa indeksi, jotta Streamlit ei näytä sitä vasemmalla
+        cat_points_df = cat_points_df.reset_index(drop=True)
         st.dataframe(cat_points_df, use_container_width=True)
     
         # Muuta data pitkäksi Altairia varten
