@@ -216,6 +216,25 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+def load_category_points_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+        return pd.DataFrame()
+
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama sheet kuin rosterit
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("Category Points APL")  # välilehden nimi
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        if df.empty:
+            st.warning("⚠️ 'Category Points APL' välilehti on tyhjä tai sitä ei löytynyt.")
+        return df
+    except Exception as e:
+        st.error(f"Virhe ladattaessa Category Points APL -välilehteä: {e}")
+        return pd.DataFrame()
+
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
@@ -1627,36 +1646,27 @@ with tab2:
                     st.altair_chart(chart, use_container_width=True)
 
 
-    # --- Category Points APL ---
-    st.markdown("---")
     st.subheader("📊 Category Points APL")
+    cat_points_df = load_category_points_from_gsheets()
+    if not cat_points_df.empty:
+        st.dataframe(cat_points_df, use_container_width=True)
 
-    # Lataa Google Sheetsistä välilehti Category Points APL
-    sheet_url = "https://docs.google.com/spreadsheets/d/1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo/export?format=csv&gid=1738017210"
-    cat_points_df = pd.read_csv(sheet_url)
-
-    # Näytä taulukko
-    st.dataframe(cat_points_df, use_container_width=True)
-
-    # Muuta data pitkäksi Altairia varten (kaikki kategoriat paitsi Team ja Total)
-    df_long = cat_points_df.melt(
-        id_vars=["Team"],
-        value_vars=["Goals", "Assists", "PPP", "SOG", "Hits", "Blocks", "Goalies"],
-        var_name="Category",
-        value_name="Points"
-    )
-
-    # Tolppakaavio: joukkueet x-akselilla, pisteet y-akselilla, väri kategoriasta
-    chart = (
-        alt.Chart(df_long)
-        .mark_bar()
-        .encode(
-            x=alt.X("Team:N", sort="-y", axis=alt.Axis(labelAngle=-45)),
-            y=alt.Y("Points:Q"),
-            color="Category:N",
-            tooltip=["Team", "Category", "Points"]
+        df_long = cat_points_df.melt(
+            id_vars=["Team"],
+            value_vars=["Goals","Assists","PPP","SOG","Hits","Blocks","Goalies"],
+            var_name="Category",
+            value_name="Points"
         )
-        .properties(width=700, height=400)
-    )
 
-    st.altair_chart(chart, use_container_width=True)
+        chart = (
+            alt.Chart(df_long)
+            .mark_bar()
+            .encode(
+                x=alt.X("Team:N", sort="-y", axis=alt.Axis(labelAngle=-45)),
+                y=alt.Y("Points:Q"),
+                color="Category:N",
+                tooltip=["Team","Category","Points"]
+            )
+            .properties(width=700, height=400)
+        )
+        st.altair_chart(chart, use_container_width=True)
