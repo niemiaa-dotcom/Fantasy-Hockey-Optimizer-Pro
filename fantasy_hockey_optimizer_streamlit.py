@@ -1650,23 +1650,36 @@ with tab2:
     cat_points_df = load_category_points_from_gsheets()
     if not cat_points_df.empty:
         st.dataframe(cat_points_df, use_container_width=True)
-
+    
+        # Muuta data pitkäksi Altairia varten
         df_long = cat_points_df.melt(
             id_vars=["Team"],
-            value_vars=["Goals","Assists","PPP","SOG","Hits","Blocks","Goalies"],
+            value_vars=["Goals", "Assists", "PPP", "SOG", "Hits", "Blocks", "Goalies"],
             var_name="Category",
             value_name="Points"
         )
-
+    
+        # Laske kategorioiden kokonaispisteet ja järjestä suurimmasta pienimpään
+        cat_totals = (
+            df_long.groupby("Category")["Points"]
+            .sum()
+            .reset_index()
+            .sort_values("Points", ascending=False)
+        )
+        category_order = cat_totals["Category"].tolist()
+    
+        # Piirrä vaaka pinottu palkkikaavio
         chart = (
             alt.Chart(df_long)
             .mark_bar()
             .encode(
-                x=alt.X("Team:N", sort="-y", axis=alt.Axis(labelAngle=-90)),
-                y=alt.Y("Points:Q"),
-                color="Category:N",
-                tooltip=["Team","Category","Points"]
+                y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
+                x=alt.X("Points:Q", stack="zero", axis=alt.Axis(title="Pisteet")),
+                color=alt.Color("Category:N", sort=category_order, legend=alt.Legend(title="Kategoria")),
+                order=alt.Order("Category:N", sort=category_order),
+                tooltip=["Team", "Category", "Points"]
             )
-            .properties(width=700, height=400)
+            .properties(width=700, height=600)
         )
+    
         st.altair_chart(chart, use_container_width=True)
