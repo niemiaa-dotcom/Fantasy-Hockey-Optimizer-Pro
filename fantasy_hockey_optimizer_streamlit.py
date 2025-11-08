@@ -1662,7 +1662,7 @@ with tab2:
             alt.Chart(df_long)
             .mark_bar()
             .encode(
-                x=alt.X("Team:N", sort="-y", axis=alt.Axis(labelAngle=-45)),
+                x=alt.X("Team:N", sort="-y", axis=alt.Axis(labelAngle=-90)),
                 y=alt.Y("Points:Q"),
                 color="Category:N",
                 tooltip=["Team","Category","Points"]
