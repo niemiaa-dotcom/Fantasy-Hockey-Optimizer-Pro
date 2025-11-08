@@ -215,6 +215,25 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+def load_category_points_from_gsheets():
+    client = get_gspread_client()
+    if client is None:
+        st.error("Google Sheets -asiakas ei ole käytettävissä. Tarkista tunnistautuminen.")
+        return pd.DataFrame()
+
+    try:
+        sheet_url = st.secrets["free_agents_sheet"]["url"]  # sama sheet kuin rosterit
+        sheet = client.open_by_url(sheet_url)
+        worksheet = sheet.worksheet("Category Points KKUPFL")  # välilehden nimi
+        data = worksheet.get_all_records()
+        df = pd.DataFrame(data)
+        if df.empty:
+            st.warning("⚠️ 'Category Points KKUPFL' välilehti on tyhjä tai sitä ei löytynyt.")
+        return df
+    except Exception as e:
+        st.error(f"Virhe ladattaessa Category Points KKUFPL -välilehteä: {e}")
+        return pd.DataFrame()
+
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
@@ -1618,3 +1637,45 @@ if st.button("Suorita kaikkien joukkueiden analyysi"):
                 )
 
                 st.altair_chart(chart, use_container_width=True)
+
+
+st.subheader("📊 Category Points APL")
+cat_points_df = load_category_points_from_gsheets()
+if not cat_points_df.empty:
+    st.dataframe(cat_points_df, use_container_width=True)
+
+    # Muuta data pitkäksi Altairia varten
+    df_long = cat_points_df.melt(
+        id_vars=["Team"],
+        value_vars=["Goals", "Assists", "SOG", "Hits", "Blocks", "Goalies"],
+        var_name="Category",
+        value_name="Points"
+    )
+
+    # Laske kategorioiden kokonaispisteet ja järjestä suurimmasta pienimpään
+    cat_totals = (
+        df_long.groupby("Category")["Points"]
+        .sum()
+        .reset_index()
+        .sort_values("Points", ascending=False)
+    )
+    category_order = cat_totals["Category"].tolist()
+
+    # Piirrä vaaka pinottu palkkikaavio
+    chart = (
+        alt.Chart(df_long)
+        .mark_bar()
+        .encode(
+            y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
+            x=alt.X("Points:Q", stack="zero", axis=alt.Axis(title="Pisteet")),
+            color=alt.Color(
+                "Category:N",
+                scale=alt.Scale(domain=category_order),
+                legend=alt.Legend(title="Kategoria")
+            ),
+            tooltip=["Team", "Category", "Points"]
+        )
+        .properties(width=700, height=600)
+    )
+
+    st.altair_chart(chart, use_container_width=True)
