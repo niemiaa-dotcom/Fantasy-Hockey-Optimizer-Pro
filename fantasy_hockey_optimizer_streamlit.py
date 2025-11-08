@@ -1649,6 +1649,11 @@ with tab2:
     st.subheader("📊 Category Points APL")
     cat_points_df = load_category_points_from_gsheets()
     if not cat_points_df.empty:
+        # Numeroi joukkueet Total-sarakkeen mukaan
+        cat_points_df["Rank"] = cat_points_df["Total"].rank(method="dense", ascending=False).astype(int)
+        
+        # Järjestä taulukko rankin mukaan
+        cat_points_df = cat_points_df.sort_values("Rank")
         st.dataframe(cat_points_df, use_container_width=True)
     
         # Muuta data pitkäksi Altairia varten
