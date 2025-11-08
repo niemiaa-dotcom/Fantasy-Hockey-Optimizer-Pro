@@ -1655,7 +1655,7 @@ with tab2:
         # Muuta data pitkäksi Altairia varten
         df_long = cat_points_df.melt(
             id_vars=["Team"],
-            value_vars=["Goals", "Assists", "PPP", "SOG", "Hits", "Blocks", "Goalies"],
+            value_vars=["Goals", "Assists", "SOG", "Hits", "Blocks", "Goalies"],
             var_name="Category",
             value_name="Points"
         )
