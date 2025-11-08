@@ -1624,3 +1624,38 @@ with tab2:
                     )
     
                     st.altair_chart(chart, use_container_width=True)
+
+
+    # --- Category Points APL ---
+    st.markdown("---")
+    st.subheader("📊 Category Points APL")
+
+    # Lataa Google Sheetsistä välilehti Category Points APL
+    sheet_url = "https://docs.google.com/spreadsheets/d/1aLYs8mIiG_oe3vn0zCPKoTEJfriL0fS7xZlXxThpSSo/export?format=csv&gid=1738017210"
+    cat_points_df = pd.read_csv(sheet_url)
+
+    # Näytä taulukko
+    st.dataframe(cat_points_df, use_container_width=True)
+
+    # Muuta data pitkäksi Altairia varten (kaikki kategoriat paitsi Team ja Total)
+    df_long = cat_points_df.melt(
+        id_vars=["Team"],
+        value_vars=["Goals", "Assists", "PPP", "SOG", "Hits", "Blocks", "Goalies"],
+        var_name="Category",
+        value_name="Points"
+    )
+
+    # Tolppakaavio: joukkueet x-akselilla, pisteet y-akselilla, väri kategoriasta
+    chart = (
+        alt.Chart(df_long)
+        .mark_bar()
+        .encode(
+            x=alt.X("Team:N", sort="-y", axis=alt.Axis(labelAngle=-45)),
+            y=alt.Y("Points:Q"),
+            color="Category:N",
+            tooltip=["Team", "Category", "Points"]
+        )
+        .properties(width=700, height=400)
+    )
+
+    st.altair_chart(chart, use_container_width=True)
