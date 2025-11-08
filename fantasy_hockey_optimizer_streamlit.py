@@ -1639,15 +1639,23 @@ with tab2:
                     st.altair_chart(chart, use_container_width=True)
     
     
-    st.subheader("📊 Category Points APL")
+    st.subheader("📊 Category Points KKUPFL")
     cat_points_df = load_category_points_from_gsheets()
     if not cat_points_df.empty:
+        cat_points_df["Rank"] = cat_points_df["Total"].rank(method="dense", ascending=False).astype(int)
+        cat_points_df = cat_points_df.sort_values("Rank")
+        
+        # Siirrä Rank ensimmäiseksi
+        cols = ["Rank"] + [c for c in cat_points_df.columns if c != "Rank"]
+        cat_points_df = cat_points_df[cols]
+        # Nollaa indeksi, jotta Streamlit ei näytä sitä vasemmalla
+        cat_points_df = cat_points_df.reset_index(drop=True)
         st.dataframe(cat_points_df, use_container_width=True)
     
         # Muuta data pitkäksi Altairia varten
         df_long = cat_points_df.melt(
             id_vars=["Team"],
-            value_vars=["Goals", "Assists", "SOG", "Hits", "Blocks", "Goalies"],
+            value_vars=["Goals", "Assists", "PPP", "SOG", "Hits", "Blocks", "Goalies"],
             var_name="Category",
             value_name="Points"
         )
