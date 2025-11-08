@@ -1591,91 +1591,91 @@ with tab2:
 
     import altair as alt  # varmista että tämä on tiedoston yläosassa
 
-st.markdown("---")
-st.header("📊 Liigan joukkueanalyysi")
-
-if st.button("Suorita kaikkien joukkueiden analyysi"):
-    team_rosters = load_all_team_rosters_from_gsheets()
-    if not team_rosters:
-        st.warning("Rosteritaulukkoa ei voitu ladata.")
-    else:
-        with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
-            league_results = analyze_all_teams(
-                st.session_state['schedule'],
-                team_rosters,
-                pos_limits,
-                start_date,
-                end_date
-            )
-            st.dataframe(league_results, use_container_width=True)
-
-            # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
-            if not league_results.empty:
-                st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
-
-                # varmista että pisteet ovat numeerisia
-                league_results["Ennakoidut FP"] = pd.to_numeric(
-                    league_results["Ennakoidut FP"], errors="coerce"
-                ).fillna(0)
-
-                chart = (
-                    alt.Chart(league_results)
-                    .mark_bar()
-                    .encode(
-                        x=alt.X(
-                            "Joukkue:N",
-                            sort="-y",  # suurimmasta pienimpään
-                            axis=alt.Axis(labelAngle=-45)
-                        ),
-                        y=alt.Y("Ennakoidut FP:Q", title="Fantasiapisteet"),
-                        tooltip=[
-                            alt.Tooltip("Joukkue:N", title="Joukkue"),
-                            alt.Tooltip("Ennakoidut FP:Q", title="FP", format=".2f")
-                        ]
-                    )
-                    .properties(width=700, height=400)
+    st.markdown("---")
+    st.header("📊 Liigan joukkueanalyysi")
+    
+    if st.button("Suorita kaikkien joukkueiden analyysi"):
+        team_rosters = load_all_team_rosters_from_gsheets()
+        if not team_rosters:
+            st.warning("Rosteritaulukkoa ei voitu ladata.")
+        else:
+            with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
+                league_results = analyze_all_teams(
+                    st.session_state['schedule'],
+                    team_rosters,
+                    pos_limits,
+                    start_date,
+                    end_date
                 )
-
-                st.altair_chart(chart, use_container_width=True)
-
-
-st.subheader("📊 Category Points APL")
-cat_points_df = load_category_points_from_gsheets()
-if not cat_points_df.empty:
-    st.dataframe(cat_points_df, use_container_width=True)
-
-    # Muuta data pitkäksi Altairia varten
-    df_long = cat_points_df.melt(
-        id_vars=["Team"],
-        value_vars=["Goals", "Assists", "SOG", "Hits", "Blocks", "Goalies"],
-        var_name="Category",
-        value_name="Points"
-    )
-
-    # Laske kategorioiden kokonaispisteet ja järjestä suurimmasta pienimpään
-    cat_totals = (
-        df_long.groupby("Category")["Points"]
-        .sum()
-        .reset_index()
-        .sort_values("Points", ascending=False)
-    )
-    category_order = cat_totals["Category"].tolist()
-
-    # Piirrä vaaka pinottu palkkikaavio
-    chart = (
-        alt.Chart(df_long)
-        .mark_bar()
-        .encode(
-            y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
-            x=alt.X("Points:Q", stack="zero", axis=alt.Axis(title="Pisteet")),
-            color=alt.Color(
-                "Category:N",
-                scale=alt.Scale(domain=category_order),
-                legend=alt.Legend(title="Kategoria")
-            ),
-            tooltip=["Team", "Category", "Points"]
+                st.dataframe(league_results, use_container_width=True)
+    
+                # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
+                if not league_results.empty:
+                    st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
+    
+                    # varmista että pisteet ovat numeerisia
+                    league_results["Ennakoidut FP"] = pd.to_numeric(
+                        league_results["Ennakoidut FP"], errors="coerce"
+                    ).fillna(0)
+    
+                    chart = (
+                        alt.Chart(league_results)
+                        .mark_bar()
+                        .encode(
+                            x=alt.X(
+                                "Joukkue:N",
+                                sort="-y",  # suurimmasta pienimpään
+                                axis=alt.Axis(labelAngle=-45)
+                            ),
+                            y=alt.Y("Ennakoidut FP:Q", title="Fantasiapisteet"),
+                            tooltip=[
+                                alt.Tooltip("Joukkue:N", title="Joukkue"),
+                                alt.Tooltip("Ennakoidut FP:Q", title="FP", format=".2f")
+                            ]
+                        )
+                        .properties(width=700, height=400)
+                    )
+    
+                    st.altair_chart(chart, use_container_width=True)
+    
+    
+    st.subheader("📊 Category Points APL")
+    cat_points_df = load_category_points_from_gsheets()
+    if not cat_points_df.empty:
+        st.dataframe(cat_points_df, use_container_width=True)
+    
+        # Muuta data pitkäksi Altairia varten
+        df_long = cat_points_df.melt(
+            id_vars=["Team"],
+            value_vars=["Goals", "Assists", "SOG", "Hits", "Blocks", "Goalies"],
+            var_name="Category",
+            value_name="Points"
         )
-        .properties(width=700, height=600)
-    )
-
-    st.altair_chart(chart, use_container_width=True)
+    
+        # Laske kategorioiden kokonaispisteet ja järjestä suurimmasta pienimpään
+        cat_totals = (
+            df_long.groupby("Category")["Points"]
+            .sum()
+            .reset_index()
+            .sort_values("Points", ascending=False)
+        )
+        category_order = cat_totals["Category"].tolist()
+    
+        # Piirrä vaaka pinottu palkkikaavio
+        chart = (
+            alt.Chart(df_long)
+            .mark_bar()
+            .encode(
+                y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
+                x=alt.X("Points:Q", stack="zero", axis=alt.Axis(title="Pisteet")),
+                color=alt.Color(
+                    "Category:N",
+                    scale=alt.Scale(domain=category_order),
+                    legend=alt.Legend(title="Kategoria")
+                ),
+                tooltip=["Team", "Category", "Points"]
+            )
+            .properties(width=700, height=600)
+        )
+    
+        st.altair_chart(chart, use_container_width=True)
