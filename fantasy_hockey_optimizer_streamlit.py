@@ -1999,19 +1999,19 @@ with tab2:
         col_match1, col_match2 = st.columns([1, 3])
         
         with col_match1:
-            st.subheader("Valinnat")
+            st.subheader("Settings")
             
             # Slider viikkojen valintaan (Oletus: Viikko 1 - Nykyinen)
             # Yahoo NHL kausi on n. 25 viikkoa. 
             # Voit muuttaa max_value arvoa tarvittaessa.
             week_range = st.slider(
-                "Valitse viikot (Alku - Loppu)",
+                "Matchup weeks",
                 min_value=1,
                 max_value=26,
                 value=(1, 4) # Oletusarvo: Viikot 1-4
             )
             
-            if st.button("Hae matchup-tilastot"):
+            if st.button("Import matchups"):
                 start_w, end_w = week_range
                 with st.spinner(f"Lasketaan tilastoja viikoilta {start_w}-{end_w}..."):
                     # Kutsutaan uutta funktiota
@@ -2024,7 +2024,7 @@ with tab2:
                     df = st.session_state['matchup_data_cumulative']
                     current_range = st.session_state.get('matchup_range', (0,0))
                     
-                    st.subheader(f"Tulokset: Viikot {current_range[0]} - {current_range[1]}")
+                    st.subheader(f"Results: Weeks {current_range[0]} - {current_range[1]}")
                     
                     # --- UUSI SARAKEJÄRJESTYS ---
                     # Lisätään xRecord näkyviin
@@ -2065,7 +2065,7 @@ with tab2:
                     # --- KAAVIO (Pidetään ennallaan tai lisätään Luck tooltipiin) ---
                     import altair as alt
                     
-                    st.markdown("#### 📈 Hyökkäys (PF) vs Puolustus (PA)")
+                    st.markdown("#### 📈 Points for vs Points against")
                     
                     chart = alt.Chart(df).mark_circle(size=150).encode(
                         x=alt.X('Points For', title='Tehdyt pisteet (PF)', scale=alt.Scale(zero=False)),
