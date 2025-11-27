@@ -326,7 +326,6 @@ def fetch_yahoo_league_stats():
     # Namespace XML-parsintaa varten
     ns = {'f': 'http://fantasysports.yahooapis.com/fantasy/v2/base.rng'}
 
-    # Progress bar käyttäjäkokemusta varten
     progress_text = "Haetaan dataa Yahoosta..."
     my_bar = st.progress(0, text=progress_text)
     
@@ -335,7 +334,10 @@ def fetch_yahoo_league_stats():
         
         try:
             r = requests.get(url, headers=headers)
+            
+            # Jos haku epäonnistuu, näytetään virhe UI:ssa
             if r.status_code != 200:
+                st.warning(f"⚠️ Virhe haettaessa joukkuetta {team_name} (ID: {team_key}). Status: {r.status_code}")
                 continue
 
             root = ET.fromstring(r.content)
@@ -360,8 +362,9 @@ def fetch_yahoo_league_stats():
 
             rows.append(row_data)
             
-        except Exception:
-            pass # Ohitetaan virheet hiljaa jotta sovellus ei kaadu
+        except Exception as e:
+            # TÄMÄ ON UUTTA: Näytetään virhe sen sijaan että vaietaan
+            st.warning(f"⚠️ Odottamaton virhe joukkueen {team_name} kohdalla: {e}")
         
         my_bar.progress((i + 1) / len(TEAMS_KKUPFL), text=f"Haetaan: {team_name}")
         time.sleep(0.1) 
@@ -371,7 +374,6 @@ def fetch_yahoo_league_stats():
     
     # Järjestä sarakkeet
     cols = ['Team', 'Goals', 'Assists', 'SOG', 'Hits', 'Blocks', 'Wins', 'GA', 'Saves', 'Shutouts', 'Total Points']
-    # Varmista että sarakkeet löytyvät, jotta ei tule erroria jos dataa puuttuu
     existing_cols = [c for c in cols if c in df.columns]
     df = df[existing_cols]
     
