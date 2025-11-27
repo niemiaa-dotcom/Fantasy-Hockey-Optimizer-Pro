@@ -1765,51 +1765,61 @@ with tab2:
 
     # --- LASKENTA JA VISUALISOINTI ---
     if not cat_points_df.empty:
-        # 1. Laske Fantasy Pisteet (FP) jokaiselle kategorialle
-        fp_cols = []
+        # 1. Alustukset
         cat_points_df["Calculated_Total_FP"] = 0.0
+        cat_points_df["Goalies (FP)"] = 0.0  # Uusi koottu sarake maalivahdeille
+        
+        # Lista sarakkeista, jotka halutaan näyttää erikseen (kenttäpelaajat)
+        skater_fp_cols = []
+        
+        # Määritellään mitkä kategoriat kuuluvat maalivahdeille
+        goalie_cats = {'Wins', 'Saves', 'GA', 'Shutouts'}
 
         for cat, multiplier in SCORING_SYSTEM.items():
             if cat in cat_points_df.columns:
-                # Luodaan uusi sarake: esim "Goals (FP)"
-                col_name = f"{cat} (FP)"
+                # Lasketaan kyseisen kategorian pisteet
+                points = cat_points_df[cat] * multiplier
                 
-                # Laskenta: Raaka-arvo * Kerroin
-                cat_points_df[col_name] = cat_points_df[cat] * multiplier
+                # Lisätään aina kokonaispisteisiin
+                cat_points_df["Calculated_Total_FP"] += points
                 
-                # Lisätään yhteispisteisiin
-                cat_points_df["Calculated_Total_FP"] += cat_points_df[col_name]
-                fp_cols.append(col_name)
+                if cat in goalie_cats:
+                    # Jos on maalivahtikategoria, lisätään summasarakkeeseen
+                    cat_points_df["Goalies (FP)"] += points
+                else:
+                    # Jos on kenttäpelaaja, tehdään oma sarake ja lisätään listalle
+                    col_name = f"{cat} (FP)"
+                    cat_points_df[col_name] = points
+                    skater_fp_cols.append(col_name)
 
         # 2. Järjestä joukkueet kokonaispisteiden mukaan
         cat_points_df = cat_points_df.sort_values("Calculated_Total_FP", ascending=False).reset_index(drop=True)
 
         # 3. Näytä taulukko
-        # Valitaan näytettäväksi Joukkue, Yhteispisteet ja kategorioiden FP-pisteet
-        display_cols = ["Team", "Calculated_Total_FP"] + fp_cols
+        # Yhdistetään kenttäpelaajien sarakkeet ja maalivahtien yhteissarake
+        display_cols = ["Team", "Calculated_Total_FP"] + skater_fp_cols + ["Goalies (FP)"]
         
-        df_display = cat_points_df[display_cols].copy()
+        st.subheader("Joukkueiden kokonaispisteet ja pistejakauma")
+        st.dataframe(
+            cat_points_df[display_cols].style.format("{:.1f}"), 
+            use_container_width=True
+        )
 
-        # Pyöristä vain numeeriset sarakkeet yhteen desimaaliin
-        num_cols = df_display.select_dtypes(include="number").columns
-        df_display[num_cols] = df_display[num_cols].round(1)
+        # 4. Palkkikaavio
+        # Nyt mukana on yksittäiset kenttäpelaajakategoriat + yksi iso "Goalies (FP)" palkki
+        plot_vars = skater_fp_cols + ["Goalies (FP)"]
         
-        st.dataframe(df_display, use_container_width=True)
-
-
-        # 4. Palkkikaavio (Perustuu nyt FP-pisteisiin)
-        # Muutetaan data pitkään muotoon (Long format) Altairia varten
         df_long = cat_points_df.melt(
             id_vars=["Team"],
-            value_vars=fp_cols, # Käytetään vain FP-sarakkeita
+            value_vars=plot_vars,
             var_name="Category_Label",
             value_name="Fantasy Points"
         )
 
-        # Siistitään kategorian nimi (poistetaan " (FP)" lopusta jotta legenda on siisti)
+        # Siistitään nimet visualisointia varten (poistetaan " (FP)")
         df_long["Category"] = df_long["Category_Label"].str.replace(" (FP)", "")
 
-        # Järjestetään kategoriat sen mukaan, mistä tulee eniten pisteitä keskimäärin
+        # Järjestetään kategoriat suuruusjärjestykseen visualisoinnissa
         cat_totals = df_long.groupby("Category")["Fantasy Points"].sum().reset_index().sort_values("Fantasy Points", ascending=False)
         category_order = cat_totals["Category"].tolist()
 
@@ -1821,7 +1831,7 @@ with tab2:
                 x=alt.X("Fantasy Points:Q", stack="zero", axis=alt.Axis(title="Fantasy Pisteet")),
                 color=alt.Color(
                     "Category:N", 
-                    scale=alt.Scale(domain=category_order), # Järjestä värit suuruusjärjestykseen
+                    scale=alt.Scale(domain=category_order),
                     legend=alt.Legend(title="Kategoria")
                 ),
                 tooltip=[
