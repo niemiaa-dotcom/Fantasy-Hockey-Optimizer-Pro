@@ -379,6 +379,141 @@ def fetch_yahoo_league_stats():
     
     return df
 
+def fetch_yahoo_matchups(week=None):
+    """
+    Hakee liigan matchup-tulokset valitulle viikolle.
+    Jos week on None, hakee nykyisen viikon.
+    """
+    access_token = get_yahoo_access_token()
+    if not access_token:
+        return pd.DataFrame()
+
+    # 1. Selvitetään League Key (otetaan se ensimmäisestä joukkueesta)
+    # Esim. '465.l.50897.t.1' -> '465.l.50897'
+    first_team_key = TEAMS_KKUPFL[0][0]
+    league_key = ".".join(first_team_key.split(".")[:3])
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    
+    # URL: scoreboard kertoo matchupit
+    url = f"https://fantasysports.yahooapis.com/fantasy/v2/league/{league_key}/scoreboard"
+    if week:
+        url += f";week={week}"
+
+    try:
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        
+        root = ET.fromstring(r.content)
+        ns = {'f': 'http://fantasysports.yahooapis.com/fantasy/v2/base.rng'}
+        
+        matchups = root.findall('.//f:matchup', ns)
+        
+        data = []
+        
+        for matchup in matchups:
+            # Matchupissa on aina 2 joukkuetta
+            teams = matchup.findall('.//f:team', ns)
+            if len(teams) != 2:
+                continue
+                
+            team0_name = teams[0].find('f:name', ns).text
+            team0_score = float(teams[0].find('.//f:team_points/f:total', ns).text or 0)
+            
+            team1_name = teams[1].find('f:name', ns).text
+            team1_score = float(teams[1].find('.//f:team_points/f:total', ns).text or 0)
+            
+            # Lisätään rivit molemmille joukkueille (jotta voimme näyttää PF/PA helposti)
+            
+            # Joukkue 0 näkökulma
+            data.append({
+                "Team": team0_name,
+                "Opponent": team1_name,
+                "Points For": team0_score,
+                "Points Against": team1_score,
+                "Diff": team0_score - team1_score,
+                "Status": "Voitolla" if team0_score > team1_score else ("Häviöllä" if team0_score < team1_score else "Tasan")
+            })
+            
+            # Joukkue 1 näkökulma
+            data.append({
+                "Team": team1_name,
+                "Opponent": team0_name,
+                "Points For": team1_score,
+                "Points Against": team0_score,
+                "Diff": team1_score - team0_score,
+                "Status": "Voitolla" if team1_score > team0_score else ("Häviöllä" if team1_score < team0_score else "Tasan")
+            })
+            
+        return pd.DataFrame(data)
+
+    except Exception as e:
+        st.error(f"Virhe matchup-tietojen haussa: {e}")
+        return pd.DataFrame()
+
+def fetch_cumulative_matchups(start_week, end_week):
+    """
+    Hakee matchup-tulokset aikaväliltä (start_week -> end_week)
+    ja laskee kumulatiiviset summat (PF, PA, Voitot, Tappiot).
+    """
+    all_weeks_data = []
+    
+    # Progress bar UI:ta varten
+    progress_text = f"Haetaan viikkoja {start_week}-{end_week}..."
+    my_bar = st.progress(0, text=progress_text)
+    total_weeks = end_week - start_week + 1
+    
+    for i, week in enumerate(range(start_week, end_week + 1)):
+        # Käytetään aiempaa yhden viikon hakufunktiota
+        df = fetch_yahoo_matchups(week=week)
+        
+        if not df.empty:
+            df['Week'] = week
+            all_weeks_data.append(df)
+        
+        # Päivitetään palkki
+        my_bar.progress((i + 1) / total_weeks)
+        time.sleep(0.1) # Kohteliaisuus APIa kohtaan
+
+    my_bar.empty()
+
+    if not all_weeks_data:
+        return pd.DataFrame()
+
+    # Yhdistetään kaikki viikot yhteen isoon taulukkoon
+    combined_df = pd.concat(all_weeks_data)
+
+    # --- AGGREGOINTI (YHTEENVETO) ---
+    # Ryhmitellään joukkueen mukaan
+    summary = combined_df.groupby('Team').agg({
+        'Points For': 'sum',
+        'Points Against': 'sum',
+        'Diff': 'sum',
+        'Opponent': lambda x: ', '.join(x.unique()) # Listataan vastustajat
+    }).reset_index()
+
+    # Lasketaan Voitot-Tappiot-Tasapelit aikaväliltä
+    # Voitto: Status == 'Voitolla'
+    wins = combined_df[combined_df['Status'] == 'Voitolla'].groupby('Team').size()
+    losses = combined_df[combined_df['Status'] == 'Häviöllä'].groupby('Team').size()
+    ties = combined_df[combined_df['Status'] == 'Tasan'].groupby('Team').size()
+
+    # Yhdistetään Record-data summary-taulukkoon
+    summary = summary.set_index('Team')
+    summary['W'] = wins
+    summary['L'] = losses
+    summary['T'] = ties
+    
+    # Korvataan NaN nollilla (jos ei yhtään voittoa/tappiota)
+    summary[['W', 'L', 'T']] = summary[['W', 'L', 'T']].fillna(0).astype(int)
+    
+    summary = summary.reset_index()
+    
+    # Luodaan luettava Record-sarake (esim. "3-0-0")
+    summary['Record'] = summary.apply(lambda x: f"{x['W']}-{x['L']}-{x['T']}", axis=1)
+
+    return summary
+
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
@@ -1848,3 +1983,83 @@ with tab2:
             .properties(height=600)
         )
         st.altair_chart(chart, use_container_width=True)
+st.markdown("---")
+    st.header("⚔️ Matchup Center (Kumulatiivinen)")
+    st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
+
+    col_match1, col_match2 = st.columns([1, 3])
+    
+    with col_match1:
+        st.subheader("Valinnat")
+        
+        # Slider viikkojen valintaan (Oletus: Viikko 1 - Nykyinen)
+        # Yahoo NHL kausi on n. 25 viikkoa. 
+        # Voit muuttaa max_value arvoa tarvittaessa.
+        week_range = st.slider(
+            "Valitse viikot (Alku - Loppu)",
+            min_value=1,
+            max_value=26,
+            value=(1, 4) # Oletusarvo: Viikot 1-4
+        )
+        
+        if st.button("Hae matchup-tilastot"):
+            start_w, end_w = week_range
+            with st.spinner(f"Lasketaan tilastoja viikoilta {start_w}-{end_w}..."):
+                # Kutsutaan uutta funktiota
+                matchup_df = fetch_cumulative_matchups(start_week=start_w, end_week=end_w)
+                st.session_state['matchup_data_cumulative'] = matchup_df
+                st.session_state['matchup_range'] = week_range
+
+    with col_match2:
+        if 'matchup_data_cumulative' in st.session_state and not st.session_state['matchup_data_cumulative'].empty:
+            df = st.session_state['matchup_data_cumulative']
+            current_range = st.session_state.get('matchup_range', (0,0))
+            
+            st.subheader(f"Tulokset: Viikot {current_range[0]} - {current_range[1]}")
+            
+            # --- TAULUKKO ---
+            # Valitaan näytettävät sarakkeet
+            display_cols = ["Team", "Record", "Points For", "Points Against", "Diff", "Opponent"]
+            
+            # Väritys Diff-sarakkeelle
+            def color_diff(val):
+                color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                return f'color: {color}; font-weight: bold'
+
+            st.dataframe(
+                df[display_cols].style
+                .format({"Points For": "{:.1f}", "Points Against": "{:.1f}", "Diff": "{:+.1f}"})
+                .applymap(color_diff, subset=['Diff']),
+                use_container_width=True,
+                hide_index=True
+            )
+            
+            # --- KAAVIO ---
+            import altair as alt
+            
+            st.markdown("#### 📈 Hyökkäys (PF) vs Puolustus/Onni (PA)")
+            st.caption(f"Yhteispisteet viikoilta {current_range[0]}-{current_range[1]}. Mitä alempana, sitä vähemmän pisteitä olet päästänyt.")
+
+            # Luodaan väri Record-sarakkeen voittoprosentin mukaan (karkea) tai vain Diffin mukaan
+            # Käytetään Diffiä väritykseen: Vihreä = Positiivinen maaliero
+            
+            chart = alt.Chart(df).mark_circle(size=150).encode(
+                x=alt.X('Points For', title='Tehdyt pisteet (PF) Summa', scale=alt.Scale(zero=False)),
+                y=alt.Y('Points Against', title='Vastustajan pisteet (PA) Summa', scale=alt.Scale(zero=False)),
+                color=alt.Color('Diff', title='Piste-ero', scale=alt.Scale(scheme='redyellowgreen')),
+                tooltip=['Team', 'Record', 'Points For', 'Points Against', 'Diff', 'Opponent']
+            ).properties(height=450).interactive()
+            
+            text = chart.mark_text(
+                align='left',
+                baseline='middle',
+                dx=10,
+                fontSize=11
+            ).encode(
+                text='Team'
+            )
+
+            st.altair_chart(chart + text, use_container_width=True)
+
+        elif 'matchup_data_cumulative' in st.session_state:
+            st.info("Ei dataa löytynyt valitulta aikaväliltä.")
