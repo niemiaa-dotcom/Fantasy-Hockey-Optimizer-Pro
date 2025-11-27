@@ -1993,7 +1993,7 @@ with tab2:
         st.altair_chart(chart, use_container_width=True)
 
         st.markdown("---")
-        st.header("⚔️ Matchup Center (Kumulatiivinen)")
+        st.header("⚔️ Matchup Center")
         st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
     
         col_match1, col_match2 = st.columns([1, 3])
