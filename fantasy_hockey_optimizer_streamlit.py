@@ -1993,90 +1993,100 @@ with tab2:
         st.altair_chart(chart, use_container_width=True)
 
         st.markdown("---")
-        st.header("⚔️ Matchup Center")
-        st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
+    st.header("⚔️ Matchup Center (Kumulatiivinen)")
+    st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
+
+    # --- KONTROLLIT (Ylärivillä) ---
+    # Luodaan sarakkeet säätimelle ja napille. 
+    # vertical_alignment="bottom" tasaa napin ja sliderin alareunat (siistimpi ulkoasu)
+    col_ctrl1, col_ctrl2 = st.columns([3, 1], vertical_alignment="bottom")
     
-        col_match1, col_match2 = st.columns([1, 3])
-        
-        with col_match1:
-            st.subheader("Settings")
-            
-            # Slider viikkojen valintaan (Oletus: Viikko 1 - Nykyinen)
-            # Yahoo NHL kausi on n. 25 viikkoa. 
-            # Voit muuttaa max_value arvoa tarvittaessa.
-            week_range = st.slider(
-                "Matchup weeks",
-                min_value=1,
-                max_value=26,
-                value=(1, 4) # Oletusarvo: Viikot 1-4
-            )
-            
-            if st.button("Import matchups"):
-                start_w, end_w = week_range
-                with st.spinner(f"Lasketaan tilastoja viikoilta {start_w}-{end_w}..."):
-                    # Kutsutaan uutta funktiota
-                    matchup_df = fetch_cumulative_matchups(start_week=start_w, end_week=end_w)
-                    st.session_state['matchup_data_cumulative'] = matchup_df
-                    st.session_state['matchup_range'] = week_range
+    with col_ctrl1:
+        # Slider viikkojen valintaan
+        week_range = st.slider(
+            "Valitse viikot (Alku - Loppu)",
+            min_value=1,
+            max_value=26,
+            value=st.session_state.get('matchup_range', (1, 4)) # Muistaa edellisen valinnan
+        )
     
-        with col_match2:
-                if 'matchup_data_cumulative' in st.session_state and not st.session_state['matchup_data_cumulative'].empty:
-                    df = st.session_state['matchup_data_cumulative']
-                    current_range = st.session_state.get('matchup_range', (0,0))
-                    
-                    st.subheader(f"Results: Weeks {current_range[0]} - {current_range[1]}")
-                    
-                    # --- UUSI SARAKEJÄRJESTYS ---
-                    # Lisätään xRecord näkyviin
-                    display_cols = ["Team", "Record", "xRecord", "Points For", "Points Against", "Diff"]
-                    
-                    # Lasketaan "Tuuri" (Luck) visualisointia varten
-                    # Luck = Oikeat voitot (W) - Odotetut voitot (xW_week)
-                    # Jos positiivinen, olet voittanut enemmän kuin pistemääräsi edellyttäisi (Hyvä tuuri)
-                    df['W_int'] = df['Record'].apply(lambda x: int(x.split('-')[0]))
-                    df['Luck'] = df['W_int'] - df['xW_week']
+    with col_ctrl2:
+        # Nappi on nyt sliderin vieressä
+        run_search = st.button("Hae matchup-tilastot", use_container_width=True)
+
+    # --- HAKULOGIIKKA ---
+    if run_search:
+        start_w, end_w = week_range
+        with st.spinner(f"Lasketaan tilastoja viikoilta {start_w}-{end_w}..."):
+            matchup_df = fetch_cumulative_matchups(start_week=start_w, end_week=end_w)
+            st.session_state['matchup_data_cumulative'] = matchup_df
+            st.session_state['matchup_range'] = week_range
+
+    # --- TULOKSET (Koko leveydellä) ---
+    st.markdown("---") # Erotinviiva kontrollien ja tulosten väliin
+    
+    if 'matchup_data_cumulative' in st.session_state and not st.session_state['matchup_data_cumulative'].empty:
+        df = st.session_state['matchup_data_cumulative']
+        current_range = st.session_state.get('matchup_range', (0,0))
         
-                    # Väritys Diff-sarakkeelle
-                    def color_diff(val):
-                        color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
-                        return f'color: {color}; font-weight: bold'
-                    
-                    # Väritys Luck-sarakkeelle (vapaaehtoinen lisäys, jos haluat näyttää sen)
-                    def color_luck(val):
-                        if val > 0: return 'color: green' # Olet voittanut "liikaa" (hyvä matchup-tuuri)
-                        if val < 0: return 'color: red'   # Olet hävinnyt vaikka pelasit hyvin (huono matchup-tuuri)
-                        return 'color: gray'
+        st.subheader(f"Tulokset: Viikot {current_range[0]} - {current_range[1]}")
         
-                    # Näytetään taulukko
-                    st.dataframe(
-                        df[display_cols].style
-                        .format({"Points For": "{:.1f}", "Points Against": "{:.1f}", "Diff": "{:+.1f}"})
-                        .applymap(color_diff, subset=['Diff']),
-                        use_container_width=True,
-                        hide_index=True
-                    )
-                    
-                    # Selite käyttäjälle
-                    st.caption("""
-                    **xRecord (Expected Record):** Kertoo, mikä saldosi olisi, jos olisit pelannut joka viikko "liigan keskiarvoa" (mediaania) vastaan. 
-                    Jos pisteesi olivat viikolla paremmat kuin 50% muista joukkueista, saat voiton.
-                    """)
+        # --- TAULUKKO ---
         
-                    # --- KAAVIO (Pidetään ennallaan tai lisätään Luck tooltipiin) ---
-                    import altair as alt
-                    
-                    st.markdown("#### 📈 Points for vs Points against")
-                    
-                    chart = alt.Chart(df).mark_circle(size=150).encode(
-                        x=alt.X('Points For', title='Tehdyt pisteet (PF)', scale=alt.Scale(zero=False)),
-                        y=alt.Y('Points Against', title='Vastustajan pisteet (PA)', scale=alt.Scale(zero=False)),
-                        color=alt.Color('Diff', title='Piste-ero', scale=alt.Scale(scheme='redyellowgreen')),
-                        # Lisätään tooltipiin uudet tiedot
-                        tooltip=['Team', 'Record', 'xRecord', 'Points For', 'Points Against', 'Diff', 'Luck']
-                    ).properties(height=450).interactive()
-                    
-                    text = chart.mark_text(align='left', baseline='middle', dx=10, fontSize=11).encode(text='Team')
-                    st.altair_chart(chart + text, use_container_width=True)
+        # Tarkistetaan onko xW_week olemassa (varmistus vanhaa dataa vastaan)
+        if 'xW_week' not in df.columns:
+            st.warning("⚠️ Vanhaa dataa havaittu. Paina 'Hae matchup-tilastot' -nappia päivittääksesi.")
+            display_cols = ["Team", "Record", "Points For", "Points Against", "Diff"]
+        else:
+            display_cols = ["Team", "Record", "xRecord", "Points For", "Points Against", "Diff"]
+            
+            # Lasketaan "Tuuri" (Luck) visualisointia varten
+            df['W_int'] = df['Record'].apply(lambda x: int(x.split('-')[0]))
+            df['Luck'] = df['W_int'] - df['xW_week']
+
+        # Väritys Diff-sarakkeelle
+        def color_diff(val):
+            color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+            return f'color: {color}; font-weight: bold'
+
+        # Näytetään taulukko nyt koko leveydellä
+        st.dataframe(
+            df[display_cols].style
+            .format({"Points For": "{:.1f}", "Points Against": "{:.1f}", "Diff": "{:+.1f}"})
+            .applymap(color_diff, subset=['Diff']),
+            use_container_width=True,
+            hide_index=True
+        )
         
-                elif 'matchup_data_cumulative' in st.session_state:
-                    st.info("Ei dataa löytynyt valitulta aikaväliltä.")
+        # Selite
+        if 'xRecord' in display_cols:
+            st.caption("""
+            **xRecord (Expected Record):** Kertoo, mikä saldosi olisi, jos olisit pelannut joka viikko "liigan keskiarvoa" (mediaania) vastaan. 
+            **Erotus (Luck):** Jos Record on parempi kuin xRecord, olet hyötynyt suotuisista matchupeista.
+            """)
+
+        # --- KAAVIO ---
+        import altair as alt
+        
+        st.markdown("#### 📈 Hyökkäys (PF) vs Puolustus (PA)")
+        
+        # Tehdään kaaviosta leveämpi ja informatiivisempi
+        chart = alt.Chart(df).mark_circle(size=200).encode(
+            x=alt.X('Points For', title='Tehdyt pisteet (PF)', scale=alt.Scale(zero=False)),
+            y=alt.Y('Points Against', title='Vastustajan pisteet (PA)', scale=alt.Scale(zero=False)),
+            color=alt.Color('Diff', title='Piste-ero', scale=alt.Scale(scheme='redyellowgreen')),
+            tooltip=['Team', 'Record', 'xRecord', 'Points For', 'Points Against', 'Diff', 'Luck']
+        ).properties(
+            height=500 # Korkeampi kaavio
+        ).interactive()
+        
+        text = chart.mark_text(align='left', baseline='middle', dx=12, fontSize=12).encode(text='Team')
+        
+        # Keskiarvoviivat helpottamaan hahmottamista (kuka on "oikeassa yläkulmassa")
+        mean_pf = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(x='mean(Points For)')
+        mean_pa = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(y='mean(Points Against)')
+
+        st.altair_chart(chart + text + mean_pf + mean_pa, use_container_width=True)
+
+    elif 'matchup_data_cumulative' in st.session_state:
+        st.info("Ei dataa löytynyt valitulta aikaväliltä.")
