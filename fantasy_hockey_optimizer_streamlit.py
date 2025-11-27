@@ -273,19 +273,35 @@ def get_yahoo_access_token():
     """Hakee uuden access_tokenin refresh_tokenin avulla."""
     try:
         token_url = "https://api.login.yahoo.com/oauth2/get_token"
+        
+        # TÄRKEÄÄ: Yahoo vaatii redirect_urin myös tässä vaiheessa.
+        # Sen on oltava täsmälleen sama kuin Yahoo Developer Consolessa!
+        redirect_uri = 'https://localhost:8501' 
+
         payload = {
             'client_id': st.secrets["yahoo"]["client_id"],
             'client_secret': st.secrets["yahoo"]["client_secret"],
             'refresh_token': st.secrets["yahoo"]["refresh_token"],
+            'redirect_uri': redirect_uri, 
             'grant_type': 'refresh_token'
         }
+        
         resp = requests.post(token_url, data=payload)
+        
+        # Jos tulee virhe, heitetään poikkeus, jotta näemme tekstin
         resp.raise_for_status()
+        
         return resp.json()['access_token']
-    except Exception as e:
-        st.error(f"Virhe Yahoo-kirjautumisessa: {e}")
+        
+    except requests.exceptions.HTTPError as err:
+        # TÄMÄ NÄYTTÄÄ TARKAN SYYN RUUDULLA
+        st.error(f"Yahoo hylkäsi pyynnön (400).")
+        st.error(f"Palvelimen vastaus: {resp.text}") 
+        st.warning("Tarkista secrets.toml: Onko Client ID/Secret oikein? Onko refresh_token kopioitu kokonaan ilman välilyöntejä?")
         return None
-
+    except Exception as e:
+        st.error(f"Muu virhe Yahoo-kirjautumisessa: {e}")
+        return None
 def fetch_yahoo_league_stats():
     """Hakee liigan tilastot suoraan Yahoo API:sta."""
     access_token = get_yahoo_access_token()
