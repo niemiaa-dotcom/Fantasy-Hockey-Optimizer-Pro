@@ -251,6 +251,18 @@ STAT_MAP_KKUPFL = {
     '27': 'Shutouts'
 }
 
+# --- PISTEYTYSJÄRJESTELMÄ (Tarkista nämä liigasi asetuksista!) ---
+SCORING_SYSTEM = {
+    'Goals': 4.5,
+    'Assists': 3.0,
+    'SOG': 0.5,
+    'Hits': 0.25,     # Tai 0.25 tai 0.5, tarkista!
+    'Blocks': 0.5,
+    'Wins': 3.0,
+    'Saves': 0.3,
+    'GA': -1.5,      # Päästetyt maalit (yleensä miinuspisteitä)
+    'Shutouts': 3.0
+}
 # Joukkueet (ID, Nimi) - Nämä pitää olla samat kuin liigassasi
 TEAMS_KKUPFL = [
     ('465.l.50897.t.1', 'SKBG ELITE'),
@@ -1727,7 +1739,7 @@ with tab2:
     # Valinta: Mitä dataa näytetään?
     calc_mode = st.radio(
         "Lähde:",
-        ["Reaaliaikainen Yahoo Data (API)", "Ennuste (Rosterien perusteella)", "Staattinen (Google Sheet)"],
+        ["Reaaliaikainen Yahoo Data (API)", "Staattinen (Google Sheet)"],
         horizontal=True
     )
 
@@ -1738,74 +1750,83 @@ with tab2:
         if st.button("🔄 Hae tuoreimmat tilastot Yahoosta"):
              yahoo_df = fetch_yahoo_league_stats()
              if not yahoo_df.empty:
-                 # Lasketaan pisteet (Ranking)
-                 yahoo_df["Total_Score"] = 0
-                 
-                 # Nämä sarakkeet pisteytetään (suurin on paras)
-                 high_is_good = ["Goals", "Assists", "SOG", "Hits", "Blocks", "Wins", "Saves", "Shutouts"]
-                 for col in high_is_good:
-                     if col in yahoo_df.columns:
-                        yahoo_df[f"{col}_Rank"] = yahoo_df[col].rank(method="min", ascending=True)
-                        yahoo_df["Total_Score"] += yahoo_df[f"{col}_Rank"]
-                 
-                 # GA on käänteinen (pienin on paras)
-                 if "GA" in yahoo_df.columns:
-                    yahoo_df["GA_Rank"] = yahoo_df["GA"].rank(method="min", ascending=False)
-                    yahoo_df["Total_Score"] += yahoo_df["GA_Rank"]
-
-                 yahoo_df = yahoo_df.sort_values("Total_Score", ascending=False).reset_index(drop=True)
-                 
-                 # Tallennetaan session stateen jotta se pysyy ruudulla
+                 # Tallennetaan session stateen
                  st.session_state['live_yahoo_stats'] = yahoo_df
                  st.success("Tiedot päivitetty!")
         
         if 'live_yahoo_stats' in st.session_state:
-            cat_points_df = st.session_state['live_yahoo_stats']
+            cat_points_df = st.session_state['live_yahoo_stats'].copy()
         else:
             st.info("Paina yllä olevaa nappia hakeaksesi dataa.")
 
     # --- 2. GOOGLE SHEET STAATTINEN ---
     elif calc_mode == "Staattinen (Google Sheet)":
         cat_points_df = load_category_points_from_gsheets()
-        if not cat_points_df.empty:
-             # Laske rankit jos niitä ei ole
-             if "Total" in cat_points_df.columns: # Jos sheetissä on Total-sarake
-                cat_points_df["Rank"] = cat_points_df["Total"].rank(method="dense", ascending=False).astype(int)
-                cat_points_df = cat_points_df.sort_values("Rank")
-    
-    # --- 3. ENNUSTE (PROJECTION) ---
-    else: 
-        st.info("Valitse aikaväli vasemmasta sivupalkista.")
-        if st.button("Laske ennuste"):
-             # (Tähän voi lisätä aiemman ennustekoodin, pidetään tämä nyt yksinkertaisena)
-             st.warning("Ennustelogiikka vaatii rosteritiedostoon tilastosarakkeet.")
 
-    # --- VISUALISOINTI (YHTEINEN KAIKILLE) ---
+    # --- LASKENTA JA VISUALISOINTI ---
     if not cat_points_df.empty:
-        st.dataframe(cat_points_df, use_container_width=True)
-    
-        # Muokataan data kaaviota varten
-        plot_vars = ["Goals", "Assists", "SOG", "Hits", "Blocks", "Wins", "Saves"]
-        # Varmistetaan että sarakkeet löytyvät datasta
-        available_vars = [c for c in plot_vars if c in cat_points_df.columns]
+        # 1. Laske Fantasy Pisteet (FP) jokaiselle kategorialle
+        fp_cols = []
+        cat_points_df["Calculated_Total_FP"] = 0.0
+
+        for cat, multiplier in SCORING_SYSTEM.items():
+            if cat in cat_points_df.columns:
+                # Luodaan uusi sarake: esim "Goals (FP)"
+                col_name = f"{cat} (FP)"
+                
+                # Laskenta: Raaka-arvo * Kerroin
+                cat_points_df[col_name] = cat_points_df[cat] * multiplier
+                
+                # Lisätään yhteispisteisiin
+                cat_points_df["Calculated_Total_FP"] += cat_points_df[col_name]
+                fp_cols.append(col_name)
+
+        # 2. Järjestä joukkueet kokonaispisteiden mukaan
+        cat_points_df = cat_points_df.sort_values("Calculated_Total_FP", ascending=False).reset_index(drop=True)
+
+        # 3. Näytä taulukko
+        # Valitaan näytettäväksi Joukkue, Yhteispisteet ja kategorioiden FP-pisteet
+        display_cols = ["Team", "Calculated_Total_FP"] + fp_cols
         
-        if available_vars:
-            df_long = cat_points_df.melt(
-                id_vars=["Team"],
-                value_vars=available_vars,
-                var_name="Category",
-                value_name="Points"
+        st.subheader("Joukkueiden kokonaispisteet ja pistejakauma")
+        st.dataframe(
+            cat_points_df[display_cols].style.format("{:.1f}"), # Muotoile desimaalit
+            use_container_width=True
+        )
+
+        # 4. Palkkikaavio (Perustuu nyt FP-pisteisiin)
+        # Muutetaan data pitkään muotoon (Long format) Altairia varten
+        df_long = cat_points_df.melt(
+            id_vars=["Team"],
+            value_vars=fp_cols, # Käytetään vain FP-sarakkeita
+            var_name="Category_Label",
+            value_name="Fantasy Points"
+        )
+
+        # Siistitään kategorian nimi (poistetaan " (FP)" lopusta jotta legenda on siisti)
+        df_long["Category"] = df_long["Category_Label"].str.replace(" (FP)", "")
+
+        # Järjestetään kategoriat sen mukaan, mistä tulee eniten pisteitä keskimäärin
+        cat_totals = df_long.groupby("Category")["Fantasy Points"].sum().reset_index().sort_values("Fantasy Points", ascending=False)
+        category_order = cat_totals["Category"].tolist()
+
+        chart = (
+            alt.Chart(df_long)
+            .mark_bar()
+            .encode(
+                y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
+                x=alt.X("Fantasy Points:Q", stack="zero", axis=alt.Axis(title="Fantasy Pisteet")),
+                color=alt.Color(
+                    "Category:N", 
+                    scale=alt.Scale(domain=category_order), # Järjestä värit suuruusjärjestykseen
+                    legend=alt.Legend(title="Kategoria")
+                ),
+                tooltip=[
+                    alt.Tooltip("Team", title="Joukkue"),
+                    alt.Tooltip("Category", title="Kategoria"),
+                    alt.Tooltip("Fantasy Points", title="Pisteet", format=".1f")
+                ]
             )
-        
-            chart = (
-                alt.Chart(df_long)
-                .mark_bar()
-                .encode(
-                    y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
-                    x=alt.X("Points:Q", stack="zero", axis=alt.Axis(title="Arvo")),
-                    color=alt.Color("Category:N", legend=alt.Legend(title="Kategoria")),
-                    tooltip=["Team", "Category", "Points"]
-                )
-                .properties(height=600)
-            )
-            st.altair_chart(chart, use_container_width=True)
+            .properties(height=600)
+        )
+        st.altair_chart(chart, use_container_width=True)
