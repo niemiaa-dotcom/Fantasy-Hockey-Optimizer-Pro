@@ -1788,11 +1788,14 @@ with tab2:
         # Valitaan näytettäväksi Joukkue, Yhteispisteet ja kategorioiden FP-pisteet
         display_cols = ["Team", "Calculated_Total_FP"] + fp_cols
         
-        st.subheader("Joukkueiden kokonaispisteet ja pistejakauma")
-        st.dataframe(
-            cat_points_df[display_cols].style.format("{:.1f}"), # Muotoile desimaalit
-            use_container_width=True
-        )
+        df_display = cat_points_df[display_cols].copy()
+
+        # Pyöristä vain numeeriset sarakkeet yhteen desimaaliin
+        num_cols = df_display.select_dtypes(include="number").columns
+        df_display[num_cols] = df_display[num_cols].round(1)
+        
+        st.dataframe(df_display, use_container_width=True)
+
 
         # 4. Palkkikaavio (Perustuu nyt FP-pisteisiin)
         # Muutetaan data pitkään muotoon (Long format) Altairia varten
