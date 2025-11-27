@@ -1993,7 +1993,7 @@ with tab2:
         st.altair_chart(chart, use_container_width=True)
 
         st.markdown("---")
-    st.header("⚔️ Matchup Center (Kumulatiivinen)")
+    st.header("⚔️ Matchup Center")
     st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
 
     # --- KONTROLLIT (Ylärivillä) ---
@@ -2038,22 +2038,41 @@ with tab2:
             st.warning("⚠️ Vanhaa dataa havaittu. Paina 'Hae matchup-tilastot' -nappia päivittääksesi.")
             display_cols = ["Team", "Record", "Points For", "Points Against", "Diff"]
         else:
-            display_cols = ["Team", "Record", "xRecord", "Points For", "Points Against", "Diff"]
+            # 1. Lisätään "Luck" näytettäviin sarakkeisiin
+            display_cols = ["Team", "Record", "xRecord", "Points For", "Points Against", "Diff", "Luck"]
             
-            # Lasketaan "Tuuri" (Luck) visualisointia varten
+            # 2. Lasketaan Luck: Oikeat voitot - Odotetut voitot
+            # Esim. Record 3-0-0 (3 voittoa) ja xRecord 1-2 (1 voitto) -> Luck = 3 - 1 = +2 (Hyvä tuuri)
             df['W_int'] = df['Record'].apply(lambda x: int(x.split('-')[0]))
             df['Luck'] = df['W_int'] - df['xW_week']
 
-        # Väritys Diff-sarakkeelle
+        # --- TYYLITTELY ---
+
+        # Väritys Diff-sarakkeelle (Maaliero)
         def color_diff(val):
-            color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+            color = '#4caf50' if val > 0 else ('#f44336' if val < 0 else 'gray') # Vihreä / Punainen
             return f'color: {color}; font-weight: bold'
 
-        # Näytetään taulukko nyt koko leveydellä
+        # UUSI: Väritys Luck-sarakkeelle (Tuuri)
+        def color_luck(val):
+            if val > 0:
+                return 'color: #2e7d32; font-weight: bold; background-color: #e8f5e9' # Tumma vihreä teksti, vaalea tausta
+            elif val < 0:
+                return 'color: #c62828; font-weight: bold; background-color: #ffebee' # Tumma punainen teksti, vaalea tausta
+            else:
+                return 'color: gray'
+
+        # Näytetään taulukko koko leveydellä
         st.dataframe(
             df[display_cols].style
-            .format({"Points For": "{:.1f}", "Points Against": "{:.1f}", "Diff": "{:+.1f}"})
-            .applymap(color_diff, subset=['Diff']),
+            .format({
+                "Points For": "{:.1f}", 
+                "Points Against": "{:.1f}", 
+                "Diff": "{:+.1f}",
+                "Luck": "{:+d}" # Näyttää etumerkin (+ tai -) myös kokonaisluvuille
+            })
+            .applymap(color_diff, subset=['Diff'])
+            .applymap(color_luck, subset=['Luck']), # Sovelletaan uusi väri
             use_container_width=True,
             hide_index=True
         )
