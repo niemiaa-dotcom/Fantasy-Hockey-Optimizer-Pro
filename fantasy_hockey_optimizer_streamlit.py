@@ -1983,83 +1983,85 @@ with tab2:
             .properties(height=600)
         )
         st.altair_chart(chart, use_container_width=True)
-    st.markdown("---")
-        st.header("⚔️ Matchup Center (Kumulatiivinen)")
-        st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
+
+st.markdown("---")
+    st.header("⚔️ Matchup Center (Kumulatiivinen)")
+    st.caption("Tarkastele toteutuneita pisteitä ja voittosaraketta halutulla aikavälillä.")
+
+    col_match1, col_match2 = st.columns([1, 3])
     
-        col_match1, col_match2 = st.columns([1, 3])
+    with col_match1:
+        st.subheader("Valinnat")
         
-        with col_match1:
-            st.subheader("Valinnat")
+        # Slider viikkojen valintaan (Oletus: Viikko 1 - Nykyinen)
+        # Yahoo NHL kausi on n. 25 viikkoa. 
+        # Voit muuttaa max_value arvoa tarvittaessa.
+        week_range = st.slider(
+            "Valitse viikot (Alku - Loppu)",
+            min_value=1,
+            max_value=26,
+            value=(1, 4) # Oletusarvo: Viikot 1-4
+        )
+        
+        if st.button("Hae matchup-tilastot"):
+            start_w, end_w = week_range
+            with st.spinner(f"Lasketaan tilastoja viikoilta {start_w}-{end_w}..."):
+                # Kutsutaan uutta funktiota
+                matchup_df = fetch_cumulative_matchups(start_week=start_w, end_week=end_w)
+                st.session_state['matchup_data_cumulative'] = matchup_df
+                st.session_state['matchup_range'] = week_range
+
+    with col_match2:
+        if 'matchup_data_cumulative' in st.session_state and not st.session_state['matchup_data_cumulative'].empty:
+            df = st.session_state['matchup_data_cumulative']
+            current_range = st.session_state.get('matchup_range', (0,0))
             
-            # Slider viikkojen valintaan (Oletus: Viikko 1 - Nykyinen)
-            # Yahoo NHL kausi on n. 25 viikkoa. 
-            # Voit muuttaa max_value arvoa tarvittaessa.
-            week_range = st.slider(
-                "Valitse viikot (Alku - Loppu)",
-                min_value=1,
-                max_value=26,
-                value=(1, 4) # Oletusarvo: Viikot 1-4
+            st.subheader(f"Tulokset: Viikot {current_range[0]} - {current_range[1]}")
+            
+            # --- TAULUKKO ---
+            # Valitaan näytettävät sarakkeet
+            display_cols = ["Team", "Record", "Points For", "Points Against", "Diff", "Opponent"]
+            
+            # Väritys Diff-sarakkeelle
+            def color_diff(val):
+                color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                return f'color: {color}; font-weight: bold'
+
+            st.dataframe(
+                df[display_cols].style
+                .format({"Points For": "{:.1f}", "Points Against": "{:.1f}", "Diff": "{:+.1f}"})
+                .applymap(color_diff, subset=['Diff']),
+                use_container_width=True,
+                hide_index=True
             )
             
-            if st.button("Hae matchup-tilastot"):
-                start_w, end_w = week_range
-                with st.spinner(f"Lasketaan tilastoja viikoilta {start_w}-{end_w}..."):
-                    # Kutsutaan uutta funktiota
-                    matchup_df = fetch_cumulative_matchups(start_week=start_w, end_week=end_w)
-                    st.session_state['matchup_data_cumulative'] = matchup_df
-                    st.session_state['matchup_range'] = week_range
+            # --- KAAVIO ---
+            import altair as alt
+            
+            st.markdown("#### 📈 Hyökkäys (PF) vs Puolustus/Onni (PA)")
+            st.caption(f"Yhteispisteet viikoilta {current_range[0]}-{current_range[1]}. Mitä alempana, sitä vähemmän pisteitä olet päästänyt.")
+
+            # Luodaan väri Record-sarakkeen voittoprosentin mukaan (karkea) tai vain Diffin mukaan
+            # Käytetään Diffiä väritykseen: Vihreä = Positiivinen maaliero
+            
+            chart = alt.Chart(df).mark_circle(size=150).encode(
+                x=alt.X('Points For', title='Tehdyt pisteet (PF) Summa', scale=alt.Scale(zero=False)),
+                y=alt.Y('Points Against', title='Vastustajan pisteet (PA) Summa', scale=alt.Scale(zero=False)),
+                color=alt.Color('Diff', title='Piste-ero', scale=alt.Scale(scheme='redyellowgreen')),
+                tooltip=['Team', 'Record', 'Points For', 'Points Against', 'Diff', 'Opponent']
+            ).properties(height=450).interactive()
+            
+            text = chart.mark_text(
+                align='left',
+                baseline='middle',
+                dx=10,
+                fontSize=11
+            ).encode(
+                text='Team'
+            )
+
+            st.altair_chart(chart + text, use_container_width=True)
+
+        elif 'matchup_data_cumulative' in st.session_state:
+            st.info("Ei dataa löytynyt valitulta aikaväliltä.")
     
-        with col_match2:
-            if 'matchup_data_cumulative' in st.session_state and not st.session_state['matchup_data_cumulative'].empty:
-                df = st.session_state['matchup_data_cumulative']
-                current_range = st.session_state.get('matchup_range', (0,0))
-                
-                st.subheader(f"Tulokset: Viikot {current_range[0]} - {current_range[1]}")
-                
-                # --- TAULUKKO ---
-                # Valitaan näytettävät sarakkeet
-                display_cols = ["Team", "Record", "Points For", "Points Against", "Diff", "Opponent"]
-                
-                # Väritys Diff-sarakkeelle
-                def color_diff(val):
-                    color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
-                    return f'color: {color}; font-weight: bold'
-    
-                st.dataframe(
-                    df[display_cols].style
-                    .format({"Points For": "{:.1f}", "Points Against": "{:.1f}", "Diff": "{:+.1f}"})
-                    .applymap(color_diff, subset=['Diff']),
-                    use_container_width=True,
-                    hide_index=True
-                )
-                
-                # --- KAAVIO ---
-                import altair as alt
-                
-                st.markdown("#### 📈 Hyökkäys (PF) vs Puolustus/Onni (PA)")
-                st.caption(f"Yhteispisteet viikoilta {current_range[0]}-{current_range[1]}. Mitä alempana, sitä vähemmän pisteitä olet päästänyt.")
-    
-                # Luodaan väri Record-sarakkeen voittoprosentin mukaan (karkea) tai vain Diffin mukaan
-                # Käytetään Diffiä väritykseen: Vihreä = Positiivinen maaliero
-                
-                chart = alt.Chart(df).mark_circle(size=150).encode(
-                    x=alt.X('Points For', title='Tehdyt pisteet (PF) Summa', scale=alt.Scale(zero=False)),
-                    y=alt.Y('Points Against', title='Vastustajan pisteet (PA) Summa', scale=alt.Scale(zero=False)),
-                    color=alt.Color('Diff', title='Piste-ero', scale=alt.Scale(scheme='redyellowgreen')),
-                    tooltip=['Team', 'Record', 'Points For', 'Points Against', 'Diff', 'Opponent']
-                ).properties(height=450).interactive()
-                
-                text = chart.mark_text(
-                    align='left',
-                    baseline='middle',
-                    dx=10,
-                    fontSize=11
-                ).encode(
-                    text='Team'
-                )
-    
-                st.altair_chart(chart + text, use_container_width=True)
-    
-            elif 'matchup_data_cumulative' in st.session_state:
-                st.info("Ei dataa löytynyt valitulta aikaväliltä.")
