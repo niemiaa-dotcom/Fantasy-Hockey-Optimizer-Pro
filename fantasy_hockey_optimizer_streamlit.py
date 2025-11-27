@@ -1799,9 +1799,12 @@ with tab2:
         # Yhdistetään kenttäpelaajien sarakkeet ja maalivahtien yhteissarake
         display_cols = ["Team", "Calculated_Total_FP"] + skater_fp_cols + ["Goalies (FP)"]
         
+        # Määritellään sarakkeet, jotka formatoidaan numeroiksi (kaikki paitsi Team)
+        numeric_cols_to_format = ["Calculated_Total_FP"] + skater_fp_cols + ["Goalies (FP)"]
+
         st.subheader("Joukkueiden kokonaispisteet ja pistejakauma")
         st.dataframe(
-            cat_points_df[display_cols].style.format("{:.1f}"), 
+            cat_points_df[display_cols].style.format("{:.1f}", subset=numeric_cols_to_format), 
             use_container_width=True
         )
 
