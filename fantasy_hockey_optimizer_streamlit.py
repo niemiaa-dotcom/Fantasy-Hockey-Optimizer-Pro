@@ -8,6 +8,9 @@ import itertools
 import os
 import gspread
 from google.oauth2.service_account import Credentials
+import requests
+import xml.etree.ElementTree as ET
+import time
 import altair as alt
 
 # Aseta sivun konfiguraatio
@@ -379,6 +382,186 @@ if st.sidebar.button("Nollaa vastustajan rosteri"):
     st.session_state["opponent_roster"] = (pd.DataFrame(), pd.DataFrame())
     st.sidebar.info("Vastustajan rosteri nollattu.")
 
+# --- YAHOO API FUNKTIOT (APL) ---
+
+# Yahoo ID mappaukset (Lisätty PPP = 8)
+STAT_MAP_APL = {
+    '1': 'Goals',
+    '2': 'Assists',
+    '8': 'PPP',          # Power Play Points
+    '14': 'SOG',
+    '31': 'Hits',
+    '32': 'Blocks',
+    '19': 'Wins',
+    '22': 'GA',
+    '25': 'Saves',
+    '27': 'Shutouts'
+}
+
+# --- PISTEYTYSJÄRJESTELMÄ APL ---
+# ⚠️ TÄRKEÄÄ: Päivitä nämä arvot vastaamaan APL-liigan asetuksia!
+SCORING_SYSTEM_APL = {
+    'Goals': 3.0,
+    'Assists': 2.0,
+    'PPP': 1.0,         # Extra pisteet YV-pisteistä
+    'SOG': 0.4,
+    'Hits': 0.25,
+    'Blocks': 0.25,
+    'Wins': 4.0,
+    'Saves': 0.25,
+    'GA': -1.0,
+    'Shutouts': 2.0
+}
+
+# Joukkueet APL (ID 48831)
+TEAMS_APL = [
+    ('465.l.48831.t.1', 'bad'),
+    ('465.l.48831.t.2', 'KennyG9629'),
+    ('465.l.48831.t.3', 'Best Sleepover Ever'),
+    ('465.l.48831.t.4', 'Insane'),
+    ('465.l.48831.t.5', 'Zero xG'),
+    ('465.l.48831.t.6', 'stevezee'),
+    ('465.l.48831.t.7', 'Silver Patron Saints'),
+    ('465.l.48831.t.8', 'Mango Snapple Tea'),
+    ('465.l.48831.t.9', 'HockeyDude43'),
+    ('465.l.48831.t.10', "AM's Team"),
+    ('465.l.48831.t.11', 'Dangler'),
+    ('465.l.48831.t.12', 'Banana breads')
+]
+
+def get_yahoo_access_token():
+    try:
+        token_url = "https://api.login.yahoo.com/oauth2/get_token"
+        redirect_uri = 'https://localhost:8501' 
+        payload = {
+            'client_id': st.secrets["yahoo"]["client_id"],
+            'client_secret': st.secrets["yahoo"]["client_secret"],
+            'refresh_token': st.secrets["yahoo"]["refresh_token"],
+            'redirect_uri': redirect_uri, 
+            'grant_type': 'refresh_token'
+        }
+        resp = requests.post(token_url, data=payload)
+        resp.raise_for_status()
+        return resp.json()['access_token']
+    except Exception as e:
+        st.error(f"Virhe Yahoo-kirjautumisessa: {e}")
+        return None
+
+def fetch_yahoo_league_stats():
+    access_token = get_yahoo_access_token()
+    if not access_token: return pd.DataFrame()
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    rows = []
+    ns = {'f': 'http://fantasysports.yahooapis.com/fantasy/v2/base.rng'}
+    
+    my_bar = st.progress(0, text="Haetaan dataa Yahoosta...")
+    
+    for i, (team_key, team_name) in enumerate(TEAMS_APL):
+        url = f"https://fantasysports.yahooapis.com/fantasy/v2/team/{team_key}/stats;type=season"
+        try:
+            r = requests.get(url, headers=headers)
+            if r.status_code != 200: continue
+
+            root = ET.fromstring(r.content)
+            stats_node = root.find('.//f:team_stats/f:stats', ns)
+            points_node = root.find('.//f:team_points/f:total', ns)
+            total_points = points_node.text if points_node is not None else "0"
+            
+            row_data = {col: 0 for col in STAT_MAP_APL.values()}
+            row_data['Team'] = team_name
+            row_data['Total Points'] = float(total_points)
+
+            if stats_node:
+                for stat in stats_node.findall('f:stat', ns):
+                    stat_id = stat.find('f:stat_id', ns).text
+                    stat_val = stat.find('f:value', ns).text
+                    if stat_val == '-': stat_val = 0
+                    if stat_id in STAT_MAP_APL:
+                        row_data[STAT_MAP_APL[stat_id]] = float(stat_val) if stat_val else 0
+
+            rows.append(row_data)
+        except Exception:
+            pass
+        my_bar.progress((i + 1) / len(TEAMS_APL))
+        time.sleep(0.1)
+
+    my_bar.empty()
+    df = pd.DataFrame(rows)
+    cols = ['Team', 'Goals', 'Assists', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'GA', 'Saves', 'Shutouts', 'Total Points']
+    existing = [c for c in cols if c in df.columns]
+    return df[existing]
+
+def fetch_yahoo_matchups(week=None):
+    access_token = get_yahoo_access_token()
+    if not access_token: return pd.DataFrame()
+
+    first_team_key = TEAMS_APL[0][0]
+    league_key = ".".join(first_team_key.split(".")[:3])
+    headers = {'Authorization': f'Bearer {access_token}'}
+    url = f"https://fantasysports.yahooapis.com/fantasy/v2/league/{league_key}/scoreboard"
+    if week: url += f";week={week}"
+
+    try:
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        root = ET.fromstring(r.content)
+        ns = {'f': 'http://fantasysports.yahooapis.com/fantasy/v2/base.rng'}
+        matchups = root.findall('.//f:matchup', ns)
+        data = []
+        for matchup in matchups:
+            teams = matchup.findall('.//f:team', ns)
+            if len(teams) != 2: continue
+            
+            t0_name = teams[0].find('f:name', ns).text
+            t0_score = float(teams[0].find('.//f:team_points/f:total', ns).text or 0)
+            t1_name = teams[1].find('f:name', ns).text
+            t1_score = float(teams[1].find('.//f:team_points/f:total', ns).text or 0)
+            
+            data.append({"Team": t0_name, "Opponent": t1_name, "Points For": t0_score, "Points Against": t1_score, "Diff": t0_score - t1_score, "Status": "Voitolla" if t0_score > t1_score else ("Häviöllä" if t0_score < t1_score else "Tasan")})
+            data.append({"Team": t1_name, "Opponent": t0_name, "Points For": t1_score, "Points Against": t0_score, "Diff": t1_score - t0_score, "Status": "Voitolla" if t1_score > t0_score else ("Häviöllä" if t1_score < t0_score else "Tasan")})
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Virhe: {e}")
+        return pd.DataFrame()
+
+def fetch_cumulative_matchups(start_week, end_week):
+    all_weeks = []
+    my_bar = st.progress(0, text=f"Haetaan viikkoja {start_week}-{end_week}...")
+    
+    for i, week in enumerate(range(start_week, end_week + 1)):
+        df = fetch_yahoo_matchups(week=week)
+        if not df.empty:
+            weekly_median = df['Points For'].median()
+            df['xW_week'] = (df['Points For'] > weekly_median).astype(int)
+            df['xL_week'] = (df['Points For'] <= weekly_median).astype(int)
+            df['Week'] = week
+            all_weeks.append(df)
+        my_bar.progress((i + 1) / (end_week - start_week + 1))
+        time.sleep(0.1)
+    
+    my_bar.empty()
+    if not all_weeks: return pd.DataFrame()
+    
+    combined = pd.concat(all_weeks)
+    summary = combined.groupby('Team').agg({
+        'Points For': 'sum', 'Points Against': 'sum', 'Diff': 'sum',
+        'Opponent': lambda x: ', '.join(x.unique()), 'xW_week': 'sum', 'xL_week': 'sum'
+    }).reset_index()
+
+    wins = combined[combined['Status'] == 'Voitolla'].groupby('Team').size()
+    losses = combined[combined['Status'] == 'Häviöllä'].groupby('Team').size()
+    ties = combined[combined['Status'] == 'Tasan'].groupby('Team').size()
+
+    summary = summary.set_index('Team')
+    summary['W'] = wins.reindex(summary.index, fill_value=0)
+    summary['L'] = losses.reindex(summary.index, fill_value=0)
+    summary['T'] = ties.reindex(summary.index, fill_value=0)
+    summary = summary.reset_index()
+    
+    summary['Record'] = summary.apply(lambda x: f"{int(x['W'])}-{int(x['L'])}-{int(x['T'])}", axis=1)
+    summary['xRecord'] = summary.apply(lambda x: f"{int(x['xW_week'])}-{int(x['xL_week'])}", axis=1)
+    return summary
 
 
 # --- SIVUPALKKI: ROSTERIN HALLINTA ---
@@ -1645,52 +1828,99 @@ with tab2:
     
                     st.altair_chart(chart, use_container_width=True)
 
+# 3. Category Points (Päivitetty)
+    st.markdown("---")
+    st.header("📊 Category Points APL")
+    
+    calc_mode = st.radio("Lähde:", ["Reaaliaikainen Yahoo Data (API)", "Staattinen (Google Sheet)"], horizontal=True)
+    cat_df = pd.DataFrame()
+    
+    if calc_mode == "Reaaliaikainen Yahoo Data (API)":
+        if st.button("🔄 Hae tuoreimmat tilastot"):
+            df = fetch_yahoo_league_stats()
+            if not df.empty:
+                st.session_state['apl_live_stats'] = df
+                st.success("Päivitetty!")
+        if 'apl_live_stats' in st.session_state: cat_df = st.session_state['apl_live_stats'].copy()
+    else:
+        cat_df = load_category_points_from_gsheets()
 
-    st.subheader("📊 Category Points APL")
-    cat_points_df = load_category_points_from_gsheets()
-    if not cat_points_df.empty:
-        cat_points_df["Rank"] = cat_points_df["Total"].rank(method="dense", ascending=False).astype(int)
-        cat_points_df = cat_points_df.sort_values("Rank")
+    if not cat_df.empty:
+        # Laske FP
+        cat_df["Calculated_Total_FP"] = 0.0
+        cat_df["Goalies (FP)"] = 0.0
+        skater_cols = []
+        goalie_cats = {'Wins', 'Saves', 'GA', 'Shutouts'}
         
-        # Siirrä Rank ensimmäiseksi
-        cols = ["Rank"] + [c for c in cat_points_df.columns if c != "Rank"]
-        cat_points_df = cat_points_df[cols]
-        # Nollaa indeksi, jotta Streamlit ei näytä sitä vasemmalla
-        cat_points_df = cat_points_df.reset_index(drop=True)
-        st.dataframe(cat_points_df, use_container_width=True)
-    
-        # Muuta data pitkäksi Altairia varten
-        df_long = cat_points_df.melt(
-            id_vars=["Team"],
-            value_vars=["Goals", "Assists", "PPP", "SOG", "Hits", "Blocks", "Goalies"],
-            var_name="Category",
-            value_name="Points"
-        )
-    
-        # Laske kategorioiden kokonaispisteet ja järjestä suurimmasta pienimpään
-        cat_totals = (
-            df_long.groupby("Category")["Points"]
-            .sum()
-            .reset_index()
-            .sort_values("Points", ascending=False)
-        )
-        category_order = cat_totals["Category"].tolist()
-    
-        # Piirrä vaaka pinottu palkkikaavio
-        chart = (
-            alt.Chart(df_long)
-            .mark_bar()
-            .encode(
-                y=alt.Y("Team:N", sort="-x", axis=alt.Axis(title="Joukkue")),
-                x=alt.X("Points:Q", stack="zero", axis=alt.Axis(title="Pisteet")),
-                color=alt.Color(
-                    "Category:N",
-                    scale=alt.Scale(domain=category_order),
-                    legend=alt.Legend(title="Kategoria")
-                ),
-                tooltip=["Team", "Category", "Points"]
-            )
-            .properties(width=700, height=600)
-        )
-    
+        for cat, mult in SCORING_SYSTEM_APL.items():
+            if cat in cat_df.columns:
+                points = cat_df[cat] * mult
+                cat_df["Calculated_Total_FP"] += points
+                if cat in goalie_cats:
+                    cat_df["Goalies (FP)"] += points
+                else:
+                    cname = f"{cat} (FP)"
+                    cat_df[cname] = points
+                    skater_cols.append(cname)
+        
+        cat_df = cat_df.sort_values("Calculated_Total_FP", ascending=False).reset_index(drop=True)
+        disp_cols = ["Team", "Calculated_Total_FP"] + skater_cols + ["Goalies (FP)"]
+        num_cols = [c for c in disp_cols if c != "Team"]
+        
+        st.dataframe(cat_df[disp_cols].style.format("{:.1f}", subset=num_cols), use_container_width=True)
+        
+        # Chart
+        long_df = cat_df.melt(id_vars=["Team"], value_vars=skater_cols + ["Goalies (FP)"], var_name="Cat", value_name="FP")
+        long_df["Category"] = long_df["Cat"].str.replace(" (FP)", "")
+        order = long_df.groupby("Category")["FP"].sum().sort_values(ascending=False).index.tolist()
+        
+        chart = alt.Chart(long_df).mark_bar().encode(
+            y=alt.X('Team', sort='-x'), x='FP', color=alt.Color('Category', scale=alt.Scale(domain=order)),
+            tooltip=['Team', 'Category', 'FP']
+        ).properties(height=600)
         st.altair_chart(chart, use_container_width=True)
+
+    # 4. Matchup Center (Päivitetty)
+    st.markdown("---")
+    st.header("⚔️ Matchup Center (Kumulatiivinen)")
+    
+    col_c1, col_c2 = st.columns([3, 1], vertical_alignment="bottom")
+    with col_c1:
+        wr = st.slider("Viikot", 1, 26, (1, 4))
+    with col_c2:
+        run_mc = st.button("Hae Matchupit", use_container_width=True)
+        
+    if run_mc:
+        st.session_state['apl_matchup_df'] = fetch_cumulative_matchups(wr[0], wr[1])
+        
+    if 'apl_matchup_df' in st.session_state:
+        df = st.session_state['apl_matchup_df']
+        if not df.empty:
+            if 'xW_week' in df.columns:
+                df['W_int'] = df['Record'].apply(lambda x: int(x.split('-')[0]))
+                df['Luck'] = df['W_int'] - df['xW_week']
+                
+                cols = ["Team", "Record", "xRecord", "Points For", "Points Against", "Diff", "Luck"]
+                
+                def color_diff(val): return f'color: {"#4caf50" if val>0 else "#f44336"}; font-weight: bold'
+                def color_luck(val): return f'color: {"#2e7d32" if val>0 else ("#c62828" if val<0 else "gray")}; font-weight: bold'
+                
+                st.dataframe(df[cols].style.format({"Points For":"{:.1f}","Points Against":"{:.1f}","Diff":"{:.1f}","Luck":"{:+d}"})
+                             .applymap(color_diff, subset=['Diff']).applymap(color_luck, subset=['Luck']), use_container_width=True)
+                
+                chart = alt.Chart(df).mark_circle(size=200).encode(
+                    x=alt.X('Points For', scale=alt.Scale(zero=False)),
+                    y=alt.Y('Points Against', scale=alt.Scale(zero=False)),
+                    color=alt.Color('Diff', scale=alt.Scale(scheme='redyellowgreen')),
+                    tooltip=cols
+                ).properties(height=500).interactive()
+                
+                text = chart.mark_text(dx=12).encode(text='Team')
+                mpf = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(x='mean(Points For)')
+                mpa = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(y='mean(Points Against)')
+                
+                st.altair_chart(chart + text + mpf + mpa, use_container_width=True)
+    
+
+
+
