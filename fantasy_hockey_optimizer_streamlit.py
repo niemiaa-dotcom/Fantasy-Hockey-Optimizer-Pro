@@ -1816,75 +1816,42 @@ with tab2:
     if 'valio_roto_stats' in st.session_state:
         roto_df = st.session_state['valio_roto_stats']
         
-        # Näytetään taulukko
-        # Erotellaan raakadatat ja Roto-pisteet
-        raw_cols = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
-        roto_cols = [f'{c} (Roto)' for c in raw_cols]
+        # Määritellään halutut sarakkeet
+        raw_cols_target = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
+        
+        # Suodatetaan: Otetaan vain ne sarakkeet jotka OIKEASTI löytyvät datasta
+        # Tämä estää KeyErrorin jos jokin kategoria puuttuu
+        raw_cols_present = [c for c in raw_cols_target if c in roto_df.columns]
+        
+        # Generoidaan vastaavat Roto-sarakkeiden nimet
+        roto_cols_present = [f'{c} (Roto)' for c in raw_cols_present if f'{c} (Roto)' in roto_df.columns]
         
         st.subheader("Sarjataulukko (Total Roto Points)")
         
-        # Tyylittely: näytetään Joukkue ja Total Roto ensin
-        disp = roto_df[['Team', 'Total Roto'] + roto_cols]
-        st.dataframe(disp.style.format("{:.1f}", subset=['Total Roto'] + roto_cols), use_container_width=True)
+        # Luodaan näyttölista turvallisesti
+        display_cols = ['Team', 'Total Roto'] + roto_cols_present
+        # Varmistetaan vielä kerran että kaikki löytyy
+        display_cols = [c for c in display_cols if c in roto_df.columns]
+        
+        disp = roto_df[display_cols]
+        
+        # Formatoidaan numerot
+        st.dataframe(disp.style.format("{:.1f}", subset=[c for c in display_cols if c != 'Team']), use_container_width=True)
         
         st.subheader("Raakatilastot")
-        st.dataframe(roto_df[['Team'] + raw_cols], use_container_width=True)
+        # Näytetään vain löytyvät raakasarakkeet
+        raw_display_cols = ['Team'] + raw_cols_present
+        st.dataframe(roto_df[raw_display_cols], use_container_width=True)
 
         # Kaavio
-        chart_data = roto_df.melt(id_vars=['Team'], value_vars=roto_cols, var_name='Category', value_name='Points')
-        chart_data['Category'] = chart_data['Category'].str.replace(' (Roto)', '')
-        
-        chart = alt.Chart(chart_data).mark_bar().encode(
-            y=alt.X('Team', sort='-x'),
-            x='Points',
-            color='Category',
-            tooltip=['Team', 'Category', 'Points']
-        ).properties(height=600)
-        st.altair_chart(chart, use_container_width=True)
-
-    # 3. Matchup Center (Roto Context)
-    st.markdown("---")
-    st.header("⚔️ Matchup Center (Roto Analysis)")
-    st.caption("Analysoi matchupit Roto-pisteiden valossa: 'Oma taso' vs 'Vastustajan taso'")
-    
-    col_c1, col_c2 = st.columns([3, 1], vertical_alignment="bottom")
-    with col_c1:
-        wr = st.slider("Viikot", 1, 26, (1, 4))
-    with col_c2:
-        run_mc = st.button("Hae Matchupit", use_container_width=True)
-        
-    if run_mc:
-        st.session_state['valio_matchup_df'] = fetch_cumulative_matchups_roto(wr[0], wr[1])
-        
-    if 'valio_matchup_df' in st.session_state:
-        df = st.session_state['valio_matchup_df']
-        if not df.empty:
+        if roto_cols_present:
+            chart_data = roto_df.melt(id_vars=['Team'], value_vars=roto_cols_present, var_name='Category', value_name='Points')
+            chart_data['Category'] = chart_data['Category'].str.replace(' (Roto)', '')
             
-            st.subheader(f"Tulokset: Viikot {wr[0]} - {wr[1]}")
-            
-            # Näytetään päätaulukko
-            display_cols = ['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
-            st.dataframe(
-                df[display_cols].style.format("{:.1f}", subset=['Total Roto', 'Opponent Total Roto']),
-                use_container_width=True
-            )
-            
-            # Scatter Plot: Oma Roto vs Vastustajan Roto (Onni)
-            st.markdown("#### 📈 Oma Suoritus vs Vastustajan Suoritus (Roto Pisteet)")
-            st.caption("Oikea alakulma = Pelasit hyvin (korkea Roto) ja vastustaja huonosti (matala Roto). Vasen yläkulma = Pelasit huonosti ja vastustaja hyvin.")
-            
-            chart = alt.Chart(df).mark_circle(size=200).encode(
-                x=alt.X('Total Roto', title='Omat Roto-pisteet (Suoritus)', scale=alt.Scale(zero=False)),
-                y=alt.Y('Opponent Total Roto', title='Vastustajan Roto-pisteet (Kovuus)', scale=alt.Scale(zero=False)),
-                color=alt.Color('Total Roto', scale=alt.Scale(scheme='greens')),
-                tooltip=['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
-            ).properties(height=500).interactive()
-            
-            text = chart.mark_text(dx=12).encode(text='Team')
-            
-            # Keskiarvoviivat
-            mid_x = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(x='mean(Total Roto)')
-            mid_y = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(y='mean(Opponent Total Roto)')
-            
-            st.altair_chart(chart + text + mid_x + mid_y, use_container_width=True)
-
+            chart = alt.Chart(chart_data).mark_bar().encode(
+                y=alt.X('Team', sort='-x'),
+                x='Points',
+                color='Category',
+                tooltip=['Team', 'Category', 'Points']
+            ).properties(height=600)
+            st.altair_chart(chart, use_container_width=True)
