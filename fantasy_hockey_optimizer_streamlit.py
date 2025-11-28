@@ -8,6 +8,10 @@ import itertools
 import os
 import gspread
 from google.oauth2.service_account import Credentials
+import requests
+import xml.etree.ElementTree as ET
+import time
+import altair as alt
 
 # Aseta sivun konfiguraatio
 st.set_page_config(
@@ -215,6 +219,229 @@ def load_free_agents_from_gsheets():
         st.error(f"Virhe vapaiden agenttien Google Sheets -tiedoston lukemisessa: {e}")
         return pd.DataFrame()
 
+# --- YAHOO API FUNKTIOT (VALIOLIIKA) ---
+
+# Yahoo ID mappaukset
+STAT_MAP_VALIOLIIKA = {
+    '1': 'Goals',
+    '2': 'Assists',
+    '4': 'Points',       # P
+    '8': 'PPP',          # Power Play Points
+    '14': 'SOG',
+    '31': 'Hits',
+    '32': 'Blocks',
+    '19': 'Wins',
+    '26': 'SV%'          # Save Percentage (Yleensä ID 26)
+}
+
+# Valioliika Joukkueet (ID 1533)
+# HUOM: Tarkista että järjestys on oikea Yahoo-liigassasi!
+TEAMS_VALIOLIIKA = [
+    ('465.l.1533.t.1', 'Mighty Moose'),
+    ('465.l.1533.t.2', 'Bastuwhisk Mountain Bang'),
+    ('465.l.1533.t.3', 'Lempäälän Laamat'),
+    ('465.l.1533.t.4', 'N.Y. Rillataan'),
+    ('465.l.1533.t.5', 'SalmonRapid Slicks'),
+    ('465.l.1533.t.6', 'Talkkarit'),
+    ('465.l.1533.t.7', 'Backwoods Clumsy Tinkerers'),
+    ('465.l.1533.t.8', 'Kynäniskat'),
+    ('465.l.1533.t.9', 'Oracles of Salmon Rapids'),
+    ('465.l.1533.t.10', 'Lutakon Ketut'),
+    ('465.l.1533.t.11', 'Animaali'),
+    ('465.l.1533.t.12', 'Laajasalon Dynamo')
+]
+
+def get_yahoo_access_token():
+    try:
+        token_url = "https://api.login.yahoo.com/oauth2/get_token"
+        redirect_uri = 'https://localhost:8501' 
+        payload = {
+            'client_id': st.secrets["yahoo"]["client_id"],
+            'client_secret': st.secrets["yahoo"]["client_secret"],
+            'refresh_token': st.secrets["yahoo"]["refresh_token"],
+            'redirect_uri': redirect_uri, 
+            'grant_type': 'refresh_token'
+        }
+        resp = requests.post(token_url, data=payload)
+        resp.raise_for_status()
+        return resp.json()['access_token']
+    except Exception as e:
+        st.error(f"Virhe Yahoo-kirjautumisessa: {e}")
+        return None
+
+def calculate_roto_scores(df):
+    """Laskee Roto-pisteet (Rank) annetulle datalle."""
+    if df.empty: return df
+    
+    df_roto = df.copy()
+    categories = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
+    
+    # Roto-pisteet: Pienin arvo = 1 piste, Suurin = N pistettä (missä N on joukkueiden määrä)
+    # Kaikki kategoriat ovat "suurempi on parempi"
+    
+    roto_cols = []
+    for cat in categories:
+        if cat in df_roto.columns:
+            # Rank laskee sijoituksen. method='min' tasapisteissä.
+            # Ascending=True -> Pienin saa sijan 1 (1 piste). Suurin saa sijan 10 (10 pistettä).
+            df_roto[f'{cat} (Roto)'] = df_roto[cat].rank(ascending=True, method='min')
+            roto_cols.append(f'{cat} (Roto)')
+    
+    df_roto['Total Roto'] = df_roto[roto_cols].sum(axis=1)
+    return df_roto
+
+def fetch_yahoo_league_stats():
+    access_token = get_yahoo_access_token()
+    if not access_token: return pd.DataFrame()
+
+    headers = {'Authorization': f'Bearer {access_token}'}
+    rows = []
+    ns = {'f': 'http://fantasysports.yahooapis.com/fantasy/v2/base.rng'}
+    
+    my_bar = st.progress(0, text="Haetaan dataa Yahoosta...")
+    
+    for i, (team_key, team_name) in enumerate(TEAMS_VALIOLIIKA):
+        url = f"https://fantasysports.yahooapis.com/fantasy/v2/team/{team_key}/stats;type=season"
+        try:
+            r = requests.get(url, headers=headers)
+            if r.status_code != 200: continue
+
+            root = ET.fromstring(r.content)
+            stats_node = root.find('.//f:team_stats/f:stats', ns)
+            
+            row_data = {'Team': team_name}
+
+            if stats_node:
+                for stat in stats_node.findall('f:stat', ns):
+                    stat_id = stat.find('f:stat_id', ns).text
+                    stat_val = stat.find('f:value', ns).text
+                    if stat_val == '-': stat_val = 0
+                    if stat_id in STAT_MAP_VALIOLIIKA:
+                        row_data[STAT_MAP_VALIOLIIKA[stat_id]] = float(stat_val) if stat_val else 0
+
+            rows.append(row_data)
+        except Exception:
+            pass
+        my_bar.progress((i + 1) / len(TEAMS_VALIOLIIKA))
+        time.sleep(0.1)
+
+    my_bar.empty()
+    df = pd.DataFrame(rows)
+    # Varmista sarakkeet
+    cols = ['Team'] + list(STAT_MAP_VALIOLIIKA.values())
+    existing = [c for c in cols if c in df.columns]
+    return df[existing]
+
+def fetch_yahoo_matchups(week=None):
+    access_token = get_yahoo_access_token()
+    if not access_token: return pd.DataFrame()
+
+    first_team_key = TEAMS_VALIOLIIKA[0][0]
+    league_key = ".".join(first_team_key.split(".")[:3])
+    headers = {'Authorization': f'Bearer {access_token}'}
+    url = f"https://fantasysports.yahooapis.com/fantasy/v2/league/{league_key}/scoreboard"
+    if week: url += f";week={week}"
+
+    try:
+        r = requests.get(url, headers=headers)
+        r.raise_for_status()
+        root = ET.fromstring(r.content)
+        ns = {'f': 'http://fantasysports.yahooapis.com/fantasy/v2/base.rng'}
+        matchups = root.findall('.//f:matchup', ns)
+        data = []
+        
+        for matchup in matchups:
+            teams = matchup.findall('.//f:team', ns)
+            if len(teams) != 2: continue
+            
+            # Parsitaan joukkueet ja niiden statsit tästä matchupista
+            matchup_stats = {}
+            for t in teams:
+                t_name = t.find('f:name', ns).text
+                t_stats_node = t.find('.//f:team_stats/f:stats', ns)
+                stats = {'Team': t_name}
+                if t_stats_node:
+                    for stat in t_stats_node.findall('f:stat', ns):
+                        stat_id = stat.find('f:stat_id', ns).text
+                        stat_val = stat.find('f:value', ns).text
+                        if stat_val == '-': stat_val = 0
+                        if stat_id in STAT_MAP_VALIOLIIKA:
+                            stats[STAT_MAP_VALIOLIIKA[stat_id]] = float(stat_val) if stat_val else 0
+                matchup_stats[t_name] = stats
+            
+            t0 = list(matchup_stats.values())[0]
+            t1 = list(matchup_stats.values())[1]
+            
+            # Tallennetaan molemmat näkökulmat
+            # Lisätään "Opponent Stats" -etuliite vastustajan tilastoihin
+            
+            row0 = t0.copy()
+            row0['Opponent'] = t1['Team']
+            for k, v in t1.items():
+                if k != 'Team': row0[f'Opp_{k}'] = v
+            data.append(row0)
+
+            row1 = t1.copy()
+            row1['Opponent'] = t0['Team']
+            for k, v in t0.items():
+                if k != 'Team': row1[f'Opp_{k}'] = v
+            data.append(row1)
+
+        return pd.DataFrame(data)
+    except Exception as e:
+        st.error(f"Virhe: {e}")
+        return pd.DataFrame()
+
+def fetch_cumulative_matchups_roto(start_week, end_week):
+    all_weeks = []
+    my_bar = st.progress(0, text=f"Haetaan viikkoja {start_week}-{end_week}...")
+    
+    for i, week in enumerate(range(start_week, end_week + 1)):
+        df = fetch_yahoo_matchups(week=week)
+        if not df.empty:
+            df['Week'] = week
+            all_weeks.append(df)
+        my_bar.progress((i + 1) / (end_week - start_week + 1))
+        time.sleep(0.1)
+    
+    my_bar.empty()
+    if not all_weeks: return pd.DataFrame()
+    
+    combined = pd.concat(all_weeks)
+    
+    # Aggregointi: Summaa count-statsit, Keskiarvoista ratio-statsit (SV%)
+    agg_rules = {}
+    opp_agg_rules = {}
+    
+    for cat in STAT_MAP_VALIOLIIKA.values():
+        if cat == 'SV%':
+            agg_rules[cat] = 'mean'
+            opp_agg_rules[f'Opp_{cat}'] = 'mean'
+        else:
+            agg_rules[cat] = 'sum'
+            opp_agg_rules[f'Opp_{cat}'] = 'sum'
+            
+    # Yhdistetään säännöt
+    final_agg = {**agg_rules, **opp_agg_rules}
+    final_agg['Opponent'] = lambda x: ', '.join(x.unique())
+    
+    summary = combined.groupby('Team').agg(final_agg).reset_index()
+    
+    # Laske Roto-pisteet tälle jaksolle (Oma suoritus)
+    summary = calculate_roto_scores(summary)
+    
+    # Laske Roto-pisteet vastustajan suoritukselle (Opponent Strength)
+    # Tehdään tilapäinen DF vastustajan statseista ja lasketaan Roto
+    opp_cols = [c for c in summary.columns if c.startswith('Opp_')]
+    opp_df = summary[['Team'] + opp_cols].copy()
+    # Nimetään uudelleen jotta calculate_roto_scores toimii
+    rename_dict = {c: c.replace('Opp_', '') for c in opp_cols}
+    opp_df = opp_df.rename(columns=rename_dict)
+    
+    opp_roto = calculate_roto_scores(opp_df)
+    summary['Opponent Total Roto'] = opp_roto['Total Roto']
+    
+    return summary
 
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
@@ -1573,49 +1800,91 @@ with tab2:
 
     import altair as alt  # varmista että tämä on tiedoston yläosassa
 
-st.markdown("---")
-st.header("📊 Liigan joukkueanalyysi")
+ # 2. Category Points (Roto)
+    st.markdown("---")
+    st.header("📊 Category Points (Roto Standings)")
+    
+    if st.button("🔄 Hae koko kauden Roto-tilastot Yahoosta"):
+        df = fetch_yahoo_league_stats()
+        if not df.empty:
+            # Laske Roto-pisteet (Rank)
+            df = calculate_roto_scores(df)
+            df = df.sort_values("Total Roto", ascending=False).reset_index(drop=True)
+            st.session_state['valio_roto_stats'] = df
+            st.success("Tiedot päivitetty!")
+            
+    if 'valio_roto_stats' in st.session_state:
+        roto_df = st.session_state['valio_roto_stats']
+        
+        # Näytetään taulukko
+        # Erotellaan raakadatat ja Roto-pisteet
+        raw_cols = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
+        roto_cols = [f'{c} (Roto)' for c in raw_cols]
+        
+        st.subheader("Sarjataulukko (Total Roto Points)")
+        
+        # Tyylittely: näytetään Joukkue ja Total Roto ensin
+        disp = roto_df[['Team', 'Total Roto'] + roto_cols]
+        st.dataframe(disp.style.format("{:.1f}", subset=['Total Roto'] + roto_cols), use_container_width=True)
+        
+        st.subheader("Raakatilastot")
+        st.dataframe(roto_df[['Team'] + raw_cols], use_container_width=True)
 
-if st.button("Suorita kaikkien joukkueiden analyysi"):
-    team_rosters = load_all_team_rosters_from_gsheets()
-    if not team_rosters:
-        st.warning("Rosteritaulukkoa ei voitu ladata.")
-    else:
-        with st.spinner("Lasketaan kaikkien joukkueiden aktiiviset pelit ja FP..."):
-            league_results = analyze_all_teams(
-                st.session_state['schedule'],
-                team_rosters,
-                pos_limits,
-                start_date,
-                end_date
+        # Kaavio
+        chart_data = roto_df.melt(id_vars=['Team'], value_vars=roto_cols, var_name='Category', value_name='Points')
+        chart_data['Category'] = chart_data['Category'].str.replace(' (Roto)', '')
+        
+        chart = alt.Chart(chart_data).mark_bar().encode(
+            y=alt.X('Team', sort='-x'),
+            x='Points',
+            color='Category',
+            tooltip=['Team', 'Category', 'Points']
+        ).properties(height=600)
+        st.altair_chart(chart, use_container_width=True)
+
+    # 3. Matchup Center (Roto Context)
+    st.markdown("---")
+    st.header("⚔️ Matchup Center (Roto Analysis)")
+    st.caption("Analysoi matchupit Roto-pisteiden valossa: 'Oma taso' vs 'Vastustajan taso'")
+    
+    col_c1, col_c2 = st.columns([3, 1], vertical_alignment="bottom")
+    with col_c1:
+        wr = st.slider("Viikot", 1, 26, (1, 4))
+    with col_c2:
+        run_mc = st.button("Hae Matchupit", use_container_width=True)
+        
+    if run_mc:
+        st.session_state['valio_matchup_df'] = fetch_cumulative_matchups_roto(wr[0], wr[1])
+        
+    if 'valio_matchup_df' in st.session_state:
+        df = st.session_state['valio_matchup_df']
+        if not df.empty:
+            
+            st.subheader(f"Tulokset: Viikot {wr[0]} - {wr[1]}")
+            
+            # Näytetään päätaulukko
+            display_cols = ['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
+            st.dataframe(
+                df[display_cols].style.format("{:.1f}", subset=['Total Roto', 'Opponent Total Roto']),
+                use_container_width=True
             )
-            st.dataframe(league_results, use_container_width=True)
-
-            # 📊 Palkkikaavio joukkueiden yhteenlasketuista FP:stä Altairilla
-            if not league_results.empty:
-                st.subheader("Joukkueiden yhteenlasketut fantasiapisteet")
-
-                # varmista että pisteet ovat numeerisia
-                league_results["Ennakoidut FP"] = pd.to_numeric(
-                    league_results["Ennakoidut FP"], errors="coerce"
-                ).fillna(0)
-
-                chart = (
-                    alt.Chart(league_results)
-                    .mark_bar()
-                    .encode(
-                        x=alt.X(
-                            "Joukkue:N",
-                            sort="-y",  # suurimmasta pienimpään
-                            axis=alt.Axis(labelAngle=-45)
-                        ),
-                        y=alt.Y("Ennakoidut FP:Q", title="Fantasiapisteet"),
-                        tooltip=[
-                            alt.Tooltip("Joukkue:N", title="Joukkue"),
-                            alt.Tooltip("Ennakoidut FP:Q", title="FP", format=".2f")
-                        ]
-                    )
-                    .properties(width=700, height=400)
-                )
-
-                st.altair_chart(chart, use_container_width=True)
+            
+            # Scatter Plot: Oma Roto vs Vastustajan Roto (Onni)
+            st.markdown("#### 📈 Oma Suoritus vs Vastustajan Suoritus (Roto Pisteet)")
+            st.caption("Oikea alakulma = Pelasit hyvin (korkea Roto) ja vastustaja huonosti (matala Roto). Vasen yläkulma = Pelasit huonosti ja vastustaja hyvin.")
+            
+            chart = alt.Chart(df).mark_circle(size=200).encode(
+                x=alt.X('Total Roto', title='Omat Roto-pisteet (Suoritus)', scale=alt.Scale(zero=False)),
+                y=alt.Y('Opponent Total Roto', title='Vastustajan Roto-pisteet (Kovuus)', scale=alt.Scale(zero=False)),
+                color=alt.Color('Total Roto', scale=alt.Scale(scheme='greens')),
+                tooltip=['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
+            ).properties(height=500).interactive()
+            
+            text = chart.mark_text(dx=12).encode(text='Team')
+            
+            # Keskiarvoviivat
+            mid_x = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(x='mean(Total Roto)')
+            mid_y = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(y='mean(Opponent Total Roto)')
+            
+            st.altair_chart(chart + text + mid_x + mid_y, use_container_width=True)
+Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
