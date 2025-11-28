@@ -1887,4 +1887,4 @@ with tab2:
             mid_y = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(y='mean(Opponent Total Roto)')
             
             st.altair_chart(chart + text + mid_x + mid_y, use_container_width=True)
-Use Arrow Up and Arrow Down to select a turn, Enter to jump to it, and Escape to return to the chat.
+
