@@ -1937,7 +1937,7 @@ with tab2:
             
             chart = alt.Chart(df).mark_circle(size=200).encode(
                 x=alt.X('Total Roto', title='Omat Roto-pisteet (Suoritus)', scale=alt.Scale(zero=False)),
-                y=alt.Y('Opponent Total Roto', title='Vastustajan Roto-pisteet (Kovuus)', scale=alt.Scale(zero=False)),
+                y=alt.Y('Opponent Total Roto', title='Vastustajan Roto-pisteet (tuuri)', scale=alt.Scale(zero=False)),
                 color=alt.Color('Total Roto', scale=alt.Scale(scheme='greens')),
                 tooltip=['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
             ).properties(height=500).interactive()
