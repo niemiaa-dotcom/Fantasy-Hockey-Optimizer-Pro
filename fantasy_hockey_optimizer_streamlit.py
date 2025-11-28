@@ -274,21 +274,20 @@ def calculate_roto_scores(df):
     if df.empty: return df
     
     df_roto = df.copy()
-    categories = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
     
-    # Roto-pisteet: Pienin arvo = 1 piste, Suurin = N pistettä (missä N on joukkueiden määrä)
-    # Kaikki kategoriat ovat "suurempi on parempi"
+    # --- MUUTOS: Lisätty 'Points' tähän listaan ---
+    categories = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
     
     roto_cols = []
     for cat in categories:
         if cat in df_roto.columns:
             # Rank laskee sijoituksen. method='min' tasapisteissä.
-            # Ascending=True -> Pienin saa sijan 1 (1 piste). Suurin saa sijan 10 (10 pistettä).
             df_roto[f'{cat} (Roto)'] = df_roto[cat].rank(ascending=True, method='min')
             roto_cols.append(f'{cat} (Roto)')
     
     df_roto['Total Roto'] = df_roto[roto_cols].sum(axis=1)
     return df_roto
+
 
 def fetch_yahoo_league_stats():
     access_token = get_yahoo_access_token()
@@ -1836,11 +1835,10 @@ with tab2:
     if 'valio_roto_stats' in st.session_state:
         roto_df = st.session_state['valio_roto_stats']
         
-        # Määritellään halutut sarakkeet
+        # --- MUUTOS: Lisätty 'Points' tähän listaan, jotta se näkyy taulukossa ---
         raw_cols_target = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
         
         # Suodatetaan: Otetaan vain ne sarakkeet jotka OIKEASTI löytyvät datasta
-        # Tämä estää KeyErrorin jos jokin kategoria puuttuu
         raw_cols_present = [c for c in raw_cols_target if c in roto_df.columns]
         
         # Generoidaan vastaavat Roto-sarakkeiden nimet
@@ -1848,9 +1846,8 @@ with tab2:
         
         st.subheader("Sarjataulukko (Total Roto Points)")
         
-        # Luodaan näyttölista turvallisesti
+        # Luodaan näyttölista
         display_cols = ['Team', 'Total Roto'] + roto_cols_present
-        # Varmistetaan vielä kerran että kaikki löytyy
         display_cols = [c for c in display_cols if c in roto_df.columns]
         
         disp = roto_df[display_cols]
@@ -1859,7 +1856,7 @@ with tab2:
         st.dataframe(disp.style.format("{:.1f}", subset=[c for c in display_cols if c != 'Team']), use_container_width=True)
         
         st.subheader("Raakatilastot")
-        # Näytetään vain löytyvät raakasarakkeet
+        # Näytetään raakasarakkeet
         raw_display_cols = ['Team'] + raw_cols_present
         st.dataframe(roto_df[raw_display_cols], use_container_width=True)
 
