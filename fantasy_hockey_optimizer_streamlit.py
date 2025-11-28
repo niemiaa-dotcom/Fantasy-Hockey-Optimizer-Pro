@@ -401,16 +401,16 @@ STAT_MAP_APL = {
 # --- PISTEYTYSJÄRJESTELMÄ APL ---
 # ⚠️ TÄRKEÄÄ: Päivitä nämä arvot vastaamaan APL-liigan asetuksia!
 SCORING_SYSTEM_APL = {
-    'Goals': 3.0,
-    'Assists': 2.0,
-    'PPP': 1.0,         # Extra pisteet YV-pisteistä
-    'SOG': 0.4,
-    'Hits': 0.25,
-    'Blocks': 0.25,
-    'Wins': 4.0,
-    'Saves': 0.25,
-    'GA': -1.0,
-    'Shutouts': 2.0
+    'Goals': 5.0,
+    'Assists': 3.75,
+    'PPP': 0.5,         # Extra pisteet YV-pisteistä
+    'SOG': 0.5,
+    'Hits': 0.3,
+    'Blocks': 0.6
+    'Wins': 2.75,
+    'Saves': 0.35,
+    'GA': -1.5,
+    'Shutouts': 3.0
 }
 
 # Joukkueet APL (ID 48831)
