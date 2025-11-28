@@ -1835,34 +1835,45 @@ with tab2:
     if 'valio_roto_stats' in st.session_state:
         roto_df = st.session_state['valio_roto_stats']
         
-        # --- MUUTOS: Lisätty 'Points' tähän listaan, jotta se näkyy taulukossa ---
+        # Määritellään halutut sarakkeet
         raw_cols_target = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
         
-        # Suodatetaan: Otetaan vain ne sarakkeet jotka OIKEASTI löytyvät datasta
+        # 1. Tarkistetaan mitkä raakadatasarakkeet ovat olemassa
         raw_cols_present = [c for c in raw_cols_target if c in roto_df.columns]
         
-        # Generoidaan vastaavat Roto-sarakkeiden nimet
+        # 2. Generoidaan Roto-sarakkeiden nimet ja TARKISTETAAN ETTÄ NE OVAT OLEMASSA
+        # Tämä on kriittinen korjaus: tarkistetaan 'if f"{c} (Roto)" in roto_df.columns'
         roto_cols_present = [f'{c} (Roto)' for c in raw_cols_present if f'{c} (Roto)' in roto_df.columns]
         
         st.subheader("Sarjataulukko (Total Roto Points)")
         
-        # Luodaan näyttölista
+        # Luodaan näyttölista turvallisesti
         display_cols = ['Team', 'Total Roto'] + roto_cols_present
+        # Varmistus: otetaan vain ne jotka löytyvät
         display_cols = [c for c in display_cols if c in roto_df.columns]
         
         disp = roto_df[display_cols]
         
-        # Formatoidaan numerot
-        st.dataframe(disp.style.format("{:.1f}", subset=[c for c in display_cols if c != 'Team']), use_container_width=True)
+        # Formatoidaan numerot (jätetään Team pois muotoilusta)
+        numeric_cols = [c for c in display_cols if c != 'Team']
+        st.dataframe(disp.style.format("{:.1f}", subset=numeric_cols), use_container_width=True)
         
         st.subheader("Raakatilastot")
-        # Näytetään raakasarakkeet
         raw_display_cols = ['Team'] + raw_cols_present
         st.dataframe(roto_df[raw_display_cols], use_container_width=True)
 
         # Kaavio
-        if roto_cols_present:
-            chart_data = roto_df.melt(id_vars=['Team'], value_vars=roto_cols_present, var_name='Category', value_name='Points')
+        # Lisätään ylimääräinen tarkistus varmuuden vuoksi
+        valid_chart_cols = [c for c in roto_cols_present if c in roto_df.columns]
+        
+        if valid_chart_cols:
+            # Käytetään vain validoituja sarakkeita (valid_chart_cols) value_vars-kohdassa
+            chart_data = roto_df.melt(
+                id_vars=['Team'], 
+                value_vars=valid_chart_cols, 
+                var_name='Category', 
+                value_name='Points'
+            )
             chart_data['Category'] = chart_data['Category'].str.replace(' (Roto)', '')
             
             chart = alt.Chart(chart_data).mark_bar().encode(
@@ -1872,3 +1883,5 @@ with tab2:
                 tooltip=['Team', 'Category', 'Points']
             ).properties(height=600)
             st.altair_chart(chart, use_container_width=True)
+        else:
+            st.warning("Ei Roto-pisteitä visualisoitavaksi.")
