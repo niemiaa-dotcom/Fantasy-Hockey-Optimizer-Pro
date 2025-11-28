@@ -1964,26 +1964,20 @@ with tab2:
             if valid_stats:
                 # Tehdään siisti DataFrame näyttöä varten
                 stats_view = df[['Team'] + valid_stats].set_index('Team')
-        
+
                 # 3. Määritellään numeroiden muotoilu
-                # SV% halutaan 3 desimaalia (esim 0.915), muut kokonaislukuina (esim 15)
                 format_dict = {}
                 for c in valid_stats:
                     if c == 'SV%':
                         format_dict[c] = "{:.3f}"
                     else:
                         format_dict[c] = "{:.0f}"
-        
-                # 4. Näytetään taulukko Heatmap-tyylillä
-                # cmap='RdYlGn' tarkoittaa Red-Yellow-Green (Pienin on punainen, suurin vihreä)
-                # Tämä toimii kaikissa näissä kategorioissa, koska "enemmän on parempi"
-                
+
+                # 4. Näytetään taulukko (ILMAN VÄREJÄ, jotta matplotlib-virhe poistuu)
                 st.dataframe(
-                    stats_view.style
-                    .format(format_dict)
-                    .background_gradient(cmap='RdYlGn', subset=valid_stats), 
+                    stats_view.style.format(format_dict), 
                     use_container_width=True
                 )
-        else:
-            st.warning("Tilastotietoja ei saatavilla.")
+            else:
+                st.warning("Tilastotietoja ei saatavilla.")
         
