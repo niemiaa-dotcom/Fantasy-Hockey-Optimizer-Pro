@@ -238,17 +238,17 @@ STAT_MAP_VALIOLIIKA = {
 # HUOM: Tarkista että järjestys on oikea Yahoo-liigassasi!
 TEAMS_VALIOLIIKA = [
     ('465.l.1533.t.1', 'Mighty Moose'),
-    ('465.l.1533.t.2', 'Bastuwhisk Mountain Bang'),
-    ('465.l.1533.t.3', 'Lempäälän Laamat'),
-    ('465.l.1533.t.4', 'N.Y. Rillataan'),
-    ('465.l.1533.t.5', 'SalmonRapid Slicks'),
-    ('465.l.1533.t.6', 'Talkkarit'),
-    ('465.l.1533.t.7', 'Backwoods Clumsy Tinkerers'),
-    ('465.l.1533.t.8', 'Kynäniskat'),
-    ('465.l.1533.t.9', 'Oracles of Salmon Rapids'),
-    ('465.l.1533.t.10', 'Lutakon Ketut'),
-    ('465.l.1533.t.11', 'Animaali'),
-    ('465.l.1533.t.12', 'Laajasalon Dynamo')
+    ('465.l.1533.t.3', 'Bastuwhisk Mountain Bang'),
+    ('465.l.1533.t.5', 'Lempäälän Laamat'),
+    ('465.l.1533.t.6', 'N.Y. Rillataan'),
+    ('465.l.1533.t.10', 'SalmonRapid Slicks'),
+    ('465.l.1533.t.9', 'Talkkarit'),
+    ('465.l.1533.t.8', 'Backwoods Clumsy Tinkerers'),
+    ('465.l.1533.t.12', 'Kynäniskat'),
+    ('465.l.1533.t.7', 'Oracles of Salmon Rapids'),
+    ('465.l.1533.t.11', 'Lutakon Ketut'),
+    ('465.l.1533.t.2', 'Animaali'),
+    ('465.l.1533.t.4', 'Laajasalon Dynamo')
 ]
 
 def get_yahoo_access_token():
