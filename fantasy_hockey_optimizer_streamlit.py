@@ -1885,3 +1885,50 @@ with tab2:
             st.altair_chart(chart, use_container_width=True)
         else:
             st.warning("Ei Roto-pisteitä visualisoitavaksi.")
+
+
+ # 3. Matchup Center (Roto Context)
+    st.markdown("---")
+    st.header("⚔️ Matchup Center (Roto Analysis)")
+    st.caption("Analysoi matchupit Roto-pisteiden valossa: 'Oma taso' vs 'Vastustajan taso'")
+    
+    col_c1, col_c2 = st.columns([3, 1], vertical_alignment="bottom")
+    with col_c1:
+        wr = st.slider("Viikot", 1, 26, (1, 4))
+    with col_c2:
+        run_mc = st.button("Hae Matchupit", use_container_width=True)
+        
+    if run_mc:
+        st.session_state['valio_matchup_df'] = fetch_cumulative_matchups_roto(wr[0], wr[1])
+        
+    if 'valio_matchup_df' in st.session_state:
+        df = st.session_state['valio_matchup_df']
+        if not df.empty:
+            
+            st.subheader(f"Tulokset: Viikot {wr[0]} - {wr[1]}")
+            
+            # Näytetään päätaulukko
+            display_cols = ['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
+            st.dataframe(
+                df[display_cols].style.format("{:.1f}", subset=['Total Roto', 'Opponent Total Roto']),
+                use_container_width=True
+            )
+            
+            # Scatter Plot: Oma Roto vs Vastustajan Roto (Onni)
+            st.markdown("#### 📈 Oma Suoritus vs Vastustajan Suoritus (Roto Pisteet)")
+            st.caption("Oikea alakulma = Pelasit hyvin (korkea Roto) ja vastustaja huonosti (matala Roto). Vasen yläkulma = Pelasit huonosti ja vastustaja hyvin.")
+            
+            chart = alt.Chart(df).mark_circle(size=200).encode(
+                x=alt.X('Total Roto', title='Omat Roto-pisteet (Suoritus)', scale=alt.Scale(zero=False)),
+                y=alt.Y('Opponent Total Roto', title='Vastustajan Roto-pisteet (Kovuus)', scale=alt.Scale(zero=False)),
+                color=alt.Color('Total Roto', scale=alt.Scale(scheme='greens')),
+                tooltip=['Team', 'Total Roto', 'Opponent Total Roto', 'Opponent']
+            ).properties(height=500).interactive()
+            
+            text = chart.mark_text(dx=12).encode(text='Team')
+            
+            # Keskiarvoviivat
+            mid_x = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(x='mean(Total Roto)')
+            mid_y = alt.Chart(df).mark_rule(color='gray', strokeDash=[5,5]).encode(y='mean(Opponent Total Roto)')
+            
+            st.altair_chart(chart + text + mid_x + mid_y, use_container_width=True)
