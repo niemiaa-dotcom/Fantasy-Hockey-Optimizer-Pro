@@ -1866,26 +1866,43 @@ with tab2:
         # Lisätään ylimääräinen tarkistus varmuuden vuoksi
         valid_chart_cols = [c for c in roto_cols_present if c in roto_df.columns]
         
-        if valid_chart_cols:
-            # Käytetään vain validoituja sarakkeita (valid_chart_cols) value_vars-kohdassa
-            chart_data = roto_df.melt(
-                id_vars=['Team'], 
-                value_vars=valid_chart_cols, 
-                var_name='Category', 
-                value_name='Points'
-            )
-            chart_data['Category'] = chart_data['Category'].str.replace(' (Roto)', '')
-            
-            chart = alt.Chart(chart_data).mark_bar().encode(
-                y=alt.X('Team', sort='-x'),
-                x='Points',
-                color='Category',
-                tooltip=['Team', 'Category', 'Points']
-            ).properties(height=600)
-            st.altair_chart(chart, use_container_width=True)
+        # Kaavio - Varmistettu versio
+        valid_chart_cols = [c for c in roto_cols_present if c in roto_df.columns]
+        
+        # Tarkistetaan että Team-sarake ja datapisteet ovat olemassa
+        if valid_chart_cols and 'Team' in roto_df.columns:
+            try:
+                # 1. Luodaan erillinen, puhdas kopio datasta vain kaaviota varten
+                # Tämä estää indeksien tai piilosarakkeiden aiheuttamat ongelmat
+                plot_df = roto_df[['Team'] + valid_chart_cols].copy()
+                
+                # 2. Meltataan tämä puhdas kopio
+                chart_data = plot_df.melt(
+                    id_vars=['Team'], 
+                    value_vars=valid_chart_cols, 
+                    var_name='Category', 
+                    value_name='Points'
+                )
+                
+                # 3. Siistitään nimet ja piirretään
+                chart_data['Category'] = chart_data['Category'].str.replace(' (Roto)', '')
+                
+                chart = alt.Chart(chart_data).mark_bar().encode(
+                    y=alt.X('Team', sort='-x'),
+                    x='Points',
+                    color='Category',
+                    tooltip=['Team', 'Category', 'Points']
+                ).properties(height=600)
+                
+                st.altair_chart(chart, use_container_width=True)
+                
+            except Exception as e:
+                st.warning(f"Kaavion luonti epäonnistui: {e}")
         else:
-            st.warning("Ei Roto-pisteitä visualisoitavaksi.")
-
+            if 'Team' not in roto_df.columns:
+                st.error("Virhe: 'Team'-sarake puuttuu datasta.")
+            else:
+                st.warning("Ei Roto-pisteitä visualisoitavaksi.")
 
  # 3. Matchup Center (Roto Context)
     st.markdown("---")
