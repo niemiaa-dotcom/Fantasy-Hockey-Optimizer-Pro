@@ -1,4 +1,4 @@
-import streamlit as st
+fetch_yahoo_league_statsimport streamlit as st
 import datetime
 import pandas as pd
 import numpy as np
@@ -327,9 +327,15 @@ def fetch_yahoo_league_stats():
 
     my_bar.empty()
     df = pd.DataFrame(rows)
-    # Varmista sarakkeet
-    cols = ['Team'] + list(STAT_MAP_VALIOLIIKA.values())
-    existing = [c for c in cols if c in df.columns]
+    
+    # --- MUUTOS: Lasketaan Points (G + A) ---
+    if 'Goals' in df.columns and 'Assists' in df.columns:
+        df['Points'] = df['Goals'] + df['Assists']
+    
+    # Varmistetaan että Points on mukana listassa
+    target_cols = ['Team', 'Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
+    existing = [c for c in target_cols if c in df.columns]
+    
     return df[existing]
 
 def fetch_yahoo_matchups(week=None):
@@ -367,14 +373,17 @@ def fetch_yahoo_matchups(week=None):
                         if stat_val == '-': stat_val = 0
                         if stat_id in STAT_MAP_VALIOLIIKA:
                             stats[STAT_MAP_VALIOLIIKA[stat_id]] = float(stat_val) if stat_val else 0
+                
+                # --- MUUTOS: Lasketaan Points (G + A) tässä vaiheessa ---
+                if 'Goals' in stats and 'Assists' in stats:
+                    stats['Points'] = stats['Goals'] + stats['Assists']
+                
                 matchup_stats[t_name] = stats
             
             t0 = list(matchup_stats.values())[0]
             t1 = list(matchup_stats.values())[1]
             
             # Tallennetaan molemmat näkökulmat
-            # Lisätään "Opponent Stats" -etuliite vastustajan tilastoihin
-            
             row0 = t0.copy()
             row0['Opponent'] = t1['Team']
             for k, v in t1.items():
@@ -409,17 +418,29 @@ def fetch_cumulative_matchups_roto(start_week, end_week):
     
     combined = pd.concat(all_weeks)
     
-    # Aggregointi: Summaa count-statsit, Keskiarvoista ratio-statsit (SV%)
+    # Aggregointi
     agg_rules = {}
     opp_agg_rules = {}
     
-    for cat in STAT_MAP_VALIOLIIKA.values():
-        if cat == 'SV%':
-            agg_rules[cat] = 'mean'
-            opp_agg_rules[f'Opp_{cat}'] = 'mean'
-        else:
-            agg_rules[cat] = 'sum'
-            opp_agg_rules[f'Opp_{cat}'] = 'sum'
+    # --- MUUTOS: Varmistetaan että 'Points' on mukana listassa ---
+    cats_to_sum = list(STAT_MAP_VALIOLIIKA.values())
+    if 'Points' not in cats_to_sum:
+        cats_to_sum.append('Points')
+
+    for cat in cats_to_sum:
+        # Tarkistetaan onko kategoria datassa
+        if cat in combined.columns:
+            if cat == 'SV%':
+                agg_rules[cat] = 'mean'
+            else:
+                agg_rules[cat] = 'sum'
+        
+        # Tarkistetaan onko vastustajan kategoria datassa
+        if f'Opp_{cat}' in combined.columns:
+            if cat == 'SV%':
+                opp_agg_rules[f'Opp_{cat}'] = 'mean'
+            else:
+                opp_agg_rules[f'Opp_{cat}'] = 'sum'
             
     # Yhdistetään säännöt
     final_agg = {**agg_rules, **opp_agg_rules}
@@ -431,9 +452,9 @@ def fetch_cumulative_matchups_roto(start_week, end_week):
     summary = calculate_roto_scores(summary)
     
     # Laske Roto-pisteet vastustajan suoritukselle (Opponent Strength)
-    # Tehdään tilapäinen DF vastustajan statseista ja lasketaan Roto
     opp_cols = [c for c in summary.columns if c.startswith('Opp_')]
     opp_df = summary[['Team'] + opp_cols].copy()
+    
     # Nimetään uudelleen jotta calculate_roto_scores toimii
     rename_dict = {c: c.replace('Opp_', '') for c in opp_cols}
     opp_df = opp_df.rename(columns=rename_dict)
@@ -442,7 +463,6 @@ def fetch_cumulative_matchups_roto(start_week, end_week):
     summary['Opponent Total Roto'] = opp_roto['Total Roto']
     
     return summary
-
 # --- SIVUPALKKI: TIEDOSTOJEN LATAUS ---
 st.sidebar.header("📁 Tiedostojen lataus")
 
