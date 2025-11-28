@@ -406,7 +406,7 @@ SCORING_SYSTEM_APL = {
     'PPP': 0.5,         # Extra pisteet YV-pisteistä
     'SOG': 0.5,
     'Hits': 0.3,
-    'Blocks': 0.6
+    'Blocks': 0.6,
     'Wins': 2.75,
     'Saves': 0.35,
     'GA': -1.5,
