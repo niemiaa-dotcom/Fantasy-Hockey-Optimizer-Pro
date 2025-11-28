@@ -1953,31 +1953,44 @@ with tab2:
             # --- UUSI OSIO: RAAKATILASTOT ---
             st.markdown("---")
             st.subheader("📊 Joukkueiden tilastot valitulla jaksolla")
-            st.caption("Taulukko näyttää joukkueiden yhteenlasketut tilastot valituilta viikoilta. Värit (Vihreä=Hyvä, Punainen=Huono) auttavat tunnistamaan vastustajan heikkoudet.")
-        
-            # 1. Määritellään näytettävät sarakkeet (samat kuin kategoriat)
+            st.caption("Taulukko näyttää joukkueiden yhteenlasketut tilastot ja Roto-pisteet valituilta viikoilta.")
+
+            # 1. Määritellään kategoriat
             raw_stats_cols = ['Goals', 'Assists', 'Points', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'SV%']
             
             # 2. Varmistetaan mitkä näistä löytyvät datasta
             valid_stats = [c for c in raw_stats_cols if c in df.columns]
-        
-            if valid_stats:
-                # Tehdään siisti DataFrame näyttöä varten
-                stats_view = df[['Team'] + valid_stats].set_index('Team')
 
-                # 3. Määritellään numeroiden muotoilu
+            if valid_stats:
+                # 3. Rakennetaan lista näytettävistä sarakkeista
+                # Lisätään 'Total Roto' mukaan, jos se löytyy datasta
+                cols_to_show = ['Team'] + valid_stats
+                if 'Total Roto' in df.columns:
+                    cols_to_show.append('Total Roto')
+
+                # Tehdään DataFrame näyttöä varten
+                stats_view = df[cols_to_show].set_index('Team')
+
+                # Järjestetään taulukko Total Roto -pisteiden mukaan (paras ensin)
+                if 'Total Roto' in stats_view.columns:
+                    stats_view = stats_view.sort_values('Total Roto', ascending=False)
+
+                # 4. Määritellään numeroiden muotoilu
                 format_dict = {}
                 for c in valid_stats:
                     if c == 'SV%':
                         format_dict[c] = "{:.3f}"
                     else:
                         format_dict[c] = "{:.0f}"
+                
+                # Formatoidaan myös Total Roto yhdellä desimaalilla
+                if 'Total Roto' in stats_view.columns:
+                    format_dict['Total Roto'] = "{:.1f}"
 
-                # 4. Näytetään taulukko (ILMAN VÄREJÄ, jotta matplotlib-virhe poistuu)
+                # 5. Näytetään taulukko (Ilman värejä, jotta ei tule virheitä)
                 st.dataframe(
                     stats_view.style.format(format_dict), 
                     use_container_width=True
                 )
             else:
                 st.warning("Tilastotietoja ei saatavilla.")
-        
