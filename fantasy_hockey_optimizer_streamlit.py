@@ -7,7 +7,7 @@ import altair as alt
 
 # Page Config
 st.set_page_config(
-    page_title="Fantasy Hockey Analytics (Dynamic)",
+    page_title="Fantasy Hockey Analytics",
     page_icon="🏒",
     layout="wide",
     initial_sidebar_state="expanded"
