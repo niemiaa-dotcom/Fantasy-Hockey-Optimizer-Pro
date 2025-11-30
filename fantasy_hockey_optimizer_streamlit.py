@@ -106,7 +106,7 @@ def fetch_league_teams(league_id):
         return []
 
 def fetch_yahoo_league_stats(team_list):
-    """Fetches full season stats for the provided team list."""
+    """Fetches full season stats AND official Total Points for the provided team list."""
     access_token = get_yahoo_access_token()
     if not access_token:
         return pd.DataFrame()
@@ -128,8 +128,13 @@ def fetch_yahoo_league_stats(team_list):
             root = ET.fromstring(r.content)
             stats_node = root.find('.//f:team_stats/f:stats', ns)
             
+            # --- UUSI KOHTA: Haetaan viralliset kokonaispisteet ---
+            points_node = root.find('.//f:team_points/f:total', ns)
+            official_total_points = float(points_node.text) if points_node is not None else 0.0
+            
             row_data = {col: 0 for col in STAT_MAP_YAHOO.values()}
             row_data['Team'] = team_name
+            row_data['Official Total FP'] = official_total_points # Tallennetaan virallinen luku
 
             if stats_node:
                 for stat in stats_node.findall('f:stat', ns):
@@ -152,8 +157,8 @@ def fetch_yahoo_league_stats(team_list):
     my_bar.empty()
     df = pd.DataFrame(rows)
     
-    # Ensure correct column order - Added SHP
-    cols = ['Team', 'Goals', 'Assists', 'PPP', 'SHP', 'SOG', 'Hits', 'Blocks', 'Wins', 'GA', 'Saves', 'Shutouts']
+    # Ensure correct column order
+    cols = ['Team', 'Official Total FP', 'Goals', 'Assists', 'PPP', 'SHP', 'SOG', 'Hits', 'Blocks', 'Wins', 'GA', 'Saves', 'Shutouts']
     existing_cols = [c for c in cols if c in df.columns]
     df = df[existing_cols]
     
