@@ -7,7 +7,7 @@ import altair as alt
 
 # Page Config
 st.set_page_config(
-    page_title="Fantasy Hockey Analytics",
+    page_title="Fantasy Hockey Analytics (Dynamic)",
     page_icon="🏒",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -16,10 +16,12 @@ st.set_page_config(
 # --- CONFIGURATION ---
 
 # Yahoo ID Mapping (Standard IDs)
+# Added '10': 'SHP' for Short Handed Points
 STAT_MAP_YAHOO = {
     '1': 'Goals',
     '2': 'Assists',
-    '8': 'PPP',          # Added PPP just in case
+    '8': 'PPP',
+    '10': 'SHP',         # <-- NEW: Short Handed Points
     '14': 'SOG',
     '31': 'Hits',
     '32': 'Blocks',
@@ -30,11 +32,11 @@ STAT_MAP_YAHOO = {
 }
 
 # SCORING SYSTEM
-# ⚠️ NOTE: This is hardcoded. If your leagues have different point values,
-# you might want to make these inputs in the UI later.
+# Added 'SHP': 2.0
 SCORING_SYSTEM = {
     'Goals': 4.5,
     'Assists': 3.0,
+    'SHP': 2.0,          # <-- NEW: Multiplier added
     'SOG': 0.5,
     'Hits': 0.25,
     'Blocks': 0.5,
@@ -74,8 +76,7 @@ def fetch_league_teams(league_id):
     if not access_token:
         return []
 
-    # 465 is the Game Key for NHL 2024-2025. 
-    # If using for future seasons, this needs updating.
+    # 465 is the Game Key for NHL 2024-2025.
     league_key = f"465.l.{league_id}"
     
     headers = {'Authorization': f'Bearer {access_token}'}
@@ -151,8 +152,8 @@ def fetch_yahoo_league_stats(team_list):
     my_bar.empty()
     df = pd.DataFrame(rows)
     
-    # Ensure correct column order
-    cols = ['Team', 'Goals', 'Assists', 'PPP', 'SOG', 'Hits', 'Blocks', 'Wins', 'GA', 'Saves', 'Shutouts']
+    # Ensure correct column order - Added SHP
+    cols = ['Team', 'Goals', 'Assists', 'PPP', 'SHP', 'SOG', 'Hits', 'Blocks', 'Wins', 'GA', 'Saves', 'Shutouts']
     existing_cols = [c for c in cols if c in df.columns]
     df = df[existing_cols]
     
@@ -448,6 +449,12 @@ else:
                 hide_index=True
             )
             
+            if 'xRecord' in display_cols:
+                st.caption("""
+                **xRecord (Expected Record):** Shows what your record would be if you played against the "League Median" score every week.
+                **Luck:** Positive (+) means you won more games than your point total typically deserves (Good matchup luck). Negative (-) means you lost despite scoring well.
+                """)
+
             # Chart
             st.markdown("#### 📈 Offense (PF) vs Defense/Luck (PA)")
             chart = alt.Chart(df).mark_circle(size=200).encode(
