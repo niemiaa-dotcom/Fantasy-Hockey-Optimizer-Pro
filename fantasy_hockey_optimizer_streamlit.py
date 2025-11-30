@@ -355,16 +355,19 @@ else:
 
         # Calculations & Visuals
         if not cat_points_df.empty:
-            cat_points_df["Total FP"] = 0.0
+            
+            # Alustetaan sarakkeet erittelyä varten
+            cat_points_df["Calculated Breakdown"] = 0.0 # Tätä käytetään vain kaavion tarkistukseen
             cat_points_df["Goalies (FP)"] = 0.0
             
             skater_fp_cols = []
             goalie_cats = {'Wins', 'Saves', 'GA', 'Shutouts'}
 
+            # Lasketaan kategoriakohtaiset pisteet VAIN erittelyä/kaaviota varten
             for cat, multiplier in SCORING_SYSTEM.items():
                 if cat in cat_points_df.columns:
                     points = cat_points_df[cat] * multiplier
-                    cat_points_df["Total FP"] += points
+                    cat_points_df["Calculated Breakdown"] += points
                     
                     if cat in goalie_cats:
                         cat_points_df["Goalies (FP)"] += points
@@ -373,12 +376,19 @@ else:
                         cat_points_df[col_name] = points
                         skater_fp_cols.append(col_name)
 
-            cat_points_df = cat_points_df.sort_values("Total FP", ascending=False).reset_index(drop=True)
+            # Järjestetään VIRALLISTEN pisteiden mukaan
+            if 'Official Total FP' in cat_points_df.columns:
+                cat_points_df = cat_points_df.sort_values("Official Total FP", ascending=False).reset_index(drop=True)
+                total_col_name = "Official Total FP"
+            else:
+                # Fallback jos vanha data
+                cat_points_df = cat_points_df.sort_values("Calculated Breakdown", ascending=False).reset_index(drop=True)
+                total_col_name = "Calculated Breakdown"
 
-            display_cols = ["Team", "Total FP"] + skater_fp_cols + ["Goalies (FP)"]
-            numeric_cols_to_format = ["Total FP"] + skater_fp_cols + ["Goalies (FP)"]
+            display_cols = ["Team", total_col_name] + skater_fp_cols + ["Goalies (FP)"]
+            numeric_cols_to_format = [total_col_name] + skater_fp_cols + ["Goalies (FP)"]
 
-            st.subheader("Total Fantasy Points Breakdown")
+            st.subheader("Total Fantasy Points Breakdown (Official Yahoo Stats)")
             st.dataframe(
                 cat_points_df[display_cols].style.format("{:.1f}", subset=numeric_cols_to_format), 
                 use_container_width=True
