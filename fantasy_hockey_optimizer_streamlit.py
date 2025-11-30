@@ -224,6 +224,21 @@ def fetch_yahoo_matchups(league_id, week=None):
         st.error(f"Error fetching matchups: {e}")
         return pd.DataFrame()
 
+def fetch_current_week_points(league_id):
+    """
+    Hakee vain kuluvan viikon pisteet (Live Scoreboard) yhdistämistä varten.
+    Palauttaa dictionaryn: {'Team Name': Current_Week_Points}
+    """
+    # Kutsutaan olemassa olevaa matchup-funktiota ilman viikkonumeroa (= nykyinen viikko)
+    df_matchups = fetch_yahoo_matchups(league_id, week=None)
+    
+    if df_matchups.empty:
+        return {}
+    
+    # Muutetaan DataFrame sanakirjaksi: {Joukkue: Pisteet}
+    # Meillä on rivit molemmille näkökulmille, joten voimme ottaa suoraan 'Team' ja 'Points For'
+    return pd.Series(df_matchups['Points For'].values, index=df_matchups['Team']).to_dict()
+
 def fetch_cumulative_matchups(league_id, start_week, end_week):
     """Fetches data over a range of weeks and calculates xRecord."""
     all_weeks_data = []
@@ -336,17 +351,36 @@ else:
     tab1, tab2 = st.tabs(["🏆 League Standings (Points)", "⚔️ Matchup Analysis"])
 
     # --- TAB 1: CATEGORY POINTS ---
+    # --- TAB 1: CATEGORY POINTS ---
     with tab1:
         st.header("🏆 League Standings & Category Points")
         st.markdown("Fantasy Points (FP) distribution based on live stats.")
 
         cat_points_df = pd.DataFrame()
 
-        if st.button("🔄 Refresh Live Data"):
-             yahoo_df = fetch_yahoo_league_stats(st.session_state['league_teams'])
-             if not yahoo_df.empty:
-                 st.session_state['live_yahoo_stats'] = yahoo_df
-                 st.success("Data updated!")
+        # UUSI NAPPI: Hakee sekä kausidatan että kuluvan viikon datan
+        if st.button("🔄 Refresh Live Data (Season + Current Week)"):
+             with st.spinner("Fetching Season Stats and Live Scores..."):
+                 # 1. Haetaan kausitilastot (Season Stats)
+                 season_df = fetch_yahoo_league_stats(st.session_state['league_teams'])
+                 
+                 # 2. Haetaan kuluvan viikon pisteet (Current Week Scoreboard)
+                 current_week_points = fetch_current_week_points(st.session_state['league_id'])
+                 
+                 if not season_df.empty:
+                     # 3. Yhdistetään tiedot
+                     # Luodaan uusi sarake kuluvan viikon pisteille. Jos ei löydy, nolla.
+                     season_df['Current Week FP'] = season_df['Team'].map(current_week_points).fillna(0.0)
+                     
+                     # 4. Päivitetään virallinen kokonaispistemäärä
+                     # Jos Official Total FP vaikuttaa siltä, ettei se sisällä kuluvaa viikkoa (usein H2H-liigoissa),
+                     # lisäämme siihen kuluvan viikon pisteet.
+                     # HUOM: Jos Yahoo joskus korjaa tämän ja sisällyttää ne, tämä voi tuplata. 
+                     # Mutta yleensä 'season' on completed weeks ja 'scoreboard' on current.
+                     season_df['Live Total FP'] = season_df['Official Total FP'] + season_df['Current Week FP']
+                     
+                     st.session_state['live_yahoo_stats'] = season_df
+                     st.success("Data updated with live scores!")
         
         if 'live_yahoo_stats' in st.session_state:
             cat_points_df = st.session_state['live_yahoo_stats'].copy()
@@ -357,13 +391,13 @@ else:
         if not cat_points_df.empty:
             
             # Alustetaan sarakkeet erittelyä varten
-            cat_points_df["Calculated Breakdown"] = 0.0 # Tätä käytetään vain kaavion tarkistukseen
+            cat_points_df["Calculated Breakdown"] = 0.0 
             cat_points_df["Goalies (FP)"] = 0.0
             
             skater_fp_cols = []
             goalie_cats = {'Wins', 'Saves', 'GA', 'Shutouts'}
 
-            # Lasketaan kategoriakohtaiset pisteet VAIN erittelyä/kaaviota varten
+            # Lasketaan kategoriakohtaiset pisteet (Season Total)
             for cat, multiplier in SCORING_SYSTEM.items():
                 if cat in cat_points_df.columns:
                     points = cat_points_df[cat] * multiplier
@@ -376,37 +410,68 @@ else:
                         cat_points_df[col_name] = points
                         skater_fp_cols.append(col_name)
 
-            # Järjestetään VIRALLISTEN pisteiden mukaan
-            if 'Official Total FP' in cat_points_df.columns:
+            # Järjestetään LIVE-pisteiden mukaan
+            if 'Live Total FP' in cat_points_df.columns:
+                cat_points_df = cat_points_df.sort_values("Live Total FP", ascending=False).reset_index(drop=True)
+                total_col_name = "Live Total FP"
+            elif 'Official Total FP' in cat_points_df.columns:
                 cat_points_df = cat_points_df.sort_values("Official Total FP", ascending=False).reset_index(drop=True)
                 total_col_name = "Official Total FP"
             else:
-                # Fallback jos vanha data
-                cat_points_df = cat_points_df.sort_values("Calculated Breakdown", ascending=False).reset_index(drop=True)
                 total_col_name = "Calculated Breakdown"
 
-            display_cols = ["Team", total_col_name] + skater_fp_cols + ["Goalies (FP)"]
-            numeric_cols_to_format = [total_col_name] + skater_fp_cols + ["Goalies (FP)"]
+            # --- TAULUKKO ---
+            # Lisätään Current Week FP näkyviin
+            display_cols = ["Team", total_col_name, "Current Week FP"] + skater_fp_cols + ["Goalies (FP)"]
+            
+            # Varmistetaan että sarakkeet löytyvät
+            display_cols = [c for c in display_cols if c in cat_points_df.columns]
+            numeric_cols = [c for c in display_cols if c != "Team"]
 
-            st.subheader("Total Fantasy Points Breakdown (Official Yahoo Stats)")
+            st.subheader("Total Fantasy Points (Season + Current Week)")
             st.dataframe(
-                cat_points_df[display_cols].style.format("{:.1f}", subset=numeric_cols_to_format), 
+                cat_points_df[display_cols].style.format("{:.1f}", subset=numeric_cols), 
                 use_container_width=True
             )
 
-            # Chart
-            plot_vars = skater_fp_cols + ["Goalies (FP)"]
-            df_long = cat_points_df.melt(id_vars=["Team"], value_vars=plot_vars, var_name="Category_Label", value_name="Fantasy Points")
+            # --- KAAVIO ---
+            # Huom: Pylväskaavio näyttää edelleen breakdownin (Season Stats).
+            # Koska emme saa kuluvan viikon MAALEJA/SYÖTTÖJÄ eriteltynä helposti scoreboardista,
+            # Current Week FP näytetään omana palkkinaan pinon päällä tai erillisenä.
+            
+            # Yksinkertaisuuden vuoksi: Lisätään 'Current Week FP' mukaan visualisointiin omana kategorianaan
+            plot_vars = skater_fp_cols + ["Goalies (FP)", "Current Week FP"]
+            
+            # Meltataan data
+            df_long = cat_points_df.melt(
+                id_vars=["Team", total_col_name], 
+                value_vars=[c for c in plot_vars if c in cat_points_df.columns],
+                var_name="Category_Label",
+                value_name="Fantasy Points"
+            )
+            
             df_long["Category"] = df_long["Category_Label"].str.replace(" (FP)", "")
+            
+            # Järjestetään
             cat_totals = df_long.groupby("Category")["Fantasy Points"].sum().reset_index().sort_values("Fantasy Points", ascending=False)
             category_order = cat_totals["Category"].tolist()
 
             chart = alt.Chart(df_long).mark_bar().encode(
-                y=alt.X("Team:N", sort="-x", axis=alt.Axis(title="Team")),
+                y=alt.Y(
+                    "Team:N", 
+                    sort=alt.EncodingSortField(field=total_col_name, order="descending"),
+                    axis=alt.Axis(title="Team")
+                ),
                 x=alt.X("Fantasy Points:Q", stack="zero", axis=alt.Axis(title="Fantasy Points")),
                 color=alt.Color("Category:N", scale=alt.Scale(domain=category_order), legend=alt.Legend(title="Category")),
-                tooltip=[alt.Tooltip("Team", title="Team"), alt.Tooltip("Category", title="Category"), alt.Tooltip("Fantasy Points", title="Points", format=".1f")]
+                tooltip=[
+                    alt.Tooltip("Team", title="Team"),
+                    alt.Tooltip("Category", title="Category"),
+                    alt.Tooltip("Fantasy Points", title="Points", format=".1f"),
+                    alt.Tooltip(total_col_name, title="Total Live Points")
+                ]
             ).properties(height=600)
+            
             st.altair_chart(chart, use_container_width=True)
 
     # --- TAB 2: MATCHUP CENTER ---
